@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('glyph.theme.v1');
+          var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var d = document.documentElement;
+          d.classList.toggle('dark', dark);
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', dark ? '#16181c' : '#f7f8fa');
+          var f = localStorage.getItem('glyph.fontsize.v1');
+          if (f === 's' || f === 'l') d.dataset.fontsize = f;
+        } catch (e) {}
+      })();
+    </script>
+    <title>岩刻 · Glyph</title>
+    <meta name="description" content="完全存在以太坊上的岩刻系统 — 零链下依赖，比作者活得更久。" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f8fa" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232f4a7c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><polygon points='12,2 21,12 12,22 3,12'/><line x1='12' y1='7' x2='12' y2='17'/><line x1='7' y1='12' x2='17' y2='12'/></svg>" />
+  </head>
+  <body class="antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

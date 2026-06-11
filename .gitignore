@@ -1,0 +1,33 @@
+# Dependencies
+webapp/node_modules/
+.context/qa/node_modules/
+
+# QA screenshot artifacts (regenerable via .context/qa/qa-shots.mjs)
+.context/qa/shots/
+
+# Build output
+webapp/dist/
+contracts/out/
+contracts/cache/
+contracts/lib/forge-std/
+contracts/lib/*/
+!contracts/lib/.gitkeep
+
+# Foundry
+contracts/broadcast/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+.gstack/
