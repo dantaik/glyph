@@ -9,12 +9,12 @@
 ```bash
 # 1. 部署合约（任何人都可以部署；部署者无任何特权）
 cd contracts && forge install foundry-rs/forge-std
-forge script script/Deploy.s.sol:DeployBlog \
+forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
   --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY 经环境变量传入（脚本用 vm.envUint 读取）
 
 # 2. 配置前端
 cat > webapp/.env.local <<EOF
-VITE_GLYPH_ADDRESS=0x合约地址
+VITE_GLYPH_ADDRESS=0x000000AE2f2249c497cfc5F262dd1491634C361C
 VITE_RPC_URL=https://ethereum-rpc.publicnode.com
 VITE_CHAIN_ID=1
 EOF
@@ -27,6 +27,36 @@ cd webapp && npm install && npm run dev
 **写作**：连接钱包 → 标题（最多 32 字节）+ 标签 + Markdown 正文（CodeMirror + 实时预览）→ 发布。
 **RPC 节点**：右上角 ⚙ 弹出设置，可覆盖默认 RPC，localStorage 持久。
 **成本估算**：发布前实时显示 gas（节点）+ ETH/USD（CoinGecko）估算。
+
+## 确定性部署（CREATE2 · 全网同一地址）
+
+Glyph 通过 canonical deterministic deployment proxy（Arachnid，
+`0x4e59b44847b379578588920cA78FbF26c0B4956C`）以 CREATE2 部署。CREATE2 地址只由
+`(deployer, salt, init-code hash)` 决定；代理本身可在任何 EVM 链上用一笔可重放交易
+（one-time-account）部署到同一地址，因此 **Glyph 在所有 EVM 链上的地址相同**：
+
+```
+合约地址:       0x000000AE2f2249c497cfc5F262dd1491634C361C   （6 个前导零）
+salt:           0x00436d208c20757dde791d2c0c0909a2c8ea61482d3fa516692d9ee5244440f1
+部署器 (proxy): 0x4e59b44847b379578588920cA78FbF26c0B4956C
+init code hash: 0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402b5cb
+```
+
+- **部署脚本**：`script/Create2Deploy.s.sol`，幂等（地址已有代码则校验后退出），任何人可跑，部署者无特权。
+- **代理缺失的链**：先向一次性签名账户 `0x3fab184622dc19b6109349b94811493bf2a45362` 转入 ≥ 0.01 ETH（100,000 gas × 100 gwei），然后重放 Arachnid 仓库 `output/deployment.json` 中的原始签名交易（在任何链上重放都产生同一代理地址）：
+
+  ```bash
+  cast publish 0xf8a58085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf31ba02222222222222222222222222222222222222222222222222222222222222222a02222222222222222222222222222222222222222222222222222222222222222
+  ```
+
+- **字节码漂移**：`Blog.sol` 的任何改动都会改变 init code hash，进而改变地址。此时重新挖盐并更新 `Create2Deploy.s.sol` 里的三个常量：
+
+  ```bash
+  cast create2 --starts-with 000000 --init-code $(forge inspect src/Blog.sol:Glyph bytecode)
+  ```
+
+- **合约验证**：`forge verify-contract 0x000000AE2f2249c497cfc5F262dd1491634C361C src/Blog.sol:Glyph --chain <chainid> --etherscan-api-key $KEY`
+- **普通部署**（地址随链而变）：`forge script script/Deploy.s.sol:DeployBlog --rpc-url $ETH_RPC --broadcast`
 
 ## 许可
 
