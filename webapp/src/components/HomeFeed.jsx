@@ -76,7 +76,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   return (
     <div>
       <section className="mb-9 text-center">
-        <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-[1.75rem]">
+        <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-display">
           人过留名，雁过留声。
           <br />
           人海亿万，唯留字者不朽。
@@ -127,13 +127,13 @@ export default function HomeFeed({ navigate, onStartWriting }) {
                   e.preventDefault();
                   openPost(featured);
                 }}
-                className="font-serif text-[1.35rem] leading-[1.4] font-bold sm:text-feature hover:text-accent transition-colors"
+                className="font-serif text-xl leading-[1.4] font-bold sm:text-2xl hover:text-accent transition-colors"
               >
                 {fmtTitle(featured.title) ?? <span className="text-ink-ghost">无标题</span>}
               </a>
             </h3>
             {teaser && (
-              <p className="mt-2 font-serif text-[0.95rem] leading-relaxed text-ink-soft line-clamp-2">
+              <p className="mt-2 font-serif text-base leading-relaxed text-ink-soft line-clamp-2">
                 {teaser}
               </p>
             )}
@@ -172,7 +172,7 @@ function MetaLine({ row, clock, className = '' }) {
     <span
       className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint tabular-nums ${className}`}
     >
-      <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-[11px]">{chainName()}</span>
+      <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
       {rel && (
         <>
           <span aria-hidden="true">·</span>

@@ -43,7 +43,7 @@ function NeighborCard({ side, meta, onGo }) {
           </>
         )}
       </span>
-      <span className="mt-1 font-serif text-[15px] leading-snug text-ink group-hover:text-accent line-clamp-2">
+      <span className="mt-1 font-serif text-base leading-snug text-ink group-hover:text-accent line-clamp-2">
         {fmtTitle(meta.title) || '无标题'}
       </span>
     </button>

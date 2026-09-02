@@ -48,7 +48,7 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             title="在 Etherscan 查看合约"
-            className="mt-3 inline-block font-mono text-[11px] tabular-nums text-ink-faint bg-paper-sunken rounded px-1.5 py-0.5 hover:text-accent transition-colors"
+            className="mt-3 inline-block font-mono text-2xs tabular-nums text-ink-faint bg-paper-sunken rounded px-1.5 py-0.5 hover:text-accent transition-colors"
           >
             {shortAddr(GLYPH_ADDRESS)}
           </a>
@@ -56,7 +56,7 @@ export default function App() {
       </footer>
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {FIXTURES_MODE && (
-        <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-[10px] text-ink-ghost">
+        <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
           演示数据
         </div>
       )}

@@ -257,7 +257,7 @@ export default function Publisher() {
         {titleOver && (
           <div
             id="post-title-bytes"
-            className="text-[11px] mt-1 tabular-nums text-danger"
+            className="text-2xs mt-1 tabular-nums text-danger"
           >
             标题太长，无法编码为 bytes32
           </div>
@@ -463,7 +463,7 @@ function CostPanel({ estimate, market, chainId }) {
     <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <span className="text-xs tracking-label text-ink-faint">预估上链成本</span>
-        <span className="font-mono text-[11px] tabular-nums text-ink-faint">
+        <span className="font-mono text-2xs tabular-nums text-ink-faint">
           {fmtGwei(market.gasPriceWei)}
           {usdAvailable && market.ethUsd != null ? (
             <> · ETH ${market.ethUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}</>
@@ -487,7 +487,7 @@ function CostPanel({ estimate, market, chainId }) {
         {imageCosts.map((c) => (
           <li
             key={c.key}
-            className="flex items-baseline justify-between gap-4 text-[13px] text-ink-soft"
+            className="flex items-baseline justify-between gap-4 text-sm text-ink-soft"
           >
             <span className="truncate">图片 {c.key}</span>
             <span className="font-mono tabular-nums text-right shrink-0">
@@ -512,7 +512,7 @@ function CostPanel({ estimate, market, chainId }) {
         </span>
       </div>
 
-      <p className="mt-2 text-[10px] text-ink-faint">
+      <p className="mt-2 text-xs text-ink-faint">
         （brotli 压缩后实际成本会有浮动）
       </p>
     </div>

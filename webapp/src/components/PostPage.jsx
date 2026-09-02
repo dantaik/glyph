@@ -132,13 +132,13 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
       </div>
 
       <header className="mb-10">
-        <h1 className="font-serif text-[1.55rem] leading-[1.45] font-bold sm:text-display">
+        <h1 className="font-serif text-2xl leading-[1.45] font-bold sm:text-display">
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span className="text-ink-ghost">{fmtIndex(meta.index)}</span>
           <span className="text-ink-ghost" aria-hidden="true">·</span>
-          <span className="font-mono text-[11px] tabular-nums" title={meta.author}>
+          <span className="font-mono text-2xs tabular-nums" title={meta.author}>
             {ensName || shortAddr(meta.author)}
           </span>
           {relTime && (
@@ -148,7 +148,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
             </>
           )}
           <span className="text-ink-ghost" aria-hidden="true">·</span>
-          <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-[11px]">{chainName()}</span>
+          <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
         </div>
         {body?.tags && body.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">

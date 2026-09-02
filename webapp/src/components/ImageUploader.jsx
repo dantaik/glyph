@@ -141,7 +141,7 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled, p
 
       {Object.keys(files).length > 0 && (
         <>
-          <p className="mt-2 text-[10px] text-ink-ghost">
+          <p className="mt-2 text-2xs text-ink-ghost">
             图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文
           </p>
           <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -186,7 +186,7 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled, p
               >
                 <Close size={12} />
               </button>
-              <span className="block text-[10px] text-ink-faint mt-0.5 truncate">
+              <span className="block text-2xs text-ink-faint mt-0.5 truncate">
                 {key} · {(file.size / 1024).toFixed(0)}KB
               </span>
             </div>

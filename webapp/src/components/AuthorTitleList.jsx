@@ -91,13 +91,13 @@ export default function AuthorTitleList({
                   className="group flex items-baseline gap-4 py-4"
                 >
 
-                  <span className="flex-1 font-serif text-[1.05rem] leading-snug group-hover:text-accent transition-colors">
+                  <span className="flex-1 font-serif text-lg leading-snug group-hover:text-accent transition-colors">
                     {fmtTitle(t.title) ?? <span className="text-ink-ghost">无标题</span>}
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-ink-faint tabular-nums whitespace-nowrap">
                     <span className="text-ink-ghost">{fmtIndex(t.index)}</span>
                     {rel && <span>{rel}</span>}
-                    <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-[11px]">{chainName()}</span>
+                    <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
                   </span>
                 </a>
               </li>
