@@ -4,19 +4,18 @@ import { client } from '../lib/blogReader';
 import { getAuthorCount } from '../lib/data';
 import { useWallet } from '../lib/wallet';
 import { CHAIN_ID } from '../lib/config';
-import ImageUploader from './ImageUploader';
-import { etherscanTxUrl } from '../lib/format';
+import { chainName, etherscanTxUrl } from '../lib/format';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
+import ImageUploader from './ImageUploader';
+import CostPanel from './CostPanel';
+import SectionHeader from './SectionHeader';
+import EditorSkeleton from './EditorSkeleton';
 import {
   getMarketState,
   estimatePublishGas,
   estimateImageGas,
   gasToCost,
-  fmtEth,
-  fmtUsd,
-  fmtGwei,
 } from '../lib/price';
-import { chainName } from '../lib/format';
 import {
   titleByteLength,
   TITLE_MAX_BYTES,
@@ -232,7 +231,6 @@ export default function Publisher() {
   // --- Render ---
   return (
     <div>
-      {/* 一 · 标题 */}
       <SectionHeader label="标题" />
       <div className="mb-10">
         <input
@@ -257,7 +255,6 @@ export default function Publisher() {
         )}
       </div>
 
-      {/* 二 · 标签 */}
       <SectionHeader label="标签" />
       <div className="mb-10">
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-edge-strong bg-paper-raised px-3 py-2 focus-within:border-accent transition-colors">
@@ -290,7 +287,6 @@ export default function Publisher() {
         </div>
       </div>
 
-      {/* 三 · 正文 */}
       <SectionHeader
         label="正文"
         right={
@@ -331,7 +327,6 @@ export default function Publisher() {
         </Suspense>
       </div>
 
-      {/* 四 · 图片 */}
       <SectionHeader label="图片" />
       <div className="mb-10">
         <ImageUploader
@@ -343,175 +338,83 @@ export default function Publisher() {
         />
       </div>
 
-      {/* 五 · 成本 */}
       <SectionHeader label="预估成本" />
       <div className="mb-6">
         <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
       </div>
 
-      {/* 动作 */}
       <div className="pt-6">
         <p className="mb-4 text-xs text-ink-faint">
           一经发布，文章将永久公开发布于 {chainName()}区块链；不可修改、不可删除。
         </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
-        {status === 'processing' && statusMsg && (
-          <span role="status" className="text-sm text-ink-faint">
-            {statusMsg}
-          </span>
-        )}
-        <button
-          onClick={handlePublish}
-          disabled={
-            !canPublish ||
-            status === 'processing' ||
-            status === 'signing' ||
-            chainMismatch
-          }
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm
-                     font-medium text-paper hover:bg-accent-strong disabled:opacity-40
-                     disabled:cursor-not-allowed transition-colors"
-        >
-          {(status === 'processing' || status === 'signing') && (
-            <span
-              className="h-4 w-4 rounded-full border-2 border-edge-strong border-t-accent animate-spin"
-              aria-hidden="true"
-            />
+          {status === 'processing' && statusMsg && (
+            <span role="status" className="text-sm text-ink-faint">
+              {statusMsg}
+            </span>
           )}
-          {status === 'processing'
-            ? '正在上传图片…'
-            : status === 'signing'
-            ? '请在钱包中确认…'
-            : '发布到链上'}
-        </button>
-        </div>
-
-
-      {status === 'error' && (
-        <div
-          role="alert"
-          className="mt-4 flex items-start gap-2 rounded-lg bg-danger-wash px-4 py-3 text-sm text-danger"
-        >
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <span className="break-all">{statusMsg}</span>
-        </div>
-      )}
-
-      {status === 'done' && txHash && (
-        <div className="mt-4 rounded-lg bg-success-wash px-4 py-3 text-sm text-success">
-          <div className="flex flex-wrap items-center gap-2">
-            <Check size={16} className="shrink-0" />
-            <span className="font-medium">已发布到链上</span>
-            <a
-              href={etherscanTxUrl(txHash)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-mono text-xs underline underline-offset-2 hover:text-accent transition-colors"
-            >
-              {txHash.slice(0, 10)}…
-              <ExternalLink size={12} />
-            </a>
-          </div>
-          <p className="mt-1 text-xs">等待区块确认后即可在列表中看到</p>
           <button
-            type="button"
-            onClick={resetDraft}
-            className="-ml-3 mt-2 rounded-lg px-3 py-1.5 text-sm text-accent hover:text-ink hover:bg-paper-sunken transition-colors"
+            onClick={handlePublish}
+            disabled={
+              !canPublish ||
+              status === 'processing' ||
+              status === 'signing' ||
+              chainMismatch
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm
+                       font-medium text-paper hover:bg-accent-strong disabled:opacity-40
+                       disabled:cursor-not-allowed transition-colors"
           >
-            再写一封
+            {(status === 'processing' || status === 'signing') && (
+              <span
+                className="h-4 w-4 rounded-full border-2 border-edge-strong border-t-accent animate-spin"
+                aria-hidden="true"
+              />
+            )}
+            {status === 'processing'
+              ? '正在上传图片…'
+              : status === 'signing'
+                ? '请在钱包中确认…'
+                : '发布到链上'}
           </button>
         </div>
-      )}
-      </div>
-    </div>
-  );
-}
 
-/** Section header with an optional right-side slot — no number, no divider. */
-function SectionHeader({ label, right }) {
-  return (
-    <div className="mb-3 flex items-baseline justify-between gap-3">
-      <h2 className="text-sm font-medium tracking-label text-ink-soft">{label}</h2>
-      {right}
-    </div>
-  );
-}
-
-function EditorSkeleton({ height }) {
-  return (
-    <div
-      aria-hidden="true"
-      className="grid grid-cols-1 gap-3"
-      style={{ height }}
-    >
-      <div className="animate-pulse rounded-xl border border-edge bg-paper-raised" />
-    </div>
-  );
-}
-
-function CostPanel({ estimate, market, chainId }) {
-  if (!estimate) {
-    return (
-      <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4 text-xs text-ink-faint">
-        正在获取 gas 价格…
-      </div>
-    );
-  }
-  const { postCost, imageCosts, totalCost, estCompressed } = estimate;
-  const usdAvailable = totalCost.usd != null;
-
-  return (
-    <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
-      <div className="mb-3 flex justify-end">
-        <span className="font-mono text-2xs tabular-nums text-ink-faint">
-          {fmtGwei(market.gasPriceWei)}
-          {usdAvailable && market.ethUsd != null ? (
-            <> · ETH ${market.ethUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}</>
-          ) : (
-            <> · 美元价格不可用</>
-          )}
-          {chainId !== 1 && <> · 链 {chainId}</>}
-        </span>
-      </div>
-
-      <ul className="space-y-1.5 text-sm">
-        <li className="flex items-baseline justify-between gap-4 text-ink-soft">
-          <span>正文（~{estCompressed} B 压缩后）</span>
-          <span className="font-mono tabular-nums text-right">
-            {fmtEth(postCost.eth)}
-            {usdAvailable && (
-              <span className="ml-2 text-ink-faint">{fmtUsd(postCost.usd)}</span>
-            )}
-          </span>
-        </li>
-        {imageCosts.map((c) => (
-          <li
-            key={c.key}
-            className="flex items-baseline justify-between gap-4 text-sm text-ink-soft"
+        {status === 'error' && (
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-lg bg-danger-wash px-4 py-3 text-sm text-danger"
           >
-            <span className="truncate">图片 {c.key}</span>
-            <span className="font-mono tabular-nums text-right shrink-0">
-              {fmtEth(c.eth)}
-              {usdAvailable && (
-                <span className="ml-2 text-ink-faint">{fmtUsd(c.usd)}</span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span className="break-all">{statusMsg}</span>
+          </div>
+        )}
 
-      <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-edge pt-2.5 text-sm font-medium text-ink">
-        <span>合计</span>
-        <span className="font-mono tabular-nums text-right">
-          {fmtEth(totalCost.eth)}
-          {usdAvailable && (
-            <span className="ml-2 font-normal text-ink-soft">
-              {fmtUsd(totalCost.usd)}
-            </span>
-          )}
-        </span>
+        {status === 'done' && txHash && (
+          <div className="mt-4 rounded-lg bg-success-wash px-4 py-3 text-sm text-success">
+            <div className="flex flex-wrap items-center gap-2">
+              <Check size={16} className="shrink-0" />
+              <span className="font-medium">已发布到链上</span>
+              <a
+                href={etherscanTxUrl(txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-mono text-xs underline underline-offset-2 hover:text-accent transition-colors"
+              >
+                {txHash.slice(0, 10)}…
+                <ExternalLink size={12} />
+              </a>
+            </div>
+            <p className="mt-1 text-xs">等待区块确认后即可在列表中看到</p>
+            <button
+              type="button"
+              onClick={resetDraft}
+              className="-ml-3 mt-2 rounded-lg px-3 py-1.5 text-sm text-accent hover:text-ink hover:bg-paper-sunken transition-colors"
+            >
+              再写一封
+            </button>
+          </div>
+        )}
       </div>
-
     </div>
   );
 }
