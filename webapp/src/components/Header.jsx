@@ -16,7 +16,7 @@ const TABS = [
 /** Sticky masthead: brand, tabs, wallet pill, theme toggle, settings */
 export default function Header({ tab, onTabChange, onOpenSettings }) {
   const { account, connect } = useWallet();
-  const [params, navigate] = useUrlState();
+  const [, navigate] = useUrlState();
   const { isDark, setTheme } = useTheme();
 
   const handleConnect = useCallback(async () => {
@@ -28,16 +28,14 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
   }, [connect]);
 
   // 读 tab = the default all-content view: clear any author/post params
-  // so clicking it always returns to the home feed. The fixtures flag
-  // (dev demo mode) is preserved.
+  // so clicking it always returns to the home feed (the router preserves
+  // the fixtures demo flag automatically).
   const handleTabChange = useCallback(
     (key) => {
-      if (key === 'read') {
-        navigate(params.fixtures ? { fixtures: params.fixtures } : {}, { replace: true });
-      }
+      if (key === 'read') navigate({}, { replace: true });
       onTabChange(key);
     },
-    [navigate, onTabChange, params.fixtures],
+    [navigate, onTabChange],
   );
 
   return (
