@@ -11,7 +11,9 @@ in Ethereum L1 calldata. Solidity contract + Vite/React 19 webapp. See
 
 - `contracts/src/Blog.sol` — the Glyph contract (shared, non-upgradeable, no owner)
 - `contracts/script/Deploy.s.sol` — Foundry deploy script
-- `webapp/src/lib/` — blogReader, payload (brotli), publish, cache (IndexedDB), wallet, price, fixtures (DEV demo data)
+- `webapp/src/lib/` — blogReader (chain I/O), scanner (traversal rules), scanStore
+  (what has been read: session + localStorage), segments (block-range algebra),
+  payload (brotli), publish, cache (IndexedDB), wallet, price, fixtures (DEV demo data)
 - `webapp/src/components/` — Reader/Publisher UI
 - `glyph-spec.md` — full technical spec
 

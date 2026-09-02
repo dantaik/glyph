@@ -155,3 +155,35 @@ export function Sliders({ size, ...rest }) {
     </svg>
   );
 }
+
+export function ChevronDown({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+export function ChevronUp({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <path d="M18 15l-6-6-6 6" />
+    </svg>
+  );
+}
+
+export function Plus({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+export function Trash({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+    </svg>
+  );
+}

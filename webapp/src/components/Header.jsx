@@ -4,6 +4,7 @@ import { useTheme } from '../lib/theme';
 import { useWallet } from '../lib/wallet';
 import { shortAddr } from '../lib/format';
 import { GlyphMark, Sun, Moon, Sliders } from './Icons';
+import ChainMenu from './ChainMenu';
 
 const ICON_BTN =
   'inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-faint hover:text-accent hover:bg-paper-sunken transition-colors';
@@ -13,7 +14,7 @@ const TABS = [
   ['write', '写'],
 ];
 
-/** Sticky masthead: brand, tabs, wallet pill, theme toggle, settings */
+/** Sticky masthead: brand, tabs, chain switcher, wallet pill, theme, settings */
 export default function Header({ tab, onTabChange, onOpenSettings }) {
   const { account, connect } = useWallet();
   const [, navigate] = useUrlState();
@@ -70,6 +71,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <ChainMenu />
           {account ? (
             <button
               onClick={() => {

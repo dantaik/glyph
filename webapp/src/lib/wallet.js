@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { walletChainParams } from './chains';
 
 const EVT = 'cairn:wallet';
 let state = { account: null, chainId: null, isConnecting: false };
@@ -46,34 +47,6 @@ async function init() {
 }
 
 
-/** Chain metadata for wallet_addEthereumChain (only known chains). */
-const KNOWN_CHAINS = {
-  1: {
-    chainName: 'Ethereum Mainnet',
-    rpcUrls: ['https://eth.drpc.org'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://etherscan.io'],
-  },
-  11155111: {
-    chainName: 'Sepolia',
-    rpcUrls: ['https://sepolia.drpc.org'],
-    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://sepolia.etherscan.io'],
-  },
-  167000: {
-    chainName: 'Taiko Mainnet',
-    rpcUrls: ['https://rpc.mainnet.taiko.xyz'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://taikoscan.io'],
-  },
-  167013: {
-    chainName: 'Taiko Hoodi',
-    rpcUrls: ['https://rpc.hoodi.taiko.xyz'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://hoodi.taikoscan.io'],
-  },
-};
-
 /**
  * Ask the wallet to switch to `chainId`. If the wallet doesn't know the
  * chain yet (4902), add it first and the switch follows automatically.
@@ -89,10 +62,11 @@ export async function switchToConfiguredChain(chainId) {
       params: [{ chainId: hex }],
     });
   } catch (err) {
-    if (err?.code === 4902 && KNOWN_CHAINS[chainId]) {
+    const params = walletChainParams(chainId);
+    if (err?.code === 4902 && params) {
       await eth.request({
         method: 'wallet_addEthereumChain',
-        params: [{ chainId: hex, ...KNOWN_CHAINS[chainId] }],
+        params: [{ chainId: hex, ...params }],
       });
     } else {
       throw err;

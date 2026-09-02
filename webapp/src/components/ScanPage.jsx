@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
-import { readFeedScan, readAuthorScanEntries } from '../lib/blogReader';
+import { readFeedScan, readAuthorScanEntries } from '../lib/scanStore';
+import { lowest, highest, blockCount } from '../lib/segments';
 import { fmtBlock, shortAddr } from '../lib/format';
 import { ArrowLeft } from './Icons';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
 
+/** How many global segments to spell out before collapsing the rest. */
+const MAX_SHOWN = 8;
+
 /**
  * Scan-range status page (/scan): the block ranges the local incremental
- * scan has already covered — the global home-feed range plus one entry per
- * visited author — read straight from the persisted localStorage state.
+ * scan has already covered — the global home-feed ranges plus one entry per
+ * visited author — read straight from the persisted scan state. Coverage is
+ * a SET of ranges, so reading deeper never re-reads a range already held.
  * Read-only diagnostics: the data exists only in this browser.
  */
 export default function ScanPage({ navigate }) {
@@ -28,7 +33,7 @@ export default function ScanPage({ navigate }) {
     };
   }, []);
 
-  const globalOk = feedScan?.head != null && feedScan?.frontier != null;
+  const globalSegments = feedScan?.segments ?? [];
 
   return (
     <div>
@@ -47,15 +52,43 @@ export default function ScanPage({ navigate }) {
 
       <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">
         为了在公共 RPC 上增量读取链上文章，浏览器会在本地记录已经扫描过的区块范围，刷新后只拉取新出现的区块，不再重复请求。
-        全局流最多缓存 300 篇、每位作者最多缓存最近 100 篇标题。
+        记录的是多段范围而不是一整段：先扫过 1–100、后来扫过 200–300，再往前翻时只会补上中间的 101–199。
+        全局流最多缓存 300 篇、每位作者最多缓存最近 200 篇标题；缓存被裁剪时对应的范围也会一并收回，避免「以为扫过」而漏掉文章。
       </p>
 
-      <SectionHeader label="全局扫描（首页流）" />
-      {globalOk ? (
-        <p className="mb-8 text-sm tabular-nums text-ink-soft">
-          区块 {fmtBlock(feedScan.frontier)} 至 {fmtBlock(feedScan.head)}
-          <span className="text-ink-ghost"> · 缓存 {(feedScan.rows ?? []).length} 篇</span>
-        </p>
+      <SectionHeader
+        label="全局扫描（首页流）"
+        right={
+          globalSegments.length > 0 ? (
+            <span className="text-xs text-ink-ghost">
+              {globalSegments.length} 段 · 共 {fmtBlock(blockCount(globalSegments))} 个区块
+            </span>
+          ) : undefined
+        }
+      />
+      {globalSegments.length > 0 ? (
+        <>
+          <ul className="mb-2 space-y-1">
+            {[...globalSegments]
+              .reverse()
+              .slice(0, MAX_SHOWN)
+              .map(([from, to]) => (
+                <li key={`${from}-${to}`} className="text-sm tabular-nums text-ink-soft">
+                  区块 {fmtBlock(from)} 至 {fmtBlock(to)}
+                  <span className="text-ink-ghost"> · {fmtBlock(to - from + 1n)} 个区块</span>
+                </li>
+              ))}
+          </ul>
+          {globalSegments.length > MAX_SHOWN && (
+            <p className="mb-2 text-xs text-ink-ghost">
+              …另有 {globalSegments.length - MAX_SHOWN} 段更早的范围
+            </p>
+          )}
+          <p className="mb-8 text-xs text-ink-ghost">
+            缓存 {(feedScan.rows ?? []).length} 篇
+            {feedScan.head != null && <> · 已同步至区块 {fmtBlock(feedScan.head)}</>}
+          </p>
+        </>
       ) : (
         <p className="mb-8 text-sm text-ink-ghost">还没有扫描记录——打开首页后自动记录。</p>
       )}
@@ -79,13 +112,18 @@ export default function ScanPage({ navigate }) {
               >
                 {shortAddr(a.address)}
               </a>
-              {a.oldest != null && a.head != null ? (
+              {a.segments.length > 0 ? (
                 <span className="text-sm tabular-nums text-ink-faint">
-                  区块 {fmtBlock(a.oldest)} 至 {fmtBlock(a.head)}
-                  <span className="text-ink-ghost"> · {a.count} 篇</span>
+                  区块 {fmtBlock(lowest(a.segments))} 至 {fmtBlock(highest(a.segments))}
+                  <span className="text-ink-ghost">
+                    {' · '}
+                    {a.segments.length} 段 · {a.count} 篇
+                  </span>
                 </span>
               ) : (
-                <span className="text-sm text-ink-ghost">未记录范围</span>
+                <span className="text-sm text-ink-ghost">
+                  未记录范围{a.count > 0 ? ` · 缓存 ${a.count} 篇` : ''}
+                </span>
               )}
             </li>
           ))}
@@ -96,7 +134,7 @@ export default function ScanPage({ navigate }) {
 
       <p className="text-xs leading-relaxed text-ink-ghost">
         记录保存在本机浏览器（localStorage），只用于避免重复的链上请求；清除浏览器数据后会自动重新扫描。
-        文章正文与图片缓存另存于浏览器 IndexedDB。
+        同一篇文章在一次会话里只会向节点请求一次，正文与图片缓存另存于浏览器 IndexedDB。
       </p>
     </div>
   );

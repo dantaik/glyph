@@ -1,0 +1,35 @@
+/**
+ * Text control that pages a list towards older posts. Shared by the home
+ * feed and the author list so both read the same — a plain underlined line
+ * of text rather than a button that competes with the titles above it.
+ */
+export default function LoadMoreButton({
+  onClick,
+  loading,
+  hasMore,
+  label = '加载更早的文章',
+  loadingLabel = '正在加载…',
+  exhaustedLabel = '已是全部文章',
+  note,
+}) {
+  if (!hasMore) {
+    return (
+      <div className="mt-8 text-center">
+        <p className="text-xs text-ink-ghost">{exhaustedLabel}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-8 text-center">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={loading}
+        className="text-sm text-ink-soft underline-offset-4 transition-colors hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-soft disabled:hover:no-underline"
+      >
+        {loading ? loadingLabel : label}
+      </button>
+      {note && !loading && <p className="mt-2 text-xs text-ink-ghost">{note}</p>}
+    </div>
+  );
+}

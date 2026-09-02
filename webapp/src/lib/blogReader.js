@@ -5,30 +5,49 @@
 //   - Each event only carries metadata (author, index, prevBlock, title).
 //   - Body bytes are NOT in the event — they live in the publish() tx calldata.
 //
+// Home feed:    loadRecentAcrossAuthors(n) / loadMoreAcrossAuthors(oldest, n)
+//   - Cross-author discovery has no on-chain head pointer, so it sweeps
+//     block ranges backwards — skipping every range already read.
+//
 // Single post body:  loadPostBody(txHash)
 //   - eth_getTransactionByHash → decode publish(bytes32, bytes) args from input
 //   - brotli-decompress payload → { tags, markdown }
 //
 // Lookup by deep link:  findTitleMeta(author, targetIndex)
 //   - Walks the chain backwards until it finds (or doesn't) the targeted index.
+//
+// What has already been read — this session and across sessions — lives in
+// scanStore.js. Every path below asks it first, so a given post is fetched
+// from the chain at most once per page session no matter which surface asks.
 
 import {
   createPublicClient,
-  http,
   parseAbi,
   hexToBytes,
   decodeFunctionData,
   decodeEventLog,
 } from 'viem';
-import { mainnet, sepolia } from 'viem/chains';
-import { RPC_URL, GLYPH_ADDRESS, CHAIN_ID } from './config';
+import { CHAIN, LOG_WINDOW, RPC_URLS, GLYPH_ADDRESS } from './config';
 import { decodeTitle } from './title';
 import { decodePayload } from './payload';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
+import * as seg from './segments';
+import * as store from './scanStore';
+import * as scanner from './scanner';
+import * as rpcLog from './rpcLog';
+import { orderedFallback } from './transport';
 
-const chain = CHAIN_ID === 11155111 ? sepolia : mainnet;
+/**
+ * One client for the whole app, over the configured endpoints in order —
+ * see transport.js for how failover and cool-down work. withRetry() below
+ * still backs off on top of it, for when EVERY endpoint is rate-limiting.
+ */
+export const client = createPublicClient({
+  chain: CHAIN.viem,
+  transport: orderedFallback(RPC_URLS, CHAIN.viem),
+});
 
-export const client = createPublicClient({ chain, transport: http(RPC_URL) });
+rpcLog.endpoints(CHAIN.name, RPC_URLS);
 
 export const abi = parseAbi([
   'function latestBlock(address author) view returns (uint256)',
@@ -86,13 +105,19 @@ async function postsInBlock(author, block) {
   // passes anything else through verbatim, so a plain number would go out
   // as a JSON number and every node rejects that.
   const at = BigInt(block);
-  const logs = await withRetry(() =>
-    client.getLogs({
-      address: GLYPH_ADDRESS,
-      event: POST_EVENT,
-      fromBlock: at,
-      toBlock: at,
-    }),
+  const logs = await rpcLog.fromNode(
+    'eth_getLogs',
+    `block ${rpcLog.b(at)} · author ${String(author).slice(0, 8)}…`,
+    () =>
+      withRetry(() =>
+        client.getLogs({
+          address: GLYPH_ADDRESS,
+          event: POST_EVENT,
+          fromBlock: at,
+          toBlock: at,
+        }),
+      ),
+    (out) => `${out.length} event${out.length === 1 ? '' : 's'}`,
   );
   // Event indexes have to count EVERY Post event in the transaction, not
   // just this author's: /tx/<hash>/<i> is resolved by findMetaByTx(), which
@@ -100,9 +125,7 @@ async function postsInBlock(author, block) {
   // narrow to the author (one tx can carry posts from several senders).
   assignEventIndexes(logs);
   const key = String(author).toLowerCase();
-  const mine = logs.filter((log) => String(log.args.author).toLowerCase() === key);
-  mine.sort((a, b) => Number(b.args.index - a.args.index));
-  return mine;
+  return logs.filter((log) => String(log.args.author).toLowerCase() === key);
 }
 
 function logToMeta(log, block) {
@@ -114,366 +137,207 @@ function logToMeta(log, block) {
     title: decodeTitle(log.args.title),
     txHash: log.transactionHash,
     eventIndex: log.__eventIndex ?? 0,
+    // Orders posts published in the same block — the feed's page cursor.
+    logIndex: log.logIndex,
   };
 }
 
 async function readHead(author) {
-  return client.readContract({
-    address: GLYPH_ADDRESS,
-    abi,
-    functionName: 'latestBlock',
-    args: [author],
-  });
+  return rpcLog.fromNode(
+    'latestBlock()',
+    `author ${String(author).slice(0, 8)}…`,
+    () =>
+      client.readContract({
+        address: GLYPH_ADDRESS,
+        abi,
+        functionName: 'latestBlock',
+        args: [author],
+      }),
+    (head) => `block ${rpcLog.b(head)}`,
+  );
 }
+
+// --- Per-author reads (reverse block-linked list) ---------------------
+
+/** That author's Post logs in one block, as metas. */
+const authorBlockFetcher = (author) => async (block) =>
+  (await postsInBlock(author, block)).map((log) => logToMeta(log, block));
 
 /**
  * Load `author`'s most recent `n` post-metadata records (newest first).
- * Incremental: an unchanged author head serves the persisted rows with
- * zero getLogs; blocks covered by the global feed scan or the author's
- * own persisted scan are reused without RPC.
+ * Incremental: an unchanged author head serves the stored rows with zero
+ * getLogs; blocks covered by a global feed sweep or by the author's own
+ * earlier reads are reused without RPC.
  */
 export async function loadTitleList(author, n) {
-  const key = String(author).toLowerCase();
-  const stored = readAuthorScans()[key];
+  store.seedFromStorage();
   const head = await readHead(author);
-  if (stored?.head != null && head <= BigInt(stored.head)) {
-    return stored.rows.slice(0, n);
+  const known = store.authorScanHead(author);
+  if (known != null && head <= BigInt(known)) {
+    return store.authorPosts(author).slice(0, n);
   }
-
-  // Merge previously discovered rows back in (they are older than the fresh
-  // walk, which starts at the head) up to the persistence cap, not to `n` —
-  // the cache is what lets the next visit skip getLogs entirely.
-  const out = await walkAuthorTitles(author, head, null, n);
-  const seen = new Set(out.map((m) => String(m.index)));
-  for (const m of stored?.rows ?? []) {
-    if (seen.has(String(m.index))) continue;
-    seen.add(String(m.index));
-    out.push(m);
-    if (out.length >= AUTHOR_ROW_CAP) break;
-  }
-  writeAuthorScan(author, { head: head.toString(), rows: out.slice(0, AUTHOR_ROW_CAP) });
-  return out.slice(0, n);
+  await scanner.walkAuthorTitles(author, head, null, n, authorBlockFetcher(author));
+  store.setAuthorScanHead(author, head);
+  store.persistAuthorScan(author);
+  // The store may already hold older rows from an earlier, deeper read — the
+  // walk stops at n, the list shows the newest n of everything known.
+  return store.authorPosts(author).slice(0, n);
 }
 
 /** Continue walking from the oldest title already shown. */
 export async function loadMoreTitles(author, oldestShown, n) {
   if (!oldestShown) return [];
-  return walkAuthorTitles(author, oldestShown.block, oldestShown.index, n);
+  store.seedFromStorage();
+  const out = await scanner.walkAuthorTitles(
+    author,
+    oldestShown.block,
+    oldestShown.index,
+    n,
+    authorBlockFetcher(author),
+  );
+  store.persistAuthorScan(author);
+  return out;
 }
 
 /**
- * Find the metadata for a single (author, index) — used for deep links.
- * Walks the per-author reverse chain backwards until we find it or pass it,
- * reusing cached rows (global + per-author) per block.
+ * Find the metadata for a single (author, index) — deep links and prev/next
+ * navigation. Answered outright when the post has already been read this
+ * session; otherwise walks the reverse chain, reusing covered blocks.
  */
 export async function findTitleMeta(author, targetIndex) {
   // Guard against garbage from the URL (?i=abc): BigInt(NaN) throws, and
   // negative / fractional indexes can never match a real post.
   if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return null;
-  const target = BigInt(targetIndex);
-  const fetchRows = makeRowLookup(author);
-  let block = BigInt(await readHead(author));
-  while (block > 0n) {
-    const rows = await fetchRows(block); // already newest-first
-    if (rows.length === 0) return null;
-    for (const m of rows) {
-      if (BigInt(m.index) === target) return m;
-    }
-    const oldest = rows[rows.length - 1];
-    if (BigInt(oldest.index) < target) return null; // walked past
-    const next = BigInt(oldest.prevBlock);
-    if (next >= block) return null; // chain doesn't descend — give up
-    block = next;
+  store.seedFromStorage();
+  const known = store.knownPost(author, BigInt(targetIndex));
+  if (known) {
+    rpcLog.fromCache('post', `#${targetIndex} of ${String(author).slice(0, 8)}…`, 'already loaded');
+    return known;
   }
-  return null;
+
+  const head = await readHead(author);
+  const found = await scanner.findAuthorPost(
+    author,
+    targetIndex,
+    head,
+    authorBlockFetcher(author),
+  );
+  store.persistAuthorScan(author);
+  return found;
 }
+
+// --- Home feed (cross-author range sweeps) ---------------------------
 
 /**
- * Home feed: most recent `n` posts across ALL authors.
- *
- * NOTE: this is the one place we deliberately break the "never scan ranges"
- * rule — there is no global on-chain head pointer, so cross-author discovery
- * with no address requires scanning. It's bounded and best-effort: we sweep
- * backwards in windows of `windowSize` blocks (to respect public-RPC range
- * limits) for at most `maxWindows` windows, or until we have `n` posts.
- * Quiet stretches with no posts are simply skipped over.
+ * Public nodes cap getLogs ranges anywhere from 25 blocks to 10,000. Tag the
+ * refusal so the sweep can shrink its window and carry on instead of giving
+ * up — but never confuse it with a rate limit, which backing off fixes.
  */
-// The home-feed scan is incremental: the covered frontier (lowest block
-// scanned), the head at that time and the discovered rows are persisted
-// to localStorage, so a new scan only fetches blocks newer than the last
-// covered head and never rescans already-covered ranges. Previously
-// discovered rows are merged back so the feed stays full between scans.
-const FEED_SCAN_KEY = 'glyph.feedScan.v1';
-const MERGE_CAP = 300; // persisted global rows (storage bound)
-const FEED_SCAN_EVT = 'glyph:feedscan';
-const AUTHOR_SCAN_KEY = 'glyph.authorScan.v1';
-const AUTHOR_SCAN_EVT = 'glyph:authorscan';
-const AUTHOR_ROW_CAP = 100; // persisted rows per author (storage bound)
-
-// Rows are BigInt-heavy metas (block/index/prevBlock) while they live in
-// memory, but localStorage is JSON-only and JSON.stringify throws on BigInt —
-// so rows must be flattened to plain numbers (block heights and indexes stay
-// far below 2^53) before persisting, or the incremental state silently vanishes.
-const plainRow = (r) => ({
-  author: r.author,
-  index: Number(r.index),
-  block: Number(r.block),
-  prevBlock: Number(r.prevBlock),
-  title: r.title,
-  txHash: r.txHash,
-  eventIndex: r.eventIndex ?? 0,
-});
-
-/** Persisted feed-scan state: { head, frontier, rows } or null. */
-export function readFeedScan() {
-  try {
-    const v = JSON.parse(localStorage.getItem(FEED_SCAN_KEY) || 'null');
-    if (v && typeof v.head === 'string' && Array.isArray(v.rows)) return v;
-  } catch {
-    /* corrupted entry — treat as first scan */
+function tagRangeError(err) {
+  const msg = String(err?.details || err?.shortMessage || err?.message || err);
+  if (/rate limit|429|too many requests/i.test(msg)) return err;
+  if (/\brange\b|too large|exceed|limited to|must not exceed/i.test(msg)) {
+    err.rangeTooLarge = true;
   }
-  return null;
+  return err;
 }
 
-function writeFeedScan(scan) {
-  try {
-    localStorage.setItem(
-      FEED_SCAN_KEY,
-      JSON.stringify({
-        head: scan.head,
-        frontier: scan.frontier,
-        rows: (scan.rows ?? []).map(plainRow),
-      }),
-    );
-  } catch {
-    /* quota / privacy mode — scan stays in-memory via the TTL layer */
-  }
-  // Let listeners (e.g. the footer) re-read the persisted range.
-  try {
-    window.dispatchEvent(new CustomEvent(FEED_SCAN_EVT));
-  } catch {
-    /* non-browser context */
-  }
-}
-
-// --- Per-author persisted scans ({ address: { head, rows } }) ---
-//
-// Each visited author gets their own covered range, so revisiting an
-// author with no new posts costs zero getLogs, and the global feed scan
-// above is reused instead of re-walking blocks every address shares.
-
-function readAuthorScans() {
-  try {
-    const v = JSON.parse(localStorage.getItem(AUTHOR_SCAN_KEY) || '{}');
-    return v && typeof v === 'object' ? v : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeAuthorScan(author, scan) {
-  try {
-    const all = readAuthorScans();
-    all[String(author).toLowerCase()] = {
-      head: scan.head,
-      rows: (scan.rows ?? []).map(plainRow),
-    };
-    localStorage.setItem(AUTHOR_SCAN_KEY, JSON.stringify(all));
-    // Let listeners (e.g. the scan-range page) re-read the persisted state.
-    window.dispatchEvent(new CustomEvent(AUTHOR_SCAN_EVT));
-  } catch {
-    /* quota / privacy mode — falls back to the TTL layer */
-  }
-}
-
-/** Persisted per-author scans as display entries: { address, head, oldest, count }. */
-export function readAuthorScanEntries() {
-  const all = readAuthorScans();
-  const out = [];
-  for (const [address, scan] of Object.entries(all)) {
-    const rows = Array.isArray(scan?.rows) ? scan.rows : [];
-    const blocks = rows.map((r) => BigInt(String(r.block))).filter((b) => b > 0n);
-    out.push({
-      address,
-      head: typeof scan?.head === 'string' ? scan.head : null,
-      oldest: blocks.length ? Number(blocks.reduce((a, b) => (a < b ? a : b))) : null,
-      count: rows.length,
-    });
-  }
-  // Most recently written head first.
-  out.sort((a, b) => {
-    if (a.head == null || b.head == null) return 0;
-    const ha = BigInt(a.head);
-    const hb = BigInt(b.head);
-    return hb > ha ? 1 : hb < ha ? -1 : 0;
+/** One getLogs window, as metas. */
+async function fetchFeedRange(from, to, endsAtHead) {
+  const logs = await rpcLog.fromNode(
+    'eth_getLogs',
+    rpcLog.range(from, to),
+    () =>
+      withRetry(() =>
+        client.getLogs({
+          address: GLYPH_ADDRESS,
+          event: POST_EVENT,
+          fromBlock: from,
+          // The window ending at the chain head asks for 'latest': public RPC
+          // clusters (dRPC, etc.) can serve getBlockNumber and getLogs from
+          // different nodes, and a numeric toBlock captured a moment earlier
+          // may already exceed the answering node's head.
+          toBlock: endsAtHead ? 'latest' : to,
+        }),
+      ),
+    (out) => `${out.length} post${out.length === 1 ? '' : 's'}`,
+  ).catch((err) => {
+    throw tagRangeError(err);
   });
-  return out;
+  assignEventIndexes(logs);
+  return logs.map((log) => logToMeta(log, log.blockNumber));
 }
 
-/**
- * Row lookup for one author that consults the GLOBAL feed scan and the
- * author's own persisted scan first (no RPC), falling back to a single-
- * block getLogs for uncovered blocks. Blocks already covered by either
- * layer are never re-fetched.
- */
-function makeRowLookup(author) {
-  const key = String(author).toLowerCase();
-  const stored = readAuthorScans()[key];
-  const global = readFeedScan();
-  const byBlock = new Map();
-  const seen = new Set();
-  const push = (rows) => {
-    for (const r of rows) {
-      const id = `${r.block}:${r.index}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      const list = byBlock.get(String(r.block)) ?? [];
-      list.push(r);
-      byBlock.set(String(r.block), list);
-    }
-  };
-  push((global?.rows ?? []).filter((r) => String(r.author).toLowerCase() === key));
-  push(stored?.rows ?? []);
-
-  // Newest post first, so the last entry is the block's oldest post — the
-  // one whose prevBlock continues the author's chain.
-  const newestFirst = (rows) =>
-    rows.sort((a, b) => (BigInt(a.index) < BigInt(b.index) ? 1 : -1));
-
-  // Both caches are capped and can be truncated mid-block, so holding *a*
-  // row for a block does not mean holding *all* of them. Within one block
-  // only the author's oldest post links back to an earlier block (any later
-  // one points at the block itself), so a list whose oldest row self-links
-  // is incomplete — serving it would walk the chain back into the same
-  // block forever. Re-fetch those.
-  const isWholeBlock = (rows) => {
-    if (rows.length === 0) return false;
-    const oldest = rows[rows.length - 1];
-    return BigInt(oldest.prevBlock) !== BigInt(oldest.block);
-  };
-
-  return async (block) => {
-    const at = String(block);
-    const cached = byBlock.get(at);
-    if (cached && isWholeBlock(newestFirst(cached))) return cached;
-    // The fetch is authoritative for this block — it replaces whatever
-    // partial list the caches contributed.
-    const rows = (await postsInBlock(author, block)).map((log) => logToMeta(log, block));
-    for (const r of rows) seen.add(`${r.block}:${r.index}`);
-    byBlock.set(at, newestFirst(rows));
-    return byBlock.get(at);
-  };
-}
-
-/**
- * Walk the author's reverse block chain, reusing cached rows per block.
- * Rows persisted to localStorage carry plain numbers, so every height and
- * index is normalized to BigInt before it is compared or sent to a node.
- */
-async function walkAuthorTitles(author, startBlock, skipIndex, n) {
-  const fetchRows = makeRowLookup(author);
-  let block = BigInt(startBlock);
-  let skip = skipIndex == null ? null : BigInt(skipIndex);
-  const out = [];
-  while (out.length < n && block > 0n) {
-    const rows = await fetchRows(block); // already newest-first
-    if (rows.length === 0) break;
-    for (const m of rows) {
-      if (skip != null && BigInt(m.index) >= skip) continue;
-      out.push(m);
-      if (out.length >= n) break;
-    }
-    skip = null;
-    // The chain must strictly descend; anything else (a truncated cache, a
-    // reorg, an inconsistent node) would loop forever.
-    const next = BigInt(rows[rows.length - 1].prevBlock);
-    if (next >= block) break;
-    block = next;
-  }
-  return out;
-}
-
-// NOTE: a TTL cache for this scan also lives in data.js (configurable in
-// Settings); this function handles the persistent incremental layer.
+/** Home feed: most recent `n` posts across ALL authors. */
 export async function loadRecentAcrossAuthors(
   n,
-  { windowSize = 800, maxWindows = 30 } = {},
+  { windowSize = LOG_WINDOW, maxWindows = 30 } = {},
 ) {
-  const span = BigInt(windowSize);
-  const head = await client.getBlockNumber();
-  const stored = readFeedScan();
-  const cachedRows = stored?.rows ?? [];
-  const out = [];
+  store.seedFromStorage();
+  const head = await rpcLog.fromNode(
+    'eth_blockNumber',
+    'chain head',
+    () => client.getBlockNumber(),
+    (h) => `block ${rpcLog.b(h)}`,
+  );
+  const known = store.feedScanHead();
 
-  const newestFirst = (logs) =>
-    logs.sort((a, b) => {
-      if (a.blockNumber !== b.blockNumber) return Number(b.blockNumber - a.blockNumber);
-      return b.logIndex - a.logIndex;
-    });
-
-  // No new blocks since the last scan — serve the persisted result
-  // without touching getLogs at all.
-  if (stored?.head != null && head <= BigInt(stored.head)) {
-    return cachedRows.slice(0, n);
+  // No new blocks since the last sweep — serve what we hold, zero getLogs.
+  if (known != null && head <= BigInt(known)) {
+    const rows = scanner.feedRows().slice(0, n);
+    rpcLog.fromCache('feed', `head unchanged at ${rpcLog.b(known)}`, `${rows.length} posts`);
+    return rows;
   }
 
-  // Scan the newest blocks down to the previously covered frontier (or
-  // maxWindows windows on the first visit), stopping early once n posts
-  // are collected. The first window ends at 'latest': public RPC clusters
-  // (dRPC, etc.) can serve getBlockNumber and getLogs from different
-  // nodes, and a numeric toBlock captured a moment earlier may already
-  // exceed the answering node's head.
-  const storedFrontier = stored?.frontier != null ? BigInt(stored.frontier) : null;
-  let coveredFrontier = storedFrontier;
-  let toBlock = head;
-  let logs;
-  for (let w = 0; w < maxWindows && out.length < n && toBlock > 0n; w++) {
-    if (storedFrontier != null && toBlock <= storedFrontier) break; // already covered
-    const fromBlock = toBlock >= span ? toBlock - span + 1n : 0n;
-    logs = await withRetry(() =>
-      client.getLogs({
-        address: GLYPH_ADDRESS,
-        event: POST_EVENT,
-        fromBlock,
-        toBlock: w === 0 ? 'latest' : toBlock,
-      }),
-    );
-    newestFirst(logs);
-    assignEventIndexes(logs);
-    for (const log of logs) {
-      out.push(logToMeta(log, log.blockNumber));
-      if (out.length >= n) break;
-    }
-    // The frontier only ever moves DOWN (first scan): later scans cover
-    // ranges above it, so it must never be raised again.
-    if (coveredFrontier == null || fromBlock < coveredFrontier) {
-      coveredFrontier = fromBlock;
-    }
-    if (fromBlock === 0n) break;
-    toBlock = fromBlock - 1n;
-  }
+  await scanner.sweepFeed({
+    cursor: head,
+    head,
+    n,
+    windowSize,
+    maxWindows,
+    fetchRange: fetchFeedRange,
+  });
+  store.setFeedScanHead(head);
+  store.persistFeedScan();
+  return scanner.feedRows().slice(0, n);
+}
 
-  // Merge with previously discovered rows (newest first), dedupe by
-  // txHash + eventIndex. Persist up to MERGE_CAP rows so per-author
-  // scans can reuse the global coverage; the feed itself returns n.
-  const seen = new Set();
-  const merged = [];
-  for (const row of [...out, ...cachedRows]) {
-    const key = `${row.txHash}:${row.eventIndex ?? 0}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(row);
-    if (merged.length >= MERGE_CAP) break;
+/**
+ * Page the home feed towards older posts, continuing from `oldestShown`.
+ * Bounded per call: covered ranges are free, at most `maxWindows` fetches of
+ * new ground. `done` is true only once the sweep reaches block 0.
+ */
+export async function loadMoreAcrossAuthors(
+  oldestShown,
+  n,
+  { windowSize = LOG_WINDOW, maxWindows = 30 } = {},
+) {
+  store.seedFromStorage();
+  let cursor;
+  if (oldestShown) {
+    // Start AT the cursor's own block, not below it: posts published in the
+    // same block but earlier within it are still unread, and that block is
+    // already covered so revisiting it costs nothing.
+    cursor = BigInt(oldestShown.block);
+  } else {
+    const low = seg.lowest(store.feedCoverage());
+    if (low == null) return { rows: [], done: false }; // nothing swept yet
+    cursor = low - 1n;
   }
+  if (cursor < 0n) return { rows: [], done: true };
 
-  if (coveredFrontier != null) {
-    writeFeedScan({
-      head: head.toString(),
-      frontier: coveredFrontier.toString(),
-      rows: merged,
-    });
-  }
-  return merged.slice(0, n);
+  const head = store.feedScanHead();
+  const swept = await scanner.sweepFeed({
+    cursor,
+    head: head != null ? BigInt(head) : null,
+    n,
+    olderThan: oldestShown ? store.rememberPosts([oldestShown])[0] : null,
+    windowSize,
+    maxWindows,
+    fetchRange: fetchFeedRange,
+  });
+  store.persistFeedScan();
+  return { rows: swept.rows, done: swept.reachedGenesis };
 }
 
 // --- ENS names — cached; null when the address has none, or when the
@@ -486,7 +350,12 @@ export function resolveEnsName(address) {
   if (ensCache.has(key)) return ensCache.get(key);
   const promise = (async () => {
     try {
-      const name = await client.getEnsName({ address });
+      const name = await rpcLog.fromNode(
+        'ens_getName',
+        `${String(address).slice(0, 8)}…`,
+        () => client.getEnsName({ address }),
+        (v) => v ?? 'no name',
+      );
       return name ?? null;
     } catch {
       return null; // ENS absent on this chain or RPC hiccup
@@ -500,11 +369,23 @@ export function resolveEnsName(address) {
 /**
  * Resolve post metadata from a publish transaction hash + the 0-based
  * ordinal of the Post event within that transaction (one tx can publish
- * several posts). Reads the receipt and decodes the chosen Post log —
+ * several posts). Reads the receipt and decodes every Post log in it —
  * one RPC call, no scanning. Returns null when there is no such event.
  */
 export async function findMetaByTx(txHash, eventIndex = 0) {
-  const receipt = await withRetry(() => client.getTransactionReceipt({ hash: txHash }));
+  store.seedFromStorage();
+  const known = store.knownPostByTx(txHash, eventIndex);
+  if (known) {
+    rpcLog.fromCache('post', `${String(txHash).slice(0, 10)}…/${eventIndex}`, 'already loaded');
+    return known;
+  }
+
+  const receipt = await rpcLog.fromNode(
+    'eth_getTransactionReceipt',
+    `${String(txHash).slice(0, 10)}…`,
+    () => withRetry(() => client.getTransactionReceipt({ hash: txHash })),
+    (r) => `${r.logs.length} logs in block ${rpcLog.b(r.blockNumber)}`,
+  );
   const posts = [];
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== GLYPH_ADDRESS.toLowerCase()) continue;
@@ -516,17 +397,21 @@ export async function findMetaByTx(txHash, eventIndex = 0) {
     }
   }
   posts.sort((a, b) => a.log.logIndex - b.log.logIndex);
-  const chosen = posts[eventIndex];
-  if (!chosen) return null;
-  return {
-    author: chosen.args.author,
-    index: chosen.args.index,
-    block: receipt.blockNumber,
-    prevBlock: chosen.args.prevBlock,
-    title: decodeTitle(chosen.args.title),
-    txHash,
-    eventIndex,
-  };
+  // Remember every post in the transaction, not just the one asked for: a
+  // sibling opened later in the session is then already resolved.
+  const rows = store.rememberPosts(
+    posts.map(({ log, args }, i) => ({
+      author: args.author,
+      index: args.index,
+      block: receipt.blockNumber,
+      prevBlock: args.prevBlock,
+      title: decodeTitle(args.title),
+      txHash,
+      eventIndex: i,
+      logIndex: log.logIndex,
+    })),
+  );
+  return rows[eventIndex] ?? null;
 }
 
 // --- Post body (tags + markdown) — fetched on demand from tx calldata,
@@ -544,9 +429,17 @@ export function loadPostBody(txHash) {
   const promise = (async () => {
     // Check IndexedDB cache first — posts are immutable, so cached copy is always fresh.
     const cached = await getCachedBody(txHash);
-    if (cached) return { body: cached, fromCache: true };
+    if (cached) {
+      rpcLog.fromCache('body', `${String(txHash).slice(0, 10)}…`, 'IndexedDB hit');
+      return { body: cached, fromCache: true };
+    }
 
-    const tx = await client.getTransaction({ hash: txHash });
+    const tx = await rpcLog.fromNode(
+      'eth_getTransactionByHash',
+      `body ${String(txHash).slice(0, 10)}…`,
+      () => client.getTransaction({ hash: txHash }),
+      (t) => `${rpcLog.b((t.input.length - 2) / 2)} bytes calldata`,
+    );
     const decoded = decodeFunctionData({ abi, data: tx.input });
     const payloadHex = decoded.args[1];
     const body = await decodePayload(hexToBytes(payloadHex));
@@ -573,9 +466,17 @@ export function loadImageBlob(hash, mime = 'image/webp') {
   const promise = (async () => {
     // Check IndexedDB cache first.
     const cached = await getCachedImage(hash);
-    if (cached) return cached;
+    if (cached) {
+      rpcLog.fromCache('image', `${String(hash).slice(0, 10)}…`, 'IndexedDB hit');
+      return cached;
+    }
 
-    const tx = await client.getTransaction({ hash });
+    const tx = await rpcLog.fromNode(
+      'eth_getTransactionByHash',
+      `image ${String(hash).slice(0, 10)}…`,
+      () => client.getTransaction({ hash }),
+      (t) => `${rpcLog.b((t.input.length - 2) / 2)} bytes`,
+    );
     const bytes = hexToBytes(tx.input);
     const blob = new Blob([bytes], { type: mime });
 
