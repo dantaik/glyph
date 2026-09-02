@@ -215,19 +215,19 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
 
       {loaded && (
         <footer className="mt-14 text-center">
-          <p className="text-ink-ghost" aria-hidden="true">※</p>
-          <p className="mt-3 text-xs text-ink-faint tabular-nums">
-            {chainName()} · 区块 {fmtBlock(meta.block)}
+          <p className="text-ink-ghost" aria-hidden="true">—</p>
+          <p className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
+            <span>{chainName()} · 区块 {fmtBlock(meta.block)}</span>
+            <a
+              href={etherscanTxUrl(meta.txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-accent transition-colors"
+            >
+              在 Etherscan 查看
+              <ExternalLink size={12} />
+            </a>
           </p>
-          <a
-            href={etherscanTxUrl(meta.txHash)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 inline-flex items-center gap-1 text-xs text-ink-faint hover:text-accent transition-colors"
-          >
-            在 Etherscan 查看
-            <ExternalLink size={12} />
-          </a>
         </footer>
       )}
 
