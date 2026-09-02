@@ -346,7 +346,7 @@ export default function Publisher() {
       </div>
 
       {/* 五 · 成本 */}
-      <SectionHeader label="成本" />
+      <SectionHeader label="预估成本" />
       <div className="mb-6">
         <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
       </div>
@@ -464,8 +464,7 @@ function CostPanel({ estimate, market, chainId }) {
 
   return (
     <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <span className="text-xs tracking-label text-ink-faint">预估上链成本</span>
+      <div className="mb-3 flex justify-end">
         <span className="font-mono text-2xs tabular-nums text-ink-faint">
           {fmtGwei(market.gasPriceWei)}
           {usdAvailable && market.ethUsd != null ? (
@@ -515,9 +514,6 @@ function CostPanel({ estimate, market, chainId }) {
         </span>
       </div>
 
-      <p className="mt-2 text-xs text-ink-faint">
-        （brotli 压缩后实际成本会有浮动）
-      </p>
     </div>
   );
 }
