@@ -38,14 +38,36 @@ export const abi = parseAbi([
 
 const POST_EVENT = abi.find((x) => x.type === 'event' && x.name === 'Post');
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Retry with exponential backoff on transient public-RPC failures
+ * (rate limits / timeouts). Throws the original error after the last attempt.
+ */
+async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = String(err?.message || err);
+      const retriable =
+        err?.status === 429 || /rate limit|429|too many requests|timeout|underlying network/i.test(msg);
+      if (!retriable || attempt >= retries) throw err;
+      await sleep(baseDelayMs * 2 ** attempt);
+    }
+  }
+}
+
 async function postsInBlock(author, block) {
-  const logs = await client.getLogs({
-    address: GLYPH_ADDRESS,
-    event: POST_EVENT,
-    args: { author },
-    fromBlock: block,
-    toBlock: block,
-  });
+  const logs = await withRetry(() =>
+    client.getLogs({
+      address: GLYPH_ADDRESS,
+      event: POST_EVENT,
+      args: { author },
+      fromBlock: block,
+      toBlock: block,
+    }),
+  );
   logs.sort((a, b) => Number(b.args.index - a.args.index));
   return logs;
 }
@@ -133,10 +155,21 @@ export async function findTitleMeta(author, targetIndex) {
  * limits) for at most `maxWindows` windows, or until we have `n` posts.
  * Quiet stretches with no posts are simply skipped over.
  */
+// Short-lived cache for the home-feed scan: revisiting 读 re-runs the
+// whole 30-window sweep otherwise, which burns free public-RPC quotas.
+const recentCache = { key: '', at: 0, rows: null };
+const FEED_CACHE_TTL_MS = 60_000;
+
 export async function loadRecentAcrossAuthors(
   n,
   { windowSize = 800, maxWindows = 30 } = {},
 ) {
+  const key = `${n}:${windowSize}:${maxWindows}`;
+  const now = Date.now();
+  if (recentCache.key === key && recentCache.rows && now - recentCache.at < FEED_CACHE_TTL_MS) {
+    return recentCache.rows;
+  }
+
   const span = BigInt(windowSize);
   const head = await client.getBlockNumber();
   const out = [];
@@ -153,12 +186,14 @@ export async function loadRecentAcrossAuthors(
   // already exceed the answering node's head ("block range extends beyond
   // current head block"). Subsequent windows are far below the head, so
   // numeric bounds are safe there.
-  let logs = await client.getLogs({
-    address: GLYPH_ADDRESS,
-    event: POST_EVENT,
-    fromBlock: head >= span ? head - span + 1n : 0n,
-    toBlock: 'latest',
-  });
+  let logs = await withRetry(() =>
+    client.getLogs({
+      address: GLYPH_ADDRESS,
+      event: POST_EVENT,
+      fromBlock: head >= span ? head - span + 1n : 0n,
+      toBlock: 'latest',
+    }),
+  );
   newestFirst(logs);
   for (const log of logs) {
     out.push(logToMeta(log, log.blockNumber));
@@ -168,12 +203,14 @@ export async function loadRecentAcrossAuthors(
   let toBlock = head >= span ? head - span : 0n;
   for (let w = 1; w < maxWindows && out.length < n && toBlock > 0n; w++) {
     const fromBlock = toBlock >= span ? toBlock - span + 1n : 0n;
-    logs = await client.getLogs({
-      address: GLYPH_ADDRESS,
-      event: POST_EVENT,
-      fromBlock,
-      toBlock,
-    });
+    logs = await withRetry(() =>
+      client.getLogs({
+        address: GLYPH_ADDRESS,
+        event: POST_EVENT,
+        fromBlock,
+        toBlock,
+      }),
+    );
     newestFirst(logs);
     for (const log of logs) {
       out.push(logToMeta(log, log.blockNumber));
@@ -182,7 +219,11 @@ export async function loadRecentAcrossAuthors(
     if (fromBlock === 0n) break;
     toBlock = fromBlock - 1n;
   }
-  return out.slice(0, n);
+  const rows = out.slice(0, n);
+  recentCache.key = key;
+  recentCache.at = Date.now();
+  recentCache.rows = rows;
+  return rows;
 }
 
 // --- ENS names — cached; null when the address has none, or when the
