@@ -76,12 +76,11 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   return (
     <div>
       <section className="mb-9 text-center">
-        <h1 className="font-serif text-2xl font-bold tracking-wide text-ink sm:text-[1.75rem]">
-          人过留名，雁过留声。人海亿万，唯留字者不朽
+        <h1 className="font-serif text-2xl font-bold leading-snug tracking-wide text-ink sm:text-[1.75rem]">
+          人过留名，雁过留声。
+          <br />
+          人海亿万，唯留字者不朽。
         </h1>
-        <p className="mx-auto mt-3 max-w-md font-serif text-[0.95rem] leading-relaxed text-ink-soft">
-          给未来的人类留一句话——你不是一个数字，你是来过的人。
-        </p>
       </section>
 
       <header className="mb-8 flex items-baseline justify-between border-b border-edge pb-3">
