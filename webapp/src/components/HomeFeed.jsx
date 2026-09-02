@@ -102,7 +102,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
         <EmptyState
           title="此刻还没有文章"
           body="最近的区块里没有发现新的文章。连接钱包，刻下第一篇。"
-          actionLabel="刻第一篇"
+          actionLabel="写第一篇"
           onAction={onStartWriting}
         />
       ) : (
