@@ -142,17 +142,27 @@ export default function Publisher() {
   }, [market, tags, markdown, files, isFirstPost]);
 
   // --- Tag handling ---
+  // Delimiters: Enter, half/full-width comma (,) and semicolon (;).
+  // addTagFromInput splits whatever is in the box, so pasted strings
+  // like "家，山；海" become three tags.
   const addTagFromInput = () => {
-    const t = tagsInput.trim().replace(/,$/, '').trim();
-    if (!t || tags.includes(t)) {
+    const parts = tagsInput
+      .split(/[,，;；]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
       setTagsInput('');
       return;
     }
-    setTags([...tags, t]);
+    const next = [...tags];
+    for (const t of parts) {
+      if (!next.includes(t)) next.push(t);
+    }
+    setTags(next);
     setTagsInput('');
   };
   const handleTagKey = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，' || e.key === ';' || e.key === '；') {
       e.preventDefault();
       addTagFromInput();
     } else if (e.key === 'Backspace' && !tagsInput && tags.length > 0) {
@@ -287,7 +297,7 @@ export default function Publisher() {
             onChange={(e) => setTagsInput(e.target.value)}
             onKeyDown={handleTagKey}
             onBlur={addTagFromInput}
-            placeholder={tags.length === 0 ? '回车或逗号分隔' : ''}
+            placeholder={tags.length === 0 ? '回车、逗号或分号分隔' : ''}
             className="flex-1 min-w-[6rem] bg-transparent text-sm outline-none placeholder:text-ink-ghost"
           />
         </div>
