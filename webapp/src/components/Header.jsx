@@ -6,7 +6,7 @@ import { shortAddr } from '../lib/format';
 import { GlyphMark, Sun, Moon, Sliders } from './Icons';
 
 const ICON_BTN =
-  'inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-faint hover:text-ink hover:bg-paper-sunken transition-colors';
+  'inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-faint hover:text-accent hover:bg-paper-sunken transition-colors';
 
 const TABS = [
   ['read', '读'],
@@ -57,7 +57,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
                 className={`relative min-w-[3rem] whitespace-nowrap px-2 py-4 text-center text-sm transition-colors ${
                   tab === key
                     ? 'text-ink font-medium'
-                    : 'text-ink-faint hover:text-ink'
+                    : 'text-ink-faint hover:text-accent'
                 }`}
               >
                 {label}
@@ -77,7 +77,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
                 onTabChange('read');
               }}
               aria-label="查看我的文章"
-              className="inline-flex items-center gap-1.5 rounded-full bg-paper-sunken px-3 py-1 font-mono text-xs text-ink-soft hover:text-ink transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-paper-sunken px-3 py-1 font-mono text-xs text-ink-soft hover:text-accent transition-colors"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               <span className="hidden min-[400px]:inline">

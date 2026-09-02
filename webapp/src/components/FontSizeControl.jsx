@@ -24,7 +24,7 @@ export default function FontSizeControl() {
           className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
             size === value
               ? 'bg-paper-sunken text-ink font-medium'
-              : 'text-ink-faint hover:text-ink'
+              : 'text-ink-faint hover:text-accent'
           }`}
         >
           {label}

@@ -90,7 +90,7 @@ export default function AuthorTitleList({
               type="button"
               onClick={onLoadMore}
               disabled={loadingMore}
-              className="rounded-full border border-edge px-5 py-2 text-sm text-ink-soft hover:border-edge-strong hover:text-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-full border border-edge px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loadingMore ? '正在加载…' : '加载更多'}
             </button>

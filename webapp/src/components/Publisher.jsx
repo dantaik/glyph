@@ -33,7 +33,7 @@ const PLACEHOLDER_MD = `# 小标题
 把图片拖入下方区域或点击上传；点击图片或名称即可复制引用，粘贴到正文。`;
 
 const SEGMENT_ON = 'rounded-full px-2.5 py-1 text-xs transition-colors bg-paper-sunken text-ink font-medium';
-const SEGMENT_OFF = 'rounded-full px-2.5 py-1 text-xs transition-colors text-ink-faint hover:text-ink';
+const SEGMENT_OFF = 'rounded-full px-2.5 py-1 text-xs transition-colors text-ink-faint hover:text-accent';
 
 export default function Publisher() {
   const [title, setTitle] = useState(PLACEHOLDER_TITLE);
@@ -408,7 +408,7 @@ export default function Publisher() {
             <button
               type="button"
               onClick={resetDraft}
-              className="-ml-3 mt-2 rounded-lg px-3 py-1.5 text-sm text-accent hover:text-ink hover:bg-paper-sunken transition-colors"
+              className="-ml-3 mt-2 rounded-lg px-3 py-1.5 text-sm text-accent hover:text-accent-strong hover:bg-paper-sunken transition-colors"
             >
               再写一封
             </button>

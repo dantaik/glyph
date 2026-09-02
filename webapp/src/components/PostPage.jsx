@@ -123,7 +123,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
         <button
           type="button"
           onClick={onBack}
-          className="-ml-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-ink hover:bg-paper-sunken transition-colors"
+          className="-ml-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors"
         >
           <ArrowLeft size={16} />
           返回
@@ -186,7 +186,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
             <p>加载失败：{friendlyError(error)}</p>
           </div>
           <details className="mt-3">
-            <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-ink transition-colors">
+            <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-accent transition-colors">
               技术细节
             </summary>
             <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 font-mono text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">

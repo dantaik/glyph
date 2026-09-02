@@ -20,7 +20,7 @@ export default function EmptyState({ title, body, actionLabel, onAction, tone, d
       )}
       {danger && detail && (
         <details className="mt-4 text-left">
-          <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-ink transition-colors">
+          <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-accent transition-colors">
             技术细节
           </summary>
           <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 font-mono text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">

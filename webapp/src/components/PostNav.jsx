@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight } from './Icons';
 import { fmtTitle } from '../lib/format';
 
 const CARD =
-  'group block rounded-xl border border-edge px-5 py-4 hover:border-edge-strong hover:bg-paper-raised transition-colors w-full text-left';
+  'group block rounded-xl border border-edge px-5 py-4 hover:border-accent hover:bg-paper-raised transition-colors w-full text-left';
 
 function SkeletonCard({ side }) {
   const next = side === 'next';

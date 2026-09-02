@@ -4,7 +4,7 @@ import { RPC_URL, CHAIN_ID, getCacheTtlMs, saveEndpointConfig, STORAGE_KEYS } fr
 const INPUT_CLS =
   'w-full rounded-lg border border-edge-strong bg-paper px-3 py-2 font-mono text-sm placeholder:text-ink-ghost focus:border-accent';
 const BTN_QUIET =
-  'rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-ink hover:bg-paper-sunken transition-colors';
+  'rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors';
 const BTN_PRIMARY =
   'inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm font-medium text-paper hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors';
 
