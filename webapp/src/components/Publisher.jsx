@@ -349,13 +349,13 @@ export default function Publisher() {
       <SectionHeader label="成本" />
       <div className="mb-6">
         <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
-        <p className="mt-4 text-xs text-ink-faint">
-          一经发布，将永久刻入 {chainLabel}，不可修改、不可删除。
-        </p>
       </div>
 
       {/* 动作 */}
       <div className="pt-6">
+        <p className="mb-4 text-xs text-ink-faint">
+          一经发布，将永久刻入 {chainLabel}，不可修改、不可删除。
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
         {status === 'processing' && statusMsg && (
           <span role="status" className="text-sm text-ink-faint">
