@@ -80,9 +80,10 @@ export function gasToCost(gas, gasPriceWei, ethUsd) {
 
 export function fmtEth(eth) {
   if (eth == null) return '—';
-  if (eth < 0.0001) return `${(eth * 1e6).toFixed(2)} μETH`;
-  if (eth < 1) return `${(eth * 1000).toFixed(3)} mETH`;
-  return `${eth.toFixed(4)} ETH`;
+  // 统一用 ETH 展示；最小单位 0.000001 —— 0 或更小的值也按最小单位显示。
+  const clamped = Math.max(Number(eth), 0.000001);
+  const rounded = clamped < 1 ? Number(clamped.toFixed(6)) : Number(clamped.toFixed(4));
+  return `${rounded} ETH`;
 }
 
 export function fmtUsd(usd) {
