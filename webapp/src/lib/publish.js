@@ -28,6 +28,32 @@ export async function getWallet() {
 }
 
 /**
+ * WebP-encode a canvas with a fallback chain for browsers that lack
+ * OffscreenCanvas.convertToBlob (Safari < 16.4) or WebP support entirely.
+ */
+async function canvasToBlob(canvas, type, quality) {
+  if (typeof canvas.convertToBlob === 'function') {
+    return canvas.convertToBlob({ type, quality });
+  }
+  const el = document.createElement('canvas');
+  el.width = canvas.width;
+  el.height = canvas.height;
+  const ctx = el.getContext('2d');
+  if (!ctx) throw new Error('无法创建画布上下文');
+  ctx.drawImage(canvas, 0, 0);
+  return new Promise((resolve, reject) => {
+    el.toBlob(
+      (blob) =>
+        blob
+          ? resolve(blob)
+          : reject(new Error('当前浏览器不支持 WebP 编码，请换用 Chrome / Firefox。')),
+      type,
+      quality,
+    );
+  });
+}
+
+/**
  * Downscale and compress an image file to WebP.
  * Falls back to a DOM canvas when OffscreenCanvas is unavailable.
  */
@@ -54,7 +80,7 @@ export async function processImage(
   let q = quality;
   let blob;
   do {
-    blob = await canvas.convertToBlob({ type: 'image/webp', quality: q });
+    blob = await canvasToBlob(canvas, 'image/webp', q);
     q -= 0.1;
   } while (blob.size > maxBytes && q > 0.3);
 

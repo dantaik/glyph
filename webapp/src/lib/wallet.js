@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 const EVT = 'cairn:wallet';
-let state = { account: null, isConnecting: false };
+let state = { account: null, chainId: null, isConnecting: false };
 let initialized = false;
 
 function emit(next) {
@@ -15,7 +15,19 @@ function subscribeProvider() {
   eth.on('accountsChanged', (accounts) => {
     emit({ account: accounts?.[0] || null });
   });
+  eth.on('chainChanged', (id) => {
+    emit({ chainId: id ? Number(id) : null });
+  });
   eth.on('disconnect', () => emit({ account: null }));
+}
+
+async function readChainId() {
+  try {
+    const id = await window.ethereum.request({ method: 'eth_chainId' });
+    emit({ chainId: id ? Number(id) : null });
+  } catch {
+    // chainId stays null — UI treats it as "unknown"
+  }
 }
 
 async function init() {
@@ -27,6 +39,7 @@ async function init() {
   try {
     const accounts = await eth.request({ method: 'eth_accounts' });
     if (accounts?.[0]) emit({ account: accounts[0] });
+    await readChainId();
   } catch {
     /* silent: read-only until user connects */
   }
@@ -42,14 +55,20 @@ export async function connect() {
   emit({ isConnecting: true });
   try {
     const accounts = await eth.request({ method: 'eth_requestAccounts' });
-    emit({ account: accounts?.[0] || null, isConnecting: false });
-    return accounts?.[0] || null;
+    const account = accounts?.[0] || null;
+    emit({ account, isConnecting: false });
+    await readChainId();
+    return account;
   } catch (e) {
     emit({ isConnecting: false });
     throw e;
   }
 }
 
+/**
+ * Wallet hook — every component reads the same shared store, kept in sync
+ * with the provider via accountsChanged / chainChanged / disconnect.
+ */
 export function useWallet() {
   const [, force] = useState(0);
   useEffect(() => {
@@ -60,6 +79,7 @@ export function useWallet() {
   }, []);
   return {
     account: state.account,
+    chainId: state.chainId,
     isConnecting: state.isConnecting,
     hasProvider: hasProvider(),
     connect,

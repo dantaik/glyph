@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { embedImages, publishPost, getWallet } from '../lib/publish';
-import MarkdownEditor from './MarkdownEditor';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { embedImages, publishPost } from '../lib/publish';
 import { client } from '../lib/blogReader';
 import { getAuthorCount } from '../lib/data';
+import { useWallet } from '../lib/wallet';
 import { CHAIN_ID } from '../lib/config';
+import ImageUploader from './ImageUploader';
 import { etherscanTxUrl } from '../lib/format';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import {
@@ -20,14 +21,16 @@ import {
   TITLE_MAX_BYTES,
 } from '../lib/title';
 
+// CodeMirror is heavy — split it out of the main bundle; it loads when the
+// write tab first renders.
+const MarkdownEditor = lazy(() => import('./MarkdownEditor'));
+
 const PLACEHOLDER_TITLE = '';
 const PLACEHOLDER_MD = `# 小标题
 
 写点什么...
 
-![图片描述](upload:img1)
-
-把图片拖入下方区域或点击上传，引用它的 Markdown 语法是 \`![描述](upload:img1)\`。`;
+把图片拖入下方区域或点击上传，上传后正文里用对应键名引用即可。`;
 
 const SEGMENT_ON = 'rounded-full px-2.5 py-1 text-xs transition-colors bg-paper-sunken text-ink font-medium';
 const SEGMENT_OFF = 'rounded-full px-2.5 py-1 text-xs transition-colors text-ink-faint hover:text-ink';
@@ -42,41 +45,38 @@ export default function Publisher() {
   const [status, setStatus] = useState('idle');
   const [statusMsg, setStatusMsg] = useState('');
   const [txHash, setTxHash] = useState(null);
-  const [account, setAccount] = useState(null);
   const [isFirstPost, setIsFirstPost] = useState(true);
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef(null);
+  const { account, chainId: walletChainId, connect } = useWallet();
+  const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
 
   const titleBytes = titleByteLength(title);
   const titleOver = titleBytes > TITLE_MAX_BYTES;
 
-  /** Parse upload:KEY refs from markdown */
+  /**
+   * Parse upload:KEY refs from markdown. The key charset mirrors the
+   * file-key sanitizer in ImageUploader (ASCII \w plus `-` and CJK).
+   */
   const uploadRefs = useMemo(
-    () => [...markdown.matchAll(/upload:(\w+)/g)].map((m) => m[1]),
+    () => [...markdown.matchAll(/upload:([A-Za-z0-9_\u4e00-\u9fff-]+)/g)].map((m) => m[1]),
     [markdown],
   );
 
-  // Detect wallet + first-post status (drives cold-SSTORE estimate).
+  // First-post status (drives the cold-SSTORE estimate), from the shared
+  // wallet store instead of a one-off eth_accounts poll.
   useEffect(() => {
-    if (!window.ethereum) return;
+    if (!account) {
+      setIsFirstPost(true);
+      return undefined;
+    }
     let cancelled = false;
-    (async () => {
-      try {
-        const [addr] =
-          (await window.ethereum.request?.({ method: 'eth_accounts' })) || [];
-        if (!addr || cancelled) return;
-        setAccount(addr);
-        const c = await getAuthorCount(addr);
-        if (!cancelled) setIsFirstPost(c === 0n);
-      } catch {
-        // ignore — fall back to first-post estimate
-      }
-    })();
+    getAuthorCount(account)
+      .then((c) => !cancelled && setIsFirstPost(c === 0n))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [account]);
 
   // Poll gas + ETH price every 30s.
   useEffect(() => {
@@ -92,20 +92,6 @@ export default function Publisher() {
       clearInterval(id);
     };
   }, []);
-
-  // Stable preview URLs for uploaded files.
-  const filePreviews = useMemo(() => {
-    const map = {};
-    for (const [key, file] of Object.entries(files)) {
-      map[key] = URL.createObjectURL(file);
-    }
-    return map;
-  }, [files]);
-  useEffect(
-    () => () =>
-      Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url)),
-    [filePreviews],
-  );
 
   // --- Cost estimate ---
   // Rough approximation — actual brotli output may differ a little either way.
@@ -156,35 +142,11 @@ export default function Publisher() {
     }
   };
 
-  // --- File handling ---
-  const handleFileChange = useCallback(
-    (e) => {
-      const newFiles = { ...files };
-      for (const f of e.target.files) {
-        const base =
-          (f.name
-            .replace(/\.[^.]+$/, '')
-            .replace(/[^a-zA-Z0-9一-鿿_-]/g, '') || 'img');
-        let key = base;
-        let suffix = 2;
-        while (newFiles[key]) key = `${base}-${suffix++}`;
-        newFiles[key] = f;
-      }
-      setFiles(newFiles);
-      e.target.value = '';
-    },
-    [files],
-  );
-  const removeFile = (key) => {
-    const next = { ...files };
-    delete next[key];
-    setFiles(next);
-  };
-
   // --- Connect wallet helper ---
   const ensureWallet = async () => {
-    const { account: a } = await getWallet();
-    setAccount(a);
+    if (account) return account;
+    const a = await connect();
+    if (!a) throw new Error('未连接钱包');
     return a;
   };
 
@@ -340,13 +302,15 @@ export default function Publisher() {
             </button>
           </div>
         </div>
-        <MarkdownEditor
-          value={markdown}
-          onChange={setMarkdown}
-          showPreview={showPreview}
-          disabled={status === 'processing'}
-          height="26rem"
-        />
+        <Suspense fallback={<EditorSkeleton height="26rem" />}>
+          <MarkdownEditor
+            value={markdown}
+            onChange={setMarkdown}
+            showPreview={showPreview}
+            disabled={status === 'processing'}
+            height="26rem"
+          />
+        </Suspense>
       </div>
 
       {/* Image upload */}
@@ -354,96 +318,12 @@ export default function Publisher() {
         <span className="block text-xs tracking-label text-ink-faint mb-1.5">
           图片（使用 upload:KEY 引用）
         </span>
-
-        {uploadRefs.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {uploadRefs.map((key) => (
-              <span
-                key={key}
-                className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 ${
-                  files[key]
-                    ? 'bg-success-wash text-success'
-                    : 'bg-accent-wash text-accent-strong'
-                }`}
-              >
-                {files[key] ? <Check size={12} /> : <AlertCircle size={12} />}
-                {key}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="上传图片"
-          className={`rounded-xl border-2 border-dashed p-7 text-center transition-colors cursor-pointer
-                     ${isDragging
-                       ? 'border-accent bg-accent-wash/50'
-                       : 'border-edge-strong bg-paper-raised hover:border-accent'}`}
-          onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            if (e.dataTransfer.files.length) {
-              handleFileChange({ target: { files: e.dataTransfer.files } });
-            }
-          }}
-        >
-          <p className="text-sm text-ink-faint">拖入图片或点击上传</p>
-          <p className="text-xs text-ink-ghost mt-1">
-            自动转换为 WebP q60，最大长边 1600px
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
-
-        {Object.keys(files).length > 0 && (
-          <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {Object.entries(files).map(([key, file]) => (
-              <div key={key} className="relative group">
-                <img
-                  src={filePreviews[key]}
-                  alt={key}
-                  className="w-full h-24 object-cover rounded-lg border border-edge"
-                />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(key);
-                  }}
-                  aria-label={`移除图片 ${key}`}
-                  className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full
-                             bg-paper-raised/90 text-ink-faint hover:text-danger shadow-sm
-                             opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"
-                >
-                  <Close size={12} />
-                </button>
-                <span className="block text-[10px] text-ink-faint mt-0.5 truncate">
-                  {key} · {(file.size / 1024).toFixed(0)}KB
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        <ImageUploader
+          files={files}
+          uploadRefs={uploadRefs}
+          onChange={setFiles}
+          disabled={status === 'processing'}
+        />
       </div>
 
       {/* Cost estimate */}
@@ -453,7 +333,12 @@ export default function Publisher() {
       <div className="mt-7 flex flex-wrap items-center gap-4">
         <button
           onClick={handlePublish}
-          disabled={!canPublish || status === 'processing' || status === 'signing'}
+          disabled={
+            !canPublish ||
+            status === 'processing' ||
+            status === 'signing' ||
+            chainMismatch
+          }
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm
                      font-medium text-paper hover:bg-accent-strong disabled:opacity-40
                      disabled:cursor-not-allowed transition-colors"
@@ -477,6 +362,18 @@ export default function Publisher() {
           </span>
         )}
       </div>
+
+      {chainMismatch && (
+        <div
+          role="alert"
+          className="mt-4 flex items-start gap-2 rounded-lg bg-danger-wash px-4 py-3 text-sm text-danger"
+        >
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            钱包连接的链（ID {walletChainId}）与应用配置的链（ID {CHAIN_ID}）不一致，请在钱包中切换网络后重试。
+          </span>
+        </div>
+      )}
 
       {status === 'error' && (
         <div
@@ -513,6 +410,18 @@ export default function Publisher() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function EditorSkeleton({ height }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="grid grid-cols-1 gap-3"
+      style={{ height }}
+    >
+      <div className="animate-pulse rounded-xl border border-edge bg-paper-raised" />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RPC_URL, CHAIN_ID, saveEndpointConfig, STORAGE_KEYS } from '../lib/config';
 
 const INPUT_CLS =
@@ -16,6 +16,7 @@ export default function Settings({ open, onClose }) {
   const [rpcUrl, setRpcUrl] = useState(RPC_URL);
   const [chainId, setChainId] = useState(String(CHAIN_ID));
   const [entered, setEntered] = useState(false);
+  const dialogRef = useRef(null);
 
   useEffect(() => {
     if (!open) {
@@ -34,11 +35,35 @@ export default function Settings({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return undefined;
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement;
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialog) return;
+      // Keep Tab focus inside the dialog (simple focus trap).
+      const focusables = [...dialog.querySelectorAll('input, button, a[href]')].filter(
+        (el) => !el.disabled && el.offsetParent !== null,
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !dialog.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      previouslyFocused?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -60,6 +85,7 @@ export default function Settings({ open, onClose }) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="节点设置"

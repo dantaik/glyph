@@ -11,22 +11,39 @@
 const DB_NAME = 'glyph-cache';
 const DB_VERSION = 1;
 
+/** Lazily-opened singleton connection, reused by every cache op. */
+let dbPromise = null;
+
 /** @returns {Promise<IDBDatabase>} */
 function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains('bodies')) {
-        db.createObjectStore('bodies');
-      }
-      if (!db.objectStoreNames.contains('images')) {
-        db.createObjectStore('images');
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('bodies')) {
+          db.createObjectStore('bodies');
+        }
+        if (!db.objectStoreNames.contains('images')) {
+          db.createObjectStore('images');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        // Another tab bumped the schema version — close so the next op reopens.
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
+      };
+      req.onerror = () => reject(req.error);
+    }).catch((err) => {
+      dbPromise = null;
+      throw err;
+    });
+  }
+  return dbPromise;
 }
 
 function promisify(req) {
@@ -49,7 +66,6 @@ export async function getCachedBody(txHash) {
     const result = await promisify(
       db.transaction('bodies', 'readonly').objectStore('bodies').get(txHash),
     );
-    db.close();
     return result ?? null;
   } catch {
     return null;
@@ -67,7 +83,6 @@ export async function setCachedBody(txHash, body) {
     await promisify(
       db.transaction('bodies', 'readwrite').objectStore('bodies').put(body, txHash),
     );
-    db.close();
   } catch {
     // quota exceeded or privacy mode — silent degrade
   }
@@ -76,9 +91,10 @@ export async function setCachedBody(txHash, body) {
 // --- Images ---
 
 /**
- * Retrieve a cached image as a blob URL. Returns null on cache miss.
+ * Retrieve a cached image as a Blob. Returns null on cache miss.
+ * (Callers mint their own object URLs so each consumer can revoke them.)
  * @param {string} txHash
- * @returns {Promise<string | null>}
+ * @returns {Promise<Blob | null>}
  */
 export async function getCachedImage(txHash) {
   try {
@@ -86,9 +102,8 @@ export async function getCachedImage(txHash) {
     const buf = await promisify(
       db.transaction('images', 'readonly').objectStore('images').get(txHash),
     );
-    db.close();
     if (!buf) return null;
-    return URL.createObjectURL(new Blob([buf], { type: 'image/webp' }));
+    return new Blob([buf], { type: 'image/webp' });
   } catch {
     return null;
   }
@@ -105,7 +120,6 @@ export async function setCachedImage(txHash, buffer) {
     await promisify(
       db.transaction('images', 'readwrite').objectStore('images').put(buffer, txHash),
     );
-    db.close();
   } catch {
     // silent degrade
   }

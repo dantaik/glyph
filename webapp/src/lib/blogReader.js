@@ -105,6 +105,9 @@ export async function loadMoreTitles(author, oldestShown, n) {
  * Walks the per-author reverse chain backwards until we find it or pass it.
  */
 export async function findTitleMeta(author, targetIndex) {
+  // Guard against garbage from the URL (?i=abc): BigInt(NaN) throws, and
+  // negative / fractional indexes can never match a real post.
+  if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return null;
   const target = BigInt(targetIndex);
   let block = await readHead(author);
   while (block > 0n) {
@@ -190,10 +193,13 @@ export function loadPostBody(txHash) {
 }
 
 // --- Image resolution — with permanent IndexedDB cache ---
+//
+// We cache Blobs (not object URLs): each caller mints fresh URLs from the
+// shared Blob and revokes them when done, so long sessions don't leak.
 
-const imgCache = new Map();
+const imgCache = new Map(); // hash -> Promise<Blob>
 
-export function resolveImage(hash, mime = 'image/webp') {
+export function loadImageBlob(hash, mime = 'image/webp') {
   if (imgCache.has(hash)) return imgCache.get(hash);
   const promise = (async () => {
     // Check IndexedDB cache first.
@@ -202,25 +208,31 @@ export function resolveImage(hash, mime = 'image/webp') {
 
     const tx = await client.getTransaction({ hash });
     const bytes = hexToBytes(tx.input);
-    const blobURL = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    const blob = new Blob([bytes], { type: mime });
 
     // Persist raw bytes to IndexedDB (fire-and-forget).
     setCachedImage(hash, bytes.buffer).catch(() => {});
 
-    return blobURL;
+    return blob;
   })();
   promise.catch(() => imgCache.delete(hash));
   imgCache.set(hash, promise);
   return promise;
 }
 
+/**
+ * Resolve `eth:0x<txhash>` image refs to blob URLs.
+ * @returns {Promise<{ markdown: string, urls: string[] }>} rewritten
+ *   markdown plus the fresh object URLs — the caller must revoke them.
+ */
 export async function resolveImages(markdown) {
   const re = /!\[([^\]]*)\]\(eth:(0x[0-9a-fA-F]{64})[^)]*\)/g;
   const matches = [...markdown.matchAll(re)];
-  const urls = await Promise.all(matches.map((m) => resolveImage(m[2])));
+  const blobs = await Promise.all(matches.map((m) => loadImageBlob(m[2])));
+  const urls = blobs.map((blob) => URL.createObjectURL(blob));
   let out = markdown;
   matches.forEach((m, i) => {
-    out = out.split(m[0]).join(`![${m[1]}](${urls[i]})`);
+    out = out.split(m[0]).join('![' + m[1] + '](' + urls[i] + ')');
   });
-  return out;
+  return { markdown: out, urls };
 }

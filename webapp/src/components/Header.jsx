@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useUrlState } from '../lib/router';
 import { useTheme } from '../lib/theme';
+import { useWallet } from '../lib/wallet';
 import { shortAddr } from '../lib/format';
 import { GlyphMark, Sun, Moon, Sliders } from './Icons';
 
@@ -14,31 +15,17 @@ const TABS = [
 
 /** Sticky masthead: brand, tabs, wallet pill, theme toggle, settings */
 export default function Header({ tab, onTabChange, onOpenSettings }) {
-  const [account, setAccount] = useState(null);
+  const { account, connect } = useWallet();
   const [, navigate] = useUrlState();
   const { isDark, setTheme } = useTheme();
 
-  const connect = useCallback(async () => {
-    if (!window.ethereum) return;
+  const handleConnect = useCallback(async () => {
     try {
-      const [addr] = await window.ethereum.request({
-        method: 'eth_requestAccounts',
-      });
-      setAccount(addr);
+      await connect();
     } catch (err) {
       if (err?.code !== 4001) console.warn('wallet connect failed:', err);
     }
-  }, []);
-
-  useEffect(() => {
-    if (window.ethereum?.selectedAddress) {
-      setAccount(window.ethereum.selectedAddress);
-    }
-    const handler = (accounts) => setAccount(accounts[0] || null);
-    window.ethereum?.on?.('accountsChanged', handler);
-    return () =>
-      window.ethereum?.removeListener?.('accountsChanged', handler);
-  }, []);
+  }, [connect]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-edge bg-paper/85 backdrop-blur">
@@ -88,7 +75,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
             </button>
           ) : (
             <button
-              onClick={connect}
+              onClick={handleConnect}
               className="whitespace-nowrap rounded-full bg-accent-wash px-3 py-1 text-xs font-medium text-accent-strong hover:bg-accent hover:text-paper transition-colors"
             >
               连接钱包

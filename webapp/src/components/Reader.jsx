@@ -9,15 +9,10 @@ import {
 } from '../lib/data';
 import { GLYPH_ADDRESS } from '../lib/config';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
-import {
-  fmtBlock,
-  fmtTitle,
-  estimateBlockTime,
-  fmtRelTime,
-} from '../lib/format';
 import EmptyState from './EmptyState';
 import PostPage from './PostPage';
 import HomeFeed from './HomeFeed';
+import AuthorTitleList from './AuthorTitleList';
 
 const PAGE_SIZE = 20;
 
@@ -25,13 +20,17 @@ export default function Reader({ onStartWriting }) {
   const [params, navigate] = useUrlState();
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const i = params.i;
+  // Selected index from the URL: undefined = none, invalid = null.
+  const idx = i != null && i !== '' ? Number(i) : undefined;
+  const idxValid = idx != null && Number.isSafeInteger(idx) && idx >= 0;
 
   const [titles, setTitles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(null);
-  const [currentMeta, setCurrentMeta] = useState(null);
+  // undefined = resolving, null = not found, meta = found.
+  const [currentMeta, setCurrentMeta] = useState(undefined);
   // undefined = resolving, null = unavailable, bigint = known.
   const [authorCount, setAuthorCount] = useState(undefined);
   const [clock, setClock] = useState(null);
@@ -91,28 +90,32 @@ export default function Reader({ onStartWriting }) {
 
   // Resolve the meta for the currently-selected post.
   useEffect(() => {
-    if (!author || !i) {
-      setCurrentMeta(null);
+    if (!author || idx === undefined) {
+      setCurrentMeta(undefined);
       return undefined;
     }
-    const cached = titles.find((t) => Number(t.index) === Number(i));
+    if (!idxValid) {
+      setCurrentMeta(null); // not found — index is not a valid number
+      return undefined;
+    }
+    const cached = titles.find((t) => Number(t.index) === idx);
     if (cached) {
       setCurrentMeta(cached);
       return undefined;
     }
     let cancelled = false;
-    findTitleMeta(author, Number(i)).then((m) => !cancelled && setCurrentMeta(m));
+    setCurrentMeta(undefined);
+    findTitleMeta(author, idx).then((m) => !cancelled && setCurrentMeta(m ?? null));
     return () => {
       cancelled = true;
     };
-  }, [author, i, titles]);
+  }, [author, idx, idxValid, titles]);
 
   // Neighbors for the open post: seed synchronously from the titles cache,
   // resolve misses via findTitleMeta in parallel; j<0 → null immediately;
   // when authorCount is known, j>=authorCount → null without RPC.
   useEffect(() => {
-    const idx = author && i != null && i !== '' ? Number(i) : null;
-    if (idx === null || Number.isNaN(idx)) {
+    if (!author || !idxValid) {
       setNeighbors({ prev: undefined, next: undefined });
       return undefined;
     }
@@ -147,7 +150,7 @@ export default function Reader({ onStartWriting }) {
     return () => {
       cancelled = true;
     };
-  }, [author, i, titles, authorCount]);
+  }, [author, idx, idxValid, titles, authorCount]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !author) return;
@@ -194,11 +197,21 @@ export default function Reader({ onStartWriting }) {
   // --- Single post view ---
 
   if (i != null) {
-    if (currentMeta == null) {
+    if (currentMeta === undefined) {
       return (
         <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
           加载中…
         </div>
+      );
+    }
+    if (currentMeta === null) {
+      return (
+        <EmptyState
+          title="没有找到这篇岩刻"
+          body="链接里的序号不存在（可能已越界或格式有误）。"
+          actionLabel="返回作者列表"
+          onAction={() => navigate({ author })}
+        />
       );
     }
     return (
@@ -214,107 +227,18 @@ export default function Reader({ onStartWriting }) {
   // --- Title list view ---
 
   return (
-    <div>
-      <header className="mb-8 border-b border-edge pb-5">
-        <p className="text-xs tracking-label text-ink-faint">作者</p>
-        <p className="mt-1 font-mono text-sm text-ink-soft break-all select-all">
-          {author}
-        </p>
-        <p className="mt-2 text-xs text-ink-faint tabular-nums">
-          共{' '}
-          {authorCount == null ? (
-            <span
-              className={`text-ink-ghost${authorCount === undefined ? ' animate-pulse' : ''}`}
-            >
-              —
-            </span>
-          ) : (
-            Number(authorCount)
-          )}{' '}
-          篇
-        </p>
-      </header>
-
-      {loading && titles.length === 0 && <ListSkeleton />}
-
-      {error && titles.length === 0 && !loading && (
-        <EmptyState
-          tone="danger"
-          title="加载失败"
-          body={error}
-          actionLabel="重试"
-          onAction={() => setListTick((t) => t + 1)}
-        />
-      )}
-
-      {!loading && titles.length === 0 && !error && (
-        <EmptyState title="还没有岩刻" body="这位作者还没有在链上刻过字。" />
-      )}
-
-      {titles.length > 0 && (
-        <ul className="divide-y divide-edge">
-          {titles.map((t) => {
-            const rel = fmtRelTime(estimateBlockTime(clock, t.block));
-            return (
-              <li key={`${t.block}-${t.index}`}>
-                <a
-                  href={`?author=${author}&i=${t.index}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate({ author, i: String(t.index) });
-                  }}
-                  className="group flex items-baseline gap-4 py-4"
-                >
-                  <span className="min-w-[2.5rem] font-mono text-xs text-ink-ghost tabular-nums">
-                    #{Number(t.index) + 1}
-                  </span>
-                  <span className="flex-1 font-serif text-[1.05rem] leading-snug group-hover:text-accent transition-colors">
-                    {fmtTitle(t.title) ?? <span className="text-ink-ghost">无标题</span>}
-                  </span>
-                  <span className="text-xs text-ink-faint tabular-nums whitespace-nowrap">
-                    {rel ?? `区块 ${fmtBlock(t.block)}`}
-                  </span>
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {error && titles.length > 0 && (
-        <p className="mt-4 text-center text-sm text-danger">{error}</p>
-      )}
-
-      {titles.length > 0 && (
-        <div className="mt-8 text-center">
-          {hasMore ? (
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="rounded-full border border-edge px-5 py-2 text-sm text-ink-soft hover:border-edge-strong hover:text-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {loadingMore ? '正在加载…' : '加载更多'}
-            </button>
-          ) : (
-            <p className="text-xs text-ink-ghost">已是全部岩刻</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ListSkeleton() {
-  return (
-    <ul className="divide-y divide-edge" aria-hidden="true">
-      {[0, 1, 2, 3, 4].map((k) => (
-        <li key={k} className="flex items-baseline gap-4 py-4">
-          <span className="h-3 w-8 animate-pulse rounded bg-paper-sunken" />
-          <span className="h-5 max-w-[60%] flex-1 animate-pulse rounded bg-paper-sunken" />
-          <span className="ml-auto h-3 w-16 animate-pulse rounded bg-paper-sunken" />
-        </li>
-      ))}
-    </ul>
+    <AuthorTitleList
+      author={author}
+      titles={titles}
+      loading={loading}
+      loadingMore={loadingMore}
+      hasMore={hasMore}
+      error={error}
+      authorCount={authorCount}
+      clock={clock}
+      onLoadMore={loadMore}
+      onRetry={() => setListTick((t) => t + 1)}
+      navigate={navigate}
+    />
   );
 }

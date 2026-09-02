@@ -8,9 +8,9 @@
 
 ```bash
 # 1. 部署合约（任何人都可以部署；部署者无任何特权）
-cd contracts && forge install
+cd contracts && forge install foundry-rs/forge-std
 forge script script/Deploy.s.sol:DeployBlog \
-  --rpc-url $ETH_RPC --private-key $PRIVATE_KEY --broadcast
+  --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY 经环境变量传入（脚本用 vm.envUint 读取）
 
 # 2. 配置前端
 cat > webapp/.env.local <<EOF

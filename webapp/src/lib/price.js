@@ -54,8 +54,12 @@ export function estimatePublishGas(payloadBytes, firstPost) {
   const calldata = nonzero * 40 + zero * 10;
 
   const base = 21000;
-  const logCost = 1500 + 768; // LOG3 (1 indexed topic) + 3 × 32B non-indexed args
-  const sstore = firstPost ? 22100 : 5000; // single packed slot, cold vs warm
+  // LOG with 2 topics (signature + indexed author) and 96 bytes of data:
+  // 375 + 375 × 2 + 8 × 96 = 1,893 (EIP-2929).
+  const logCost = 1893;
+  // One packed slot, read then written: warm SLOAD+SSTORE = 100+100 (EIP-2929);
+  // the first post pays cold access + 0→non-zero init = 2,100+22,100.
+  const sstore = firstPost ? 2100 + 22100 : 100 + 100;
   return base + calldata + logCost + sstore;
 }
 

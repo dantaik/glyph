@@ -1,0 +1,131 @@
+import {
+  fmtBlock,
+  fmtTitle,
+  estimateBlockTime,
+  fmtRelTime,
+} from '../lib/format';
+import EmptyState from './EmptyState';
+
+/**
+ * Author page: address header, post count, title list with relative times,
+ * load-more, and the empty/error/skeleton states. Pure render — data lives
+ * in Reader.jsx.
+ */
+export default function AuthorTitleList({
+  author,
+  titles,
+  loading,
+  loadingMore,
+  hasMore,
+  error,
+  authorCount,
+  clock,
+  onLoadMore,
+  onRetry,
+  navigate,
+}) {
+  return (
+    <div>
+      <header className="mb-8 border-b border-edge pb-5">
+        <p className="text-xs tracking-label text-ink-faint">作者</p>
+        <p className="mt-1 font-mono text-sm text-ink-soft break-all select-all">
+          {author}
+        </p>
+        <p className="mt-2 text-xs text-ink-faint tabular-nums">
+          共{' '}
+          {authorCount == null ? (
+            <span
+              className={`text-ink-ghost${authorCount === undefined ? ' animate-pulse' : ''}`}
+            >
+              —
+            </span>
+          ) : (
+            Number(authorCount)
+          )}{' '}
+          篇
+        </p>
+      </header>
+
+      {loading && titles.length === 0 && <ListSkeleton />}
+
+      {error && titles.length === 0 && !loading && (
+        <EmptyState
+          tone="danger"
+          title="加载失败"
+          body={error}
+          actionLabel="重试"
+          onAction={onRetry}
+        />
+      )}
+
+      {!loading && titles.length === 0 && !error && (
+        <EmptyState title="还没有岩刻" body="这位作者还没有在链上刻过字。" />
+      )}
+
+      {titles.length > 0 && (
+        <ul className="divide-y divide-edge">
+          {titles.map((t) => {
+            const rel = fmtRelTime(estimateBlockTime(clock, t.block));
+            return (
+              <li key={`${t.block}-${t.index}`}>
+                <a
+                  href={`?author=${author}&i=${t.index}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate({ author, i: String(t.index) });
+                  }}
+                  className="group flex items-baseline gap-4 py-4"
+                >
+                  <span className="min-w-[2.5rem] font-mono text-xs text-ink-ghost tabular-nums">
+                    #{Number(t.index) + 1}
+                  </span>
+                  <span className="flex-1 font-serif text-[1.05rem] leading-snug group-hover:text-accent transition-colors">
+                    {fmtTitle(t.title) ?? <span className="text-ink-ghost">无标题</span>}
+                  </span>
+                  <span className="text-xs text-ink-faint tabular-nums whitespace-nowrap">
+                    {rel ?? `区块 ${fmtBlock(t.block)}`}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {error && titles.length > 0 && (
+        <p className="mt-4 text-center text-sm text-danger">{error}</p>
+      )}
+
+      {titles.length > 0 && (
+        <div className="mt-8 text-center">
+          {hasMore ? (
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              className="rounded-full border border-edge px-5 py-2 text-sm text-ink-soft hover:border-edge-strong hover:text-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loadingMore ? '正在加载…' : '加载更多'}
+            </button>
+          ) : (
+            <p className="text-xs text-ink-ghost">已是全部岩刻</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <ul className="divide-y divide-edge" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((k) => (
+        <li key={k} className="flex items-baseline gap-4 py-4">
+          <span className="h-3 w-8 animate-pulse rounded bg-paper-sunken" />
+          <span className="h-5 max-w-[60%] flex-1 animate-pulse rounded bg-paper-sunken" />
+          <span className="ml-auto h-3 w-16 animate-pulse rounded bg-paper-sunken" />
+        </li>
+      ))}
+    </ul>
+  );
+}

@@ -36,7 +36,16 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
   const [relTime, setRelTime] = useState(null);
   const articleRef = useRef(null);
 
+  // Object URLs for the resolved images of the *current* post — revoked
+  // whenever the post changes or the page unmounts.
+  const urlsRef = useRef([]);
+  const releaseUrls = () => {
+    urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    urlsRef.current = [];
+  };
+
   const load = useCallback(async () => {
+    releaseUrls();
     setLoading(true);
     setError(null);
     setBody(null);
@@ -44,7 +53,8 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
     try {
       const b = await loadPostBody(meta.txHash);
       setBody(b);
-      const resolved = await resolveImages(b.markdown);
+      const { markdown: resolved, urls } = await resolveImages(b.markdown);
+      urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
     } catch (err) {
       setError(err.message || '加载失败');
@@ -56,6 +66,9 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Unmount-only cleanup: load() already revokes on every post switch.
+  useEffect(() => () => releaseUrls(), []);
 
   // Jump back to the top instantly when switching letters (prev/next nav).
   useEffect(() => {

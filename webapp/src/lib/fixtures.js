@@ -265,7 +265,7 @@ export function makeFixtures(mode) {
     },
 
     async resolveImages(markdown) {
-      return markdown;
+      return { markdown, urls: [] };
     },
 
     async getAuthorCount(author) {
