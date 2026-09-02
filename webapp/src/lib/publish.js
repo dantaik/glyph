@@ -18,6 +18,25 @@ import { encodePayload } from './payload';
 
 const chain = CHAIN_ID === 11155111 ? sepolia : mainnet;
 
+/**
+ * Per-transaction byte ceiling. NOT a consensus rule: geth's transaction
+ * pool rejects anything whose encoded size exceeds txMaxSize (4 × 32 KiB)
+ * with "oversized data", and every public endpoint runs that default — so
+ * it binds long before EIP-7825's 16,777,216 gas cap (~409 KB of calldata,
+ * the figure in the spec's constants table).
+ */
+export const MAX_TX_BYTES = 131_072;
+
+/**
+ * What's left for calldata once the transaction envelope is accounted for
+ * (signature, nonce, gas fields, and for publish() the selector + title +
+ * ABI offset/length header). Generous on purpose — being a kilobyte
+ * conservative costs nothing, and guessing high costs a rejected send.
+ */
+export const MAX_CALLDATA_BYTES = MAX_TX_BYTES - 1_024;
+
+const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
+
 async function getWallet() {
   if (!window.ethereum) {
     throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
@@ -59,7 +78,7 @@ async function canvasToBlob(canvas, type, quality) {
  */
 async function processImage(
   file,
-  { maxEdge = 1600, quality = 0.6, maxBytes = 200_000 } = {},
+  { maxEdge = 1600, quality = 0.6, maxBytes = MAX_CALLDATA_BYTES } = {},
 ) {
   const bmp = await createImageBitmap(file);
   const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
@@ -83,6 +102,14 @@ async function processImage(
     blob = await canvasToBlob(canvas, 'image/webp', q);
     q -= 0.1;
   } while (blob.size > maxBytes && q > 0.3);
+  // The loop stops lowering quality at 0.3 whether or not it got under
+  // budget. Returning an over-budget blob would just buy an "oversized
+  // data" rejection from the node, so say what happened instead.
+  if (blob.size > maxBytes) {
+    throw new Error(
+      `压缩到最低画质后仍有 ${asKB(blob.size)}，超过单笔交易上限 ${asKB(maxBytes)}，请改用尺寸更小的图片。`,
+    );
+  }
 
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -132,11 +159,39 @@ export async function embedImages(markdown, files, { quality = 0.6, onProgress }
   for (const key of used) {
     i += 1;
     onProgress?.(key, i, used.length);
-    const bytes = await processImage(files[key], { quality });
+    const bytes = await processImage(files[key], { quality }).catch((err) => {
+      throw new Error(`图片 ${key}：${err.message}`);
+    });
     const hash = await storeImage(bytes, wallet, account);
     out = out.replace(imageRefRe(key, 'g'), `$1eth:${hash}`);
   }
   return out;
+}
+
+/** A stand-in tx hash: random, so brotli can't compress it away. */
+function placeholderHash() {
+  const b = new Uint8Array(32);
+  crypto.getRandomValues(b);
+  return '0x' + [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Compress the draft and measure it against the per-transaction ceiling.
+ * Call this BEFORE embedImages: images are paid for one transaction at a
+ * time, so a body that can never be sent has to fail while it is still
+ * free. Each `upload:KEY` is measured as the `eth:<32-byte hash>` it will
+ * become — longer than the ref it replaces, and barely compressible — so
+ * the draft as typed would undercount.
+ * @returns {Promise<{ bytes: number, limit: number, ok: boolean }>}
+ */
+export async function measurePayload({ tags = [], markdown, files = {} }) {
+  let doc = markdown || '';
+  for (const key of usedImageKeys(doc, files)) {
+    doc = doc.replace(imageRefRe(key, 'g'), `$1eth:${placeholderHash()}`);
+  }
+  const payload = await encodePayload({ tags, markdown: doc });
+  const limit = MAX_CALLDATA_BYTES;
+  return { bytes: payload.length, limit, ok: payload.length <= limit };
 }
 
 /**
