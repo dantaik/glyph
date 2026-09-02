@@ -111,6 +111,21 @@ const CHAIN_NAMES = {
   167013: 'Taiko Hoodi 测试网',
 };
 
+/** Turn a raw provider error into a short, human-friendly hint. */
+export function friendlyError(message) {
+  const m = String(message || '');
+  if (/rate limit|429|too many requests/i.test(m)) {
+    return '节点请求过于频繁，请稍后重试，或到右上角设置更换 RPC 节点。';
+  }
+  if (/archive|token|personal/i.test(m)) {
+    return '当前 RPC 节点不支持这类查询，请到右上角设置更换节点。';
+  }
+  if (/network|fetch|econn|refused|failed/i.test(m)) {
+    return '网络连接出现问题，请检查网络后重试。';
+  }
+  return '节点暂时不可用，请稍后重试。';
+}
+
 /** Human-readable chain name for the configured chain id. */
 export function chainName(chainId = CHAIN_ID) {
   return CHAIN_NAMES[chainId] || `链 ${chainId}`;

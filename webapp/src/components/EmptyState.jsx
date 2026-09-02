@@ -1,10 +1,14 @@
 import { GeeseMark, AlertCircle } from './Icons';
 
-/** Centered empty/error placeholder: glyph mark, serif title, optional action pill */
-export default function EmptyState({ title, body, actionLabel, onAction, tone }) {
+/**
+ * Centered empty/error placeholder. Error states (tone=danger) show a
+ * friendly summary plus the raw technical message in a collapsible
+ * <details> block instead of dumping it into the layout.
+ */
+export default function EmptyState({ title, body, actionLabel, onAction, tone, detail }) {
   const danger = tone === 'danger';
   return (
-    <div className="py-20 text-center max-w-sm mx-auto">
+    <div className="py-16 text-center max-w-md mx-auto">
       {danger ? (
         <AlertCircle size={36} className="mx-auto text-danger" />
       ) : (
@@ -13,6 +17,16 @@ export default function EmptyState({ title, body, actionLabel, onAction, tone })
       <h2 className="mt-5 text-lg text-ink-soft">{title}</h2>
       {body && (
         <p className="mt-2 text-sm leading-relaxed text-ink-faint">{body}</p>
+      )}
+      {danger && detail && (
+        <details className="mt-4 text-left">
+          <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-ink transition-colors">
+            技术细节
+          </summary>
+          <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 font-mono text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">
+            {detail}
+          </pre>
+        </details>
       )}
       {actionLabel && (
         <button

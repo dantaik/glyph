@@ -10,6 +10,7 @@ import {
   fmtRelTime,
   chainName,
   etherscanTxUrl,
+  friendlyError,
 } from '../lib/format';
 import { ArrowLeft, AlertCircle, ExternalLink } from './Icons';
 import ProgressBar from './ProgressBar';
@@ -184,8 +185,16 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <div className="mx-auto max-w-[36em] py-6">
           <div className="flex items-start gap-2.5 text-sm text-danger">
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <p>加载失败：{error}</p>
+            <p>加载失败：{friendlyError(error)}</p>
           </div>
+          <details className="mt-3">
+            <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-ink transition-colors">
+              技术细节
+            </summary>
+            <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 font-mono text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">
+              {error}
+            </pre>
+          </details>
           <button
             type="button"
             onClick={load}

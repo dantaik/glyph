@@ -10,6 +10,7 @@ import {
   fmtRelTime,
   excerpt,
   chainName,
+  friendlyError,
 } from '../lib/format';
 import EmptyState from './EmptyState';
 
@@ -94,7 +95,8 @@ export default function HomeFeed({ navigate, onStartWriting }) {
         <EmptyState
           tone="danger"
           title="加载失败"
-          body={error}
+          body={friendlyError(error)}
+          detail={error}
           actionLabel="重试"
           onAction={() => setTick((t) => t + 1)}
         />

@@ -5,6 +5,7 @@ import {
   estimateBlockTime,
   fmtRelTime,
   chainName,
+  friendlyError,
 } from '../lib/format';
 import { resolveEnsName } from '../lib/data';
 import EmptyState from './EmptyState';
@@ -66,7 +67,8 @@ export default function AuthorTitleList({
         <EmptyState
           tone="danger"
           title="加载失败"
-          body={error}
+          body={friendlyError(error)}
+          detail={error}
           actionLabel="重试"
           onAction={onRetry}
         />
@@ -107,7 +109,7 @@ export default function AuthorTitleList({
       )}
 
       {error && titles.length > 0 && (
-        <p className="mt-4 text-center text-sm text-danger">{error}</p>
+        <p className="mt-4 text-center text-sm text-danger">{friendlyError(error)}</p>
       )}
 
       {titles.length > 0 && (
