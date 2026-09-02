@@ -49,6 +49,9 @@ export default function Publisher() {
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
   const { account, chainId: walletChainId, connect } = useWallet();
   const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
+  const chainLabel =
+    { 1: '以太坊', 11155111: 'Sepolia', 167000: 'Taiko', 167013: 'Taiko Hoodi' }[CHAIN_ID] ||
+    `chain ${CHAIN_ID}`;
 
   const titleBytes = titleByteLength(title);
   const titleOver = titleBytes > TITLE_MAX_BYTES;
@@ -329,8 +332,12 @@ export default function Publisher() {
       {/* Cost estimate */}
       <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
 
+      <p className="mt-4 text-xs text-ink-faint">
+        一经发布，将永久刻入 {chainLabel}，不可修改、不可删除。
+      </p>
+
       {/* Publish button + live status */}
-      <div className="mt-7 flex flex-wrap items-center gap-4">
+      <div className="mt-4 flex flex-wrap items-center gap-4">
         <button
           onClick={handlePublish}
           disabled={

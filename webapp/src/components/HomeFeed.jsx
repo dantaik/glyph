@@ -76,6 +76,18 @@ export default function HomeFeed({ navigate, onStartWriting }) {
 
   return (
     <div>
+      <section className="mb-9 text-center">
+        <h1 className="font-serif text-2xl font-bold tracking-wide text-ink sm:text-[1.75rem]">
+          人海亿万，唯刻痕不朽
+        </h1>
+        <p className="mx-auto mt-3 max-w-md font-serif text-[0.95rem] leading-relaxed text-ink-soft">
+          给未来的人类留一句话——你不是一个数字，你是来过的人。
+        </p>
+        <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-ink-ghost">
+          One of billions. One word forever.
+        </p>
+      </section>
+
       <header className="mb-8 flex items-baseline justify-between border-b border-edge pb-3">
         <h2 className="font-serif text-xl font-semibold">最新岩刻</h2>
         <p className="text-xs text-ink-ghost">来自所有作者的最近 {FEED_SIZE} 封</p>
