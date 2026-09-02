@@ -99,6 +99,14 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   html[data-fontsize='l'] { --article-size: 1.125rem; }
 }
 
+/* The article column measure — shared by the post header and the body
+   (36 × the reader font size, rem-based so it doesn't depend on the
+   element's own font-size). */
+.article-column {
+  max-width: calc(var(--article-size) * 36);
+  margin-inline: auto;
+}
+
 .prose-glyph {
   font-family: var(--font-serif);
   font-size: var(--article-size);
@@ -110,8 +118,6 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   line-break: strict;
   text-autospace: normal;        /* progressive: CJK–Latin spacing */
   hanging-punctuation: first allow-end;  /* progressive: Safari */
-  max-width: 36em;
-  margin-inline: auto;
 }
 .dark .prose-glyph { font-weight: 430; }  /* variable axis: thin serif sinks on dark */
 
@@ -176,9 +182,3 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
 .prose-glyph th { font-weight: 600; }
 
 .prose-compact { --article-size: 1rem; }
-
-/* Editor preview pane — full width, no article measure or centering */
-.prose-glyph.prose-preview {
-  max-width: none;
-  margin-inline: 0;
-}

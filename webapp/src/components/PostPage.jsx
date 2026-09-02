@@ -132,7 +132,8 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
         <FontSizeControl />
       </div>
 
-      <header className="mb-10 text-center">
+      <header className="mb-10">
+        <div className="article-column text-center">
         <h1 className="font-serif text-2xl leading-[1.45] font-bold sm:text-display">
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
@@ -173,7 +174,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
             ))}
           </div>
         )}
-
+        </div>
       </header>
 
       {loading && (
@@ -217,7 +218,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
 
       {loaded && (
         <div
-          className="prose-glyph"
+          className="article-column prose-glyph"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       )}
