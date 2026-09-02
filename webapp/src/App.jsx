@@ -78,7 +78,7 @@ export default function App() {
               target="_blank"
               rel="noreferrer"
               title="在 Etherscan 查看合约"
-              className="inline-block font-mono text-2xs tabular-nums text-ink-faint bg-paper-sunken rounded px-1.5 py-0.5 hover:text-accent transition-colors"
+              className="inline-block font-mono text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
             >
               合约：{shortAddr(GLYPH_ADDRESS)}
             </a>
