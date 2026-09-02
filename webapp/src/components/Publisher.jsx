@@ -41,7 +41,7 @@ export default function Publisher() {
   const [tags, setTags] = useState([]);
   const [markdown, setMarkdown] = useState(PLACEHOLDER_MD);
   const [files, setFiles] = useState({});
-  const [showPreview, setShowPreview] = useState(true);
+  const [view, setView] = useState('edit'); // 'edit' | 'preview'
   const [status, setStatus] = useState('idle');
   const [statusMsg, setStatusMsg] = useState('');
   const [txHash, setTxHash] = useState(null);
@@ -304,17 +304,17 @@ export default function Publisher() {
           >
             <button
               type="button"
-              onClick={() => setShowPreview(false)}
-              aria-pressed={!showPreview}
-              className={showPreview ? SEGMENT_OFF : SEGMENT_ON}
+              onClick={() => setView('edit')}
+              aria-pressed={view === 'edit'}
+              className={view === 'edit' ? SEGMENT_ON : SEGMENT_OFF}
             >
               编辑
             </button>
             <button
               type="button"
-              onClick={() => setShowPreview(true)}
-              aria-pressed={showPreview}
-              className={showPreview ? SEGMENT_ON : SEGMENT_OFF}
+              onClick={() => setView('preview')}
+              aria-pressed={view === 'preview'}
+              className={view === 'preview' ? SEGMENT_ON : SEGMENT_OFF}
             >
               预览
             </button>
@@ -324,7 +324,7 @@ export default function Publisher() {
           <MarkdownEditor
             value={markdown}
             onChange={setMarkdown}
-            showPreview={showPreview}
+            mode={view}
             disabled={status === 'processing'}
             height="26rem"
             previewUrls={filePreviews}

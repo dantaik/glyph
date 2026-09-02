@@ -7,21 +7,24 @@ import { renderMarkdown } from '../lib/renderMarkdown';
 import { useTheme } from '../lib/theme';
 
 /**
- * CodeMirror Markdown source editor with an optional live preview pane.
- * The preview renders full-width below the editor (no side-by-side split).
- * It re-renders as you type (it's cheap — pure string).
+ * CodeMirror Markdown source editor with a preview pane.
+ * `mode` is 'edit' | 'preview' and the two are mutually exclusive:
+ * - 'edit' renders only the editor (the preview is not computed at all,
+ *   so long articles stay fast while typing);
+ * - 'preview' renders only the full-width preview (the editor input is
+ *   hidden entirely).
  *
  * Theme-aware: follows the app light/dark theme and pins chrome colors to
  * the design tokens (Prec.highest so the builtin oneDark bg never wins).
  *
- * Props: { value, onChange, showPreview, disabled, height, previewUrls }
+ * Props: { value, onChange, mode, disabled, height, previewUrls }
  * previewUrls: { key: blobUrl } for uploaded images, used to render
- *   `upload:KEY` references in the live preview.
+ *   `upload:KEY` references in the preview.
  */
 export default function MarkdownEditor({
   value,
   onChange,
-  showPreview,
+  mode = 'edit',
   disabled,
   height = '26rem',
   previewUrls = {},
@@ -61,38 +64,41 @@ export default function MarkdownEditor({
     [isDark],
   );
 
+  // Only computed in preview mode — no per-keystroke re-render while typing.
   const previewHtml = useMemo(() => {
-    if (!showPreview) return '';
-    // Resolve upload:KEY image references to blob URLs so the live
+    if (mode !== 'preview') return '';
+    // Resolve upload:KEY image references to blob URLs so the
     // preview actually shows the uploaded images.
     const resolved = value.replace(/!\[([^\]]*)\]\(upload:([^)\s]+)\)/g, (m, alt, key) => {
       const url = previewUrls[key];
       return url ? `![${alt}](${url})` : m;
     });
     return renderMarkdown(resolved);
-  }, [showPreview, value, previewUrls]);
+  }, [mode, value, previewUrls]);
 
   return (
     <div className="grid grid-cols-1 gap-3">
-      <div className="rounded-xl border border-edge bg-paper-raised overflow-hidden focus-within:border-edge-strong transition-colors">
-        <CodeMirror
-          value={value}
-          onChange={onChange}
-          height={height}
-          extensions={extensions}
-          editable={!disabled}
-          theme={isDark ? 'dark' : 'light'}
-          basicSetup={{
-            lineNumbers: false,
-            foldGutter: false,
-            highlightActiveLine: false,
-            highlightActiveLineGutter: false,
-            indentOnInput: true,
-          }}
-        />
-      </div>
+      {mode === 'edit' && (
+        <div className="rounded-xl border border-edge bg-paper-raised overflow-hidden focus-within:border-edge-strong transition-colors">
+          <CodeMirror
+            value={value}
+            onChange={onChange}
+            height={height}
+            extensions={extensions}
+            editable={!disabled}
+            theme={isDark ? 'dark' : 'light'}
+            basicSetup={{
+              lineNumbers: false,
+              foldGutter: false,
+              highlightActiveLine: false,
+              highlightActiveLineGutter: false,
+              indentOnInput: true,
+            }}
+          />
+        </div>
+      )}
 
-      {showPreview && (
+      {mode === 'preview' && (
         <div
           className="rounded-xl border border-edge bg-paper-raised px-6 py-5 prose-glyph prose-compact prose-preview overflow-auto"
           style={{ maxHeight: height }}
