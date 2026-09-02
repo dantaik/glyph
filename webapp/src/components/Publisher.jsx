@@ -234,14 +234,9 @@ export default function Publisher() {
   // --- Render ---
   return (
     <div>
-      {/* Title */}
-      <div className="mb-7">
-        <label
-          htmlFor="post-title"
-          className="block text-xs tracking-label text-ink-faint mb-1.5"
-        >
-          标题
-        </label>
+      {/* 一 · 标题 */}
+      <SectionHeader index="一" label="标题" />
+      <div className="mb-10">
         <input
           id="post-title"
           type="text"
@@ -264,14 +259,9 @@ export default function Publisher() {
         )}
       </div>
 
-      {/* Tags */}
-      <div className="mb-7">
-        <label
-          htmlFor="post-tags"
-          className="block text-xs tracking-label text-ink-faint mb-1.5"
-        >
-          标签
-        </label>
+      {/* 二 · 标签 */}
+      <SectionHeader index="二" label="标签" />
+      <div className="mb-10">
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-edge-strong bg-paper-raised px-3 py-2 focus-within:border-accent transition-colors">
           {tags.map((t) => (
             <span
@@ -302,10 +292,11 @@ export default function Publisher() {
         </div>
       </div>
 
-      {/* Editor + live preview */}
-      <div className="mb-7">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs tracking-label text-ink-faint">正文（Markdown）</span>
+      {/* 三 · 正文 */}
+      <SectionHeader
+        index="三"
+        label="正文"
+        right={
           <div
             role="group"
             aria-label="编辑器视图"
@@ -328,7 +319,9 @@ export default function Publisher() {
               预览
             </button>
           </div>
-        </div>
+        }
+      />
+      <div className="mb-10">
         <Suspense fallback={<EditorSkeleton height="26rem" />}>
           <MarkdownEditor
             value={markdown}
@@ -341,11 +334,9 @@ export default function Publisher() {
         </Suspense>
       </div>
 
-      {/* Image upload */}
-      <div className="mb-7">
-        <span className="block text-xs tracking-label text-ink-faint mb-1.5">
-          图片（使用 upload:KEY 引用）
-        </span>
+      {/* 四 · 图片 */}
+      <SectionHeader index="四" label="图片" />
+      <div className="mb-10">
         <ImageUploader
           files={files}
           uploadRefs={uploadRefs}
@@ -355,15 +346,23 @@ export default function Publisher() {
         />
       </div>
 
-      {/* Cost estimate */}
-      <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
+      {/* 五 · 成本 */}
+      <SectionHeader index="五" label="成本" />
+      <div className="mb-6">
+        <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
+        <p className="mt-4 text-xs text-ink-faint">
+          一经发布，将永久刻入 {chainLabel}，不可修改、不可删除。
+        </p>
+      </div>
 
-      <p className="mt-4 text-xs text-ink-faint">
-        一经发布，将永久刻入 {chainLabel}，不可修改、不可删除。
-      </p>
-
-      {/* Publish button + live status */}
-      <div className="mt-4 flex flex-wrap items-center gap-4">
+      {/* 动作 */}
+      <div className="border-t border-edge pt-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+        {status === 'processing' && statusMsg && (
+          <span role="status" className="text-sm text-ink-faint">
+            {statusMsg}
+          </span>
+        )}
         <button
           onClick={handlePublish}
           disabled={
@@ -388,13 +387,7 @@ export default function Publisher() {
             ? '请在钱包中确认…'
             : '发布到链上'}
         </button>
-
-        {status === 'processing' && statusMsg && (
-          <span role="status" className="text-sm text-ink-faint">
-            {statusMsg}
-          </span>
-        )}
-      </div>
+        </div>
 
 
       {status === 'error' && (
@@ -432,6 +425,20 @@ export default function Publisher() {
           </button>
         </div>
       )}
+      </div>
+    </div>
+  );
+}
+
+/** Numbered section header (一 · 标题, …) with an optional right-side slot. */
+function SectionHeader({ index, label, right }) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-edge pb-2">
+      <h2 className="flex items-baseline gap-2">
+        <span className="font-mono text-2xs tabular-nums text-ink-ghost">{index}</span>
+        <span className="text-sm font-medium tracking-label text-ink-soft">{label}</span>
+      </h2>
+      {right}
     </div>
   );
 }
