@@ -24,6 +24,11 @@ const REL_UNITS = [
   [60, 'minute'],
 ];
 
+/** 0-based on-chain index → 1-based display: `2n` → `"第 3 篇"`. */
+export function fmtIndex(index) {
+  return `第 ${Number(index) + 1} 篇`;
+}
+
 /** `22540123n` → `"22,540,123"` (comma grouping regardless of UI locale). */
 export function fmtBlock(block) {
   if (block === null || block === undefined) return '';

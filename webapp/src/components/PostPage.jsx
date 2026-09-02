@@ -3,6 +3,7 @@ import { loadPostBody, resolveImages, getChainClock, resolveEnsName } from '../l
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
+  fmtIndex,
   fmtTitle,
   shortAddr,
   estimateBlockTime,
@@ -135,6 +136,8 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+          <span className="text-ink-ghost">{fmtIndex(meta.index)}</span>
+          <span className="text-ink-ghost" aria-hidden="true">·</span>
           <span className="font-mono text-[11px] tabular-nums" title={meta.author}>
             {ensName || shortAddr(meta.author)}
           </span>
