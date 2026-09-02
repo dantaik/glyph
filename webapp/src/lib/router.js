@@ -42,6 +42,8 @@ export function useUrlState() {
   const navigate = useCallback((next, { replace = false } = {}) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(next)) {
+      // `tx` lives in the path (/tx/<hash>), never in the query string.
+      if (k === 'tx') continue;
       if (v != null && v !== '') sp.set(k, String(v));
     }
     // Dev demo mode (fixtures) follows in-app navigation.
