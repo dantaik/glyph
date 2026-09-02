@@ -10,6 +10,10 @@
 
 import * as seg from './segments';
 import * as store from './scanStore';
+import * as rpcLog from './rpcLog';
+
+/** Never shrink a getLogs window below this — past it, give up instead. */
+const MIN_WINDOW = 25n;
 
 // --- Home feed: cross-author range sweeps ----------------------------
 
@@ -53,11 +57,15 @@ export async function sweepFeed({
   maxWindows,
   fetchRange,
 }) {
-  const span = BigInt(windowSize);
+  let span = BigInt(windowSize);
   const out = [];
   const taken = new Set();
-  let at = BigInt(cursor);
+  const start = BigInt(cursor);
+  let at = start;
   let windows = 0;
+  let fetched = 0n; // blocks pulled from the node
+  let reused = 0n; // blocks answered from ranges already read
+  let floor = start; // lowest block the sweep reached
   let reachedGenesis = false;
 
   const take = (rows) => {
@@ -75,7 +83,11 @@ export async function sweepFeed({
   while (out.length < n && at >= 0n && windows < maxWindows) {
     const covered = seg.segmentAt(store.feedCoverage(), at);
     if (covered) {
-      const full = take(store.postsInRange(covered[0], at));
+      const held = store.postsInRange(covered[0], at);
+      reused += at - covered[0] + 1n;
+      floor = covered[0];
+      rpcLog.fromCache('feed', rpcLog.range(covered[0], at), `${held.length} posts`, 'already scanned');
+      const full = take(held);
       if (covered[0] === 0n) {
         reachedGenesis = true;
         break;
@@ -88,8 +100,24 @@ export async function sweepFeed({
     const windowFloor = at >= span ? at - span + 1n : 0n;
     const below = seg.topBelow(store.feedCoverage(), at);
     const from = below != null && below + 1n > windowFloor ? below + 1n : windowFloor;
-    const rows = store.rememberPosts(await fetchRange(from, at, head != null && at === head));
+    let fresh;
+    try {
+      fresh = await fetchRange(from, at, head != null && at === head);
+    } catch (err) {
+      // The node caps getLogs ranges below our window. Halve and retry the
+      // same window top: coverage is only ever recorded for what was read,
+      // so nothing is claimed on the way.
+      if (err?.rangeTooLarge && span > MIN_WINDOW) {
+        span = span / 2n > MIN_WINDOW ? span / 2n : MIN_WINDOW;
+        rpcLog.windowShrunk(span);
+        continue;
+      }
+      throw err;
+    }
+    const rows = store.rememberPosts(fresh);
     windows++;
+    fetched += at - from + 1n;
+    floor = from;
     store.rememberFeedRange(from, at);
     const full = take(rows.sort(store.feedCompare));
     if (from === 0n) {
@@ -100,6 +128,14 @@ export async function sweepFeed({
     if (full) break;
   }
 
+  rpcLog.sweepDone({
+    from: start,
+    to: floor,
+    posts: out.length,
+    windows,
+    fetched,
+    reused,
+  });
   return { rows: out, reachedGenesis, windows };
 }
 
@@ -114,14 +150,17 @@ export async function sweepFeed({
  */
 export async function authorRowsAt(author, block, fetchBlock) {
   const at = BigInt(block);
-  if (!seg.segmentAt(store.authorCoverage(author), at)) {
-    await store.once(`author:${store.addrKey(author)}:${at}`, async () => {
-      // A parallel walk may have covered it while we waited our turn.
-      if (seg.segmentAt(store.authorCoverage(author), at)) return;
-      store.rememberPosts(await fetchBlock(at));
-      store.rememberAuthorBlock(author, at);
-    });
+  if (seg.segmentAt(store.authorCoverage(author), at)) {
+    const held = store.authorPostsInBlock(author, at);
+    rpcLog.fromCache('author', `block ${rpcLog.b(at)}`, `${held.length} posts`, 'already scanned');
+    return held;
   }
+  await store.once(`author:${store.addrKey(author)}:${at}`, async () => {
+    // A parallel walk may have covered it while we waited our turn.
+    if (seg.segmentAt(store.authorCoverage(author), at)) return;
+    store.rememberPosts(await fetchBlock(at));
+    store.rememberAuthorBlock(author, at);
+  });
   return store.authorPostsInBlock(author, at);
 }
 

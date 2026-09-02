@@ -22,24 +22,32 @@
 
 import {
   createPublicClient,
-  http,
   parseAbi,
   hexToBytes,
   decodeFunctionData,
   decodeEventLog,
 } from 'viem';
-import { mainnet, sepolia } from 'viem/chains';
-import { RPC_URL, GLYPH_ADDRESS, CHAIN_ID } from './config';
+import { CHAIN, LOG_WINDOW, RPC_URLS, GLYPH_ADDRESS } from './config';
 import { decodeTitle } from './title';
 import { decodePayload } from './payload';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
 import * as seg from './segments';
 import * as store from './scanStore';
 import * as scanner from './scanner';
+import * as rpcLog from './rpcLog';
+import { orderedFallback } from './transport';
 
-const chain = CHAIN_ID === 11155111 ? sepolia : mainnet;
+/**
+ * One client for the whole app, over the configured endpoints in order —
+ * see transport.js for how failover and cool-down work. withRetry() below
+ * still backs off on top of it, for when EVERY endpoint is rate-limiting.
+ */
+export const client = createPublicClient({
+  chain: CHAIN.viem,
+  transport: orderedFallback(RPC_URLS, CHAIN.viem),
+});
 
-export const client = createPublicClient({ chain, transport: http(RPC_URL) });
+rpcLog.endpoints(CHAIN.name, RPC_URLS);
 
 export const abi = parseAbi([
   'function latestBlock(address author) view returns (uint256)',
@@ -97,13 +105,19 @@ async function postsInBlock(author, block) {
   // passes anything else through verbatim, so a plain number would go out
   // as a JSON number and every node rejects that.
   const at = BigInt(block);
-  const logs = await withRetry(() =>
-    client.getLogs({
-      address: GLYPH_ADDRESS,
-      event: POST_EVENT,
-      fromBlock: at,
-      toBlock: at,
-    }),
+  const logs = await rpcLog.fromNode(
+    'eth_getLogs',
+    `block ${rpcLog.b(at)} · author ${String(author).slice(0, 8)}…`,
+    () =>
+      withRetry(() =>
+        client.getLogs({
+          address: GLYPH_ADDRESS,
+          event: POST_EVENT,
+          fromBlock: at,
+          toBlock: at,
+        }),
+      ),
+    (out) => `${out.length} event${out.length === 1 ? '' : 's'}`,
   );
   // Event indexes have to count EVERY Post event in the transaction, not
   // just this author's: /tx/<hash>/<i> is resolved by findMetaByTx(), which
@@ -129,12 +143,18 @@ function logToMeta(log, block) {
 }
 
 async function readHead(author) {
-  return client.readContract({
-    address: GLYPH_ADDRESS,
-    abi,
-    functionName: 'latestBlock',
-    args: [author],
-  });
+  return rpcLog.fromNode(
+    'latestBlock()',
+    `author ${String(author).slice(0, 8)}…`,
+    () =>
+      client.readContract({
+        address: GLYPH_ADDRESS,
+        abi,
+        functionName: 'latestBlock',
+        args: [author],
+      }),
+    (head) => `block ${rpcLog.b(head)}`,
+  );
 }
 
 // --- Per-author reads (reverse block-linked list) ---------------------
@@ -190,7 +210,10 @@ export async function findTitleMeta(author, targetIndex) {
   if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return null;
   store.seedFromStorage();
   const known = store.knownPost(author, BigInt(targetIndex));
-  if (known) return known;
+  if (known) {
+    rpcLog.fromCache('post', `#${targetIndex} of ${String(author).slice(0, 8)}…`, 'already loaded');
+    return known;
+  }
 
   const head = await readHead(author);
   const found = await scanner.findAuthorPost(
@@ -205,32 +228,66 @@ export async function findTitleMeta(author, targetIndex) {
 
 // --- Home feed (cross-author range sweeps) ---------------------------
 
+/**
+ * Public nodes cap getLogs ranges anywhere from 25 blocks to 10,000. Tag the
+ * refusal so the sweep can shrink its window and carry on instead of giving
+ * up — but never confuse it with a rate limit, which backing off fixes.
+ */
+function tagRangeError(err) {
+  const msg = String(err?.details || err?.shortMessage || err?.message || err);
+  if (/rate limit|429|too many requests/i.test(msg)) return err;
+  if (/\brange\b|too large|exceed|limited to|must not exceed/i.test(msg)) {
+    err.rangeTooLarge = true;
+  }
+  return err;
+}
+
 /** One getLogs window, as metas. */
 async function fetchFeedRange(from, to, endsAtHead) {
-  const logs = await withRetry(() =>
-    client.getLogs({
-      address: GLYPH_ADDRESS,
-      event: POST_EVENT,
-      fromBlock: from,
-      // The window ending at the chain head asks for 'latest': public RPC
-      // clusters (dRPC, etc.) can serve getBlockNumber and getLogs from
-      // different nodes, and a numeric toBlock captured a moment earlier may
-      // already exceed the answering node's head.
-      toBlock: endsAtHead ? 'latest' : to,
-    }),
-  );
+  const logs = await rpcLog.fromNode(
+    'eth_getLogs',
+    rpcLog.range(from, to),
+    () =>
+      withRetry(() =>
+        client.getLogs({
+          address: GLYPH_ADDRESS,
+          event: POST_EVENT,
+          fromBlock: from,
+          // The window ending at the chain head asks for 'latest': public RPC
+          // clusters (dRPC, etc.) can serve getBlockNumber and getLogs from
+          // different nodes, and a numeric toBlock captured a moment earlier
+          // may already exceed the answering node's head.
+          toBlock: endsAtHead ? 'latest' : to,
+        }),
+      ),
+    (out) => `${out.length} post${out.length === 1 ? '' : 's'}`,
+  ).catch((err) => {
+    throw tagRangeError(err);
+  });
   assignEventIndexes(logs);
   return logs.map((log) => logToMeta(log, log.blockNumber));
 }
 
 /** Home feed: most recent `n` posts across ALL authors. */
-export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows = 30 } = {}) {
+export async function loadRecentAcrossAuthors(
+  n,
+  { windowSize = LOG_WINDOW, maxWindows = 30 } = {},
+) {
   store.seedFromStorage();
-  const head = await client.getBlockNumber();
+  const head = await rpcLog.fromNode(
+    'eth_blockNumber',
+    'chain head',
+    () => client.getBlockNumber(),
+    (h) => `block ${rpcLog.b(h)}`,
+  );
   const known = store.feedScanHead();
 
   // No new blocks since the last sweep — serve what we hold, zero getLogs.
-  if (known != null && head <= BigInt(known)) return scanner.feedRows().slice(0, n);
+  if (known != null && head <= BigInt(known)) {
+    const rows = scanner.feedRows().slice(0, n);
+    rpcLog.fromCache('feed', `head unchanged at ${rpcLog.b(known)}`, `${rows.length} posts`);
+    return rows;
+  }
 
   await scanner.sweepFeed({
     cursor: head,
@@ -253,7 +310,7 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 export async function loadMoreAcrossAuthors(
   oldestShown,
   n,
-  { windowSize = 800, maxWindows = 30 } = {},
+  { windowSize = LOG_WINDOW, maxWindows = 30 } = {},
 ) {
   store.seedFromStorage();
   let cursor;
@@ -293,7 +350,12 @@ export function resolveEnsName(address) {
   if (ensCache.has(key)) return ensCache.get(key);
   const promise = (async () => {
     try {
-      const name = await client.getEnsName({ address });
+      const name = await rpcLog.fromNode(
+        'ens_getName',
+        `${String(address).slice(0, 8)}…`,
+        () => client.getEnsName({ address }),
+        (v) => v ?? 'no name',
+      );
       return name ?? null;
     } catch {
       return null; // ENS absent on this chain or RPC hiccup
@@ -313,9 +375,17 @@ export function resolveEnsName(address) {
 export async function findMetaByTx(txHash, eventIndex = 0) {
   store.seedFromStorage();
   const known = store.knownPostByTx(txHash, eventIndex);
-  if (known) return known;
+  if (known) {
+    rpcLog.fromCache('post', `${String(txHash).slice(0, 10)}…/${eventIndex}`, 'already loaded');
+    return known;
+  }
 
-  const receipt = await withRetry(() => client.getTransactionReceipt({ hash: txHash }));
+  const receipt = await rpcLog.fromNode(
+    'eth_getTransactionReceipt',
+    `${String(txHash).slice(0, 10)}…`,
+    () => withRetry(() => client.getTransactionReceipt({ hash: txHash })),
+    (r) => `${r.logs.length} logs in block ${rpcLog.b(r.blockNumber)}`,
+  );
   const posts = [];
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== GLYPH_ADDRESS.toLowerCase()) continue;
@@ -359,9 +429,17 @@ export function loadPostBody(txHash) {
   const promise = (async () => {
     // Check IndexedDB cache first — posts are immutable, so cached copy is always fresh.
     const cached = await getCachedBody(txHash);
-    if (cached) return { body: cached, fromCache: true };
+    if (cached) {
+      rpcLog.fromCache('body', `${String(txHash).slice(0, 10)}…`, 'IndexedDB hit');
+      return { body: cached, fromCache: true };
+    }
 
-    const tx = await client.getTransaction({ hash: txHash });
+    const tx = await rpcLog.fromNode(
+      'eth_getTransactionByHash',
+      `body ${String(txHash).slice(0, 10)}…`,
+      () => client.getTransaction({ hash: txHash }),
+      (t) => `${rpcLog.b((t.input.length - 2) / 2)} bytes calldata`,
+    );
     const decoded = decodeFunctionData({ abi, data: tx.input });
     const payloadHex = decoded.args[1];
     const body = await decodePayload(hexToBytes(payloadHex));
@@ -388,9 +466,17 @@ export function loadImageBlob(hash, mime = 'image/webp') {
   const promise = (async () => {
     // Check IndexedDB cache first.
     const cached = await getCachedImage(hash);
-    if (cached) return cached;
+    if (cached) {
+      rpcLog.fromCache('image', `${String(hash).slice(0, 10)}…`, 'IndexedDB hit');
+      return cached;
+    }
 
-    const tx = await client.getTransaction({ hash });
+    const tx = await rpcLog.fromNode(
+      'eth_getTransactionByHash',
+      `image ${String(hash).slice(0, 10)}…`,
+      () => client.getTransaction({ hash }),
+      (t) => `${rpcLog.b((t.input.length - 2) / 2)} bytes`,
+    );
     const bytes = hexToBytes(tx.input);
     const blob = new Blob([bytes], { type: mime });
 

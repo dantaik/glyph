@@ -17,11 +17,14 @@
 // already held for that segment. See segments.js.
 
 import * as seg from './segments';
+import { CHAIN_ID } from './config';
 
-const FEED_KEY = 'glyph.feedScan.v2';
-const FEED_KEY_LEGACY = 'glyph.feedScan.v1';
-const AUTHOR_KEY = 'glyph.authorScan.v2';
-const AUTHOR_KEY_LEGACY = 'glyph.authorScan.v1';
+// Block heights and post indexes mean nothing across chains, so every scan
+// key is scoped to the chain it was read from. The v1 keys were mainnet-only.
+const FEED_KEY = `glyph.feedScan.v2.${CHAIN_ID}`;
+const FEED_KEY_LEGACY = CHAIN_ID === 1 ? 'glyph.feedScan.v1' : null;
+const AUTHOR_KEY = `glyph.authorScan.v2.${CHAIN_ID}`;
+const AUTHOR_KEY_LEGACY = CHAIN_ID === 1 ? 'glyph.authorScan.v1' : null;
 
 export const FEED_SCAN_EVT = 'glyph:feedscan';
 export const AUTHOR_SCAN_EVT = 'glyph:authorscan';
@@ -193,6 +196,7 @@ export function setAuthorScanHead(author, head) {
 // --- localStorage snapshot -------------------------------------------
 
 function lsRead(key) {
+  if (!key) return null;
   try {
     return JSON.parse(localStorage.getItem(key) || 'null');
   } catch {
@@ -240,7 +244,7 @@ export function persistFeedScan() {
         rows: kept.map(plainRow),
       }),
     );
-    localStorage.removeItem(FEED_KEY_LEGACY);
+    if (FEED_KEY_LEGACY) localStorage.removeItem(FEED_KEY_LEGACY);
   } catch {
     /* quota / privacy mode — the session layer still holds everything */
   }
