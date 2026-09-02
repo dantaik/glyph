@@ -67,6 +67,19 @@ if (import.meta.env.DEV && FIXTURES_MODE) {
 const ttlCache = makeTtlCache(getCacheTtlMs);
 const authorKey = (a) => String(a || '').toLowerCase();
 
+/**
+ * Warm BOTH meta cache keys for a resolved post, so ?author=…&i=N and
+ * /tx/<hash> views share one cached entry regardless of which URL
+ * resolved it first.
+ */
+function cacheMetaBoth(meta) {
+  if (!meta) return meta;
+  // Touch both cache keys with the same resolved meta.
+  ttlCache(`meta:${authorKey(meta.author)}:${meta.index}`, () => Promise.resolve(meta));
+  ttlCache(`txmeta:${String(meta.txHash).toLowerCase()}`, () => Promise.resolve(meta));
+  return meta;
+}
+
 export const loadTitleList = (author, n) =>
   ttlCache(`titles:${authorKey(author)}:${n}`, () => impl.loadTitleList(author, n));
 export const loadMoreTitles = (author, oldestShown, n) =>
@@ -75,15 +88,17 @@ export const loadMoreTitles = (author, oldestShown, n) =>
     () => impl.loadMoreTitles(author, oldestShown, n),
   );
 export const findTitleMeta = (author, targetIndex) =>
-  ttlCache(`meta:${authorKey(author)}:${targetIndex}`, () =>
-    impl.findTitleMeta(author, targetIndex),
+  ttlCache(`meta:${authorKey(author)}:${targetIndex}`, async () =>
+    cacheMetaBoth(await impl.findTitleMeta(author, targetIndex)),
   );
 export const loadRecentAcrossAuthors = (n, opts) =>
   ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
     impl.loadRecentAcrossAuthors(n, opts),
   );
 export const findMetaByTx = (txHash) =>
-  ttlCache(`txmeta:${String(txHash).toLowerCase()}`, () => impl.findMetaByTx(txHash));
+  ttlCache(`txmeta:${String(txHash).toLowerCase()}`, async () =>
+    cacheMetaBoth(await impl.findMetaByTx(txHash)),
+  );
 export const loadPostBody = (txHash) => impl.loadPostBody(txHash);
 export const resolveImages = (markdown) => impl.resolveImages(markdown);
 export const resolveEnsName = (author) => impl.resolveEnsName(author);
