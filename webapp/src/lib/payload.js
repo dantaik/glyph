@@ -91,7 +91,4 @@ export async function decodePayload(compressed) {
   return { tags: parseTags(meta.tags), markdown: body };
 }
 
-/** On-chain byte size for a draft — used by the cost estimator. */
-export async function payloadByteSize({ tags, markdown }) {
-  return (await encodePayload({ tags, markdown })).length;
-}
+

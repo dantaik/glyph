@@ -16,6 +16,7 @@ import {
   fmtUsd,
   fmtGwei,
 } from '../lib/price';
+import { chainName } from '../lib/format';
 import {
   titleByteLength,
   TITLE_MAX_BYTES,
@@ -49,9 +50,6 @@ export default function Publisher() {
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
   const { account, chainId: walletChainId, connect } = useWallet();
   const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
-  const chainLabel =
-    { 1: '以太坊', 11155111: 'Sepolia 测试网', 167000: 'Taiko 主网', 167013: 'Taiko Hoodi 测试网' }[CHAIN_ID] ||
-    `链 ${CHAIN_ID}`;
 
   // Stable preview URLs for uploaded files — shared by the dropzone
   // thumbnails and the editor's live preview pane.
@@ -354,7 +352,7 @@ export default function Publisher() {
       {/* 动作 */}
       <div className="pt-6">
         <p className="mb-4 text-xs text-ink-faint">
-          一经发布，文章将永久公开发布于 {chainLabel}区块链；不可修改、不可删除。
+          一经发布，文章将永久公开发布于 {chainName()}区块链；不可修改、不可删除。
         </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
         {status === 'processing' && statusMsg && (

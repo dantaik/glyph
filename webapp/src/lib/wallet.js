@@ -45,9 +45,6 @@ async function init() {
   }
 }
 
-export function hasProvider() {
-  return typeof window !== 'undefined' && !!window.ethereum;
-}
 
 /** Chain metadata for wallet_addEthereumChain (only known chains). */
 const KNOWN_CHAINS = {
@@ -135,7 +132,6 @@ export function useWallet() {
     account: state.account,
     chainId: state.chainId,
     isConnecting: state.isConnecting,
-    hasProvider: hasProvider(),
     connect,
   };
 }

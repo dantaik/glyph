@@ -83,7 +83,7 @@ export default function Settings({ open, onClose }) {
   };
 
   const hasOverride =
-    !!(typeof localStorage !== 'undefined' && (localStorage.getItem(STORAGE_KEYS.RPC) || localStorage.getItem(STORAGE_KEYS.CHAIN)));
+    !!(typeof localStorage !== 'undefined' && (localStorage.getItem(STORAGE_KEYS.RPC) || localStorage.getItem(STORAGE_KEYS.CHAIN) || localStorage.getItem(STORAGE_KEYS.CACHE_TTL)));
 
   return (
     <div
