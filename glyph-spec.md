@@ -269,7 +269,7 @@ export async function publishPost({ title, tags = [], markdown, files = {} }) {
 
 ## 7. 读取器 `blogReader.js`
 
-每次读取都需要作者地址（前端从 URL `?author=0x…` 取）。**两段式加载**：标题列表无 body，点击打开时才拉 body。
+每次读取都需要作者地址（前端从 URL 取：`/author/0x…` 作者列表，`/tx/0x…/<事件序号>` 单篇——一笔交易可能含多个 Post 事件）。**两段式加载**：标题列表无 body，点击打开时才拉 body。
 
 **本地缓存**：所有正文和图片通过 IndexedDB 永久缓存（`glyph-cache`）。内容不可变（链上 calldata），所以缓存永不过期。命中缓存则零网络请求。
 
