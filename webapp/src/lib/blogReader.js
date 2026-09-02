@@ -180,14 +180,41 @@ export async function findTitleMeta(author, targetIndex) {
  * limits) for at most `maxWindows` windows, or until we have `n` posts.
  * Quiet stretches with no posts are simply skipped over.
  */
-// NOTE: TTL caching for this scan lives in data.js (configurable in
-// Settings) — this function always hits the chain.
+// The home-feed scan is incremental: the covered frontier (lowest block
+// scanned), the head at that time and the discovered rows are persisted
+// to localStorage, so a new scan only fetches blocks newer than the last
+// covered head and never rescans already-covered ranges. Previously
+// discovered rows are merged back so the feed stays full between scans.
+const FEED_SCAN_KEY = 'glyph.feedScan.v1';
+
+function readFeedScan() {
+  try {
+    const v = JSON.parse(localStorage.getItem(FEED_SCAN_KEY) || 'null');
+    if (v && typeof v.head === 'string' && Array.isArray(v.rows)) return v;
+  } catch {
+    /* corrupted entry — treat as first scan */
+  }
+  return null;
+}
+
+function writeFeedScan(scan) {
+  try {
+    localStorage.setItem(FEED_SCAN_KEY, JSON.stringify(scan));
+  } catch {
+    /* quota / privacy mode — scan stays in-memory via the TTL layer */
+  }
+}
+
+// NOTE: a TTL cache for this scan also lives in data.js (configurable in
+// Settings); this function handles the persistent incremental layer.
 export async function loadRecentAcrossAuthors(
   n,
   { windowSize = 800, maxWindows = 30 } = {},
 ) {
   const span = BigInt(windowSize);
   const head = await client.getBlockNumber();
+  const stored = readFeedScan();
+  const cachedRows = stored?.rows ?? [];
   const out = [];
 
   const newestFirst = (logs) =>
@@ -196,36 +223,31 @@ export async function loadRecentAcrossAuthors(
       return b.logIndex - a.logIndex;
     });
 
-  // The first window ends at 'latest' instead of the captured head: public
-  // RPC clusters (dRPC, etc.) can serve getBlockNumber and getLogs from
-  // different nodes, and a numeric toBlock captured a moment earlier may
-  // already exceed the answering node's head ("block range extends beyond
-  // current head block"). Subsequent windows are far below the head, so
-  // numeric bounds are safe there.
-  let logs = await withRetry(() =>
-    client.getLogs({
-      address: GLYPH_ADDRESS,
-      event: POST_EVENT,
-      fromBlock: head >= span ? head - span + 1n : 0n,
-      toBlock: 'latest',
-    }),
-  );
-  newestFirst(logs);
-  assignEventIndexes(logs);
-  for (const log of logs) {
-    out.push(logToMeta(log, log.blockNumber));
-    if (out.length >= n) break;
+  // No new blocks since the last scan — serve the persisted result
+  // without touching getLogs at all.
+  if (stored?.head != null && head <= BigInt(stored.head)) {
+    return cachedRows.slice(0, n);
   }
 
-  let toBlock = head >= span ? head - span : 0n;
-  for (let w = 1; w < maxWindows && out.length < n && toBlock > 0n; w++) {
+  // Scan the newest blocks down to the previously covered frontier (or
+  // maxWindows windows on the first visit), stopping early once n posts
+  // are collected. The first window ends at 'latest': public RPC clusters
+  // (dRPC, etc.) can serve getBlockNumber and getLogs from different
+  // nodes, and a numeric toBlock captured a moment earlier may already
+  // exceed the answering node's head.
+  const storedFrontier = stored?.frontier != null ? BigInt(stored.frontier) : null;
+  let coveredFrontier = storedFrontier;
+  let toBlock = head;
+  let logs;
+  for (let w = 0; w < maxWindows && out.length < n && toBlock > 0n; w++) {
+    if (storedFrontier != null && toBlock <= storedFrontier) break; // already covered
     const fromBlock = toBlock >= span ? toBlock - span + 1n : 0n;
     logs = await withRetry(() =>
       client.getLogs({
         address: GLYPH_ADDRESS,
         event: POST_EVENT,
         fromBlock,
-        toBlock,
+        toBlock: w === 0 ? 'latest' : toBlock,
       }),
     );
     newestFirst(logs);
@@ -234,10 +256,35 @@ export async function loadRecentAcrossAuthors(
       out.push(logToMeta(log, log.blockNumber));
       if (out.length >= n) break;
     }
+    // The frontier only ever moves DOWN (first scan): later scans cover
+    // ranges above it, so it must never be raised again.
+    if (coveredFrontier == null || fromBlock < coveredFrontier) {
+      coveredFrontier = fromBlock;
+    }
     if (fromBlock === 0n) break;
     toBlock = fromBlock - 1n;
   }
-  return out.slice(0, n);
+
+  // Merge with previously discovered rows (newest first), dedupe by
+  // txHash + eventIndex, cap at n.
+  const seen = new Set();
+  const merged = [];
+  for (const row of [...out, ...cachedRows]) {
+    const key = `${row.txHash}:${row.eventIndex ?? 0}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(row);
+    if (merged.length >= n) break;
+  }
+
+  if (coveredFrontier != null) {
+    writeFeedScan({
+      head: head.toString(),
+      frontier: coveredFrontier.toString(),
+      rows: merged,
+    });
+  }
+  return merged;
 }
 
 // --- ENS names — cached; null when the address has none, or when the
