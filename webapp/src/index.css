@@ -105,8 +105,8 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   margin-inline: auto;
 }
 
+/* Body prose is the UI sans — serif belongs to headings only. */
 .prose-glyph {
-  font-family: var(--font-serif);
   font-size: var(--article-size);
   line-height: 1.95;
   letter-spacing: 0.015em;
@@ -117,9 +117,10 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   text-autospace: normal;        /* progressive: CJK–Latin spacing */
   hanging-punctuation: first allow-end;  /* progressive: Safari */
 }
-.dark .prose-glyph { font-weight: 430; }  /* variable axis: thin serif sinks on dark */
+
 
 .prose-glyph h1, .prose-glyph h2, .prose-glyph h3 {
+  font-family: var(--font-serif);
   text-align: left; letter-spacing: 0.01em; color: var(--color-ink);
 }
 /* Content headings sit clearly below the page title (24–28px). */

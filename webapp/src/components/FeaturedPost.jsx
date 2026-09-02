@@ -38,7 +38,7 @@ export default function FeaturedPost({ post, clock, navigate, excerptChars = 80 
         </a>
       </h3>
       {teaser && (
-        <p className="mt-2 font-serif text-base leading-relaxed text-ink-soft line-clamp-2">
+        <p className="mt-2 text-base leading-relaxed text-ink-soft line-clamp-2">
           {teaser}
         </p>
       )}
