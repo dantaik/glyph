@@ -43,7 +43,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
                 key={key}
                 onClick={() => onTabChange(key)}
                 aria-current={tab === key ? 'page' : undefined}
-                className={`relative whitespace-nowrap px-1 py-4 text-sm transition-colors ${
+                className={`relative min-w-[3rem] whitespace-nowrap px-2 py-4 text-center text-sm transition-colors ${
                   tab === key
                     ? 'text-ink font-medium'
                     : 'text-ink-faint hover:text-ink'
