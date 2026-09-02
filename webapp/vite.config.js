@@ -6,6 +6,12 @@ import tailwindcss from '@tailwindcss/postcss';
 
 export default defineConfig({
   plugins: [react(), wasm(), topLevelAwait()],
+  // brotli-wasm locates its .wasm via import.meta.url; keep it out of the
+  // dep optimizer so vite-plugin-wasm transforms that URL instead of the
+  // prebundled copy 404ing into the SPA fallback.
+  optimizeDeps: {
+    exclude: ['brotli-wasm'],
+  },
   css: {
     postcss: {
       plugins: [tailwindcss()],
