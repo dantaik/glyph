@@ -13,7 +13,6 @@ import {
   friendlyError,
 } from '../lib/format';
 import { ArrowLeft, AlertCircle, ExternalLink } from './Icons';
-import ProgressBar from './ProgressBar';
 import FontSizeControl from './FontSizeControl';
 import PostNav from './PostNav';
 
@@ -37,7 +36,6 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [relTime, setRelTime] = useState(null);
-  const articleRef = useRef(null);
 
   // Object URLs for the resolved images of the *current* post — revoked
   // whenever the post changes or the page unmounts.
@@ -118,8 +116,6 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
 
   return (
     <article>
-      {loaded && <ProgressBar targetRef={articleRef} />}
-
       <div className="mb-8 flex items-center justify-between">
         <button
           type="button"
@@ -163,7 +159,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
             ))}
           </div>
         )}
-        <div className="mx-auto mt-7 h-[2px] w-12 rounded-full bg-accent" aria-hidden="true" />
+
       </header>
 
       {loading && (
@@ -207,7 +203,6 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
 
       {loaded && (
         <div
-          ref={articleRef}
           className="prose-glyph"
           dangerouslySetInnerHTML={{ __html: html }}
         />
