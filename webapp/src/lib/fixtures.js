@@ -261,7 +261,10 @@ export function makeFixtures(mode) {
       await delay();
       const body = bodyByTx.get(txHash);
       if (!body) throw new Error('演示数据中找不到这笔交易');
-      return { tags: [...body.tags], markdown: body.markdown };
+      return {
+        body: { tags: [...body.tags], markdown: body.markdown },
+        fromCache: false,
+      };
     },
 
     async resolveImages(markdown) {

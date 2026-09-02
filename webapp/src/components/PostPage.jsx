@@ -32,6 +32,7 @@ const SKELETON_GROUPS = [
  */
 export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onOpenAuthor }) {
   const [body, setBody] = useState(null); // { tags, markdown }
+  const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,9 +52,12 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
     setError(null);
     setBody(null);
     setHtml(null);
+    setFromCache(false);
     try {
-      const b = await loadPostBody(meta.txHash);
+      const res = await loadPostBody(meta.txHash);
+      const b = res.body;
       setBody(b);
+      setFromCache(res.fromCache);
       const { markdown: resolved, urls } = await resolveImages(b.markdown);
       urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
@@ -231,6 +235,12 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
             >
               交易
             </a>
+            {fromCache && (
+              <>
+                <span className="select-none" aria-hidden="true">·</span>
+                <span>来自本地缓存</span>
+              </>
+            )}
           </p>
         </footer>
       )}

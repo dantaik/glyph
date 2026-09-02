@@ -237,14 +237,19 @@ export function resolveEnsName(address) {
 // --- Post body (tags + markdown) — fetched on demand from tx calldata,
 //     with IndexedDB permanent cache (posts are immutable on-chain). ---
 
-const bodyCache = new Map(); // txHash -> Promise<{tags, markdown}>
+const bodyCache = new Map(); // txHash -> Promise<{ body, fromCache }>
 
+/**
+ * Load a post body ({ tags, markdown }) plus whether it came from the
+ * local IndexedDB cache, so the UI can label 来自本地缓存.
+ * @returns {Promise<{ body: { tags: string[], markdown: string }, fromCache: boolean }>}
+ */
 export function loadPostBody(txHash) {
   if (bodyCache.has(txHash)) return bodyCache.get(txHash);
   const promise = (async () => {
     // Check IndexedDB cache first — posts are immutable, so cached copy is always fresh.
     const cached = await getCachedBody(txHash);
-    if (cached) return cached;
+    if (cached) return { body: cached, fromCache: true };
 
     const tx = await client.getTransaction({ hash: txHash });
     const decoded = decodeFunctionData({ abi, data: tx.input });
@@ -254,7 +259,7 @@ export function loadPostBody(txHash) {
     // Persist to IndexedDB for future sessions (fire-and-forget).
     setCachedBody(txHash, body).catch(() => {});
 
-    return body;
+    return { body, fromCache: false };
   })();
   promise.catch(() => bodyCache.delete(txHash));
   bodyCache.set(txHash, promise);

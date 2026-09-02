@@ -57,7 +57,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     if (!first) return undefined;
     let cancelled = false;
     loadPostBody(first.txHash)
-      .then((b) => !cancelled && setFeaturedBody(b))
+      .then((res) => !cancelled && setFeaturedBody(res.body))
       .catch(() => {});
     return () => {
       cancelled = true;
