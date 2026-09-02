@@ -18,7 +18,7 @@ import { encodePayload } from './payload';
 
 const chain = CHAIN_ID === 11155111 ? sepolia : mainnet;
 
-export async function getWallet() {
+async function getWallet() {
   if (!window.ethereum) {
     throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
   }
@@ -57,7 +57,7 @@ async function canvasToBlob(canvas, type, quality) {
  * Downscale and compress an image file to WebP.
  * Falls back to a DOM canvas when OffscreenCanvas is unavailable.
  */
-export async function processImage(
+async function processImage(
   file,
   { maxEdge = 1600, quality = 0.6, maxBytes = 200_000 } = {},
 ) {

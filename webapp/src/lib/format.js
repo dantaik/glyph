@@ -7,7 +7,7 @@
 import { CHAIN_ID } from './config';
 
 /** First post-merge block — fixed 12s slots only apply from here on. */
-export const MERGE_BLOCK = 15537394n;
+const MERGE_BLOCK = 15537394n;
 
 const SECONDS_PER_SLOT = 12;
 

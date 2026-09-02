@@ -21,7 +21,6 @@ const PAGE_SIZE = 20;
 export default function Reader({ onStartWriting }) {
   const [params, navigate] = useUrlState();
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
-  const i = params.i;
   const tx = params.tx;
   const txEvent = params.txEvent != null ? Number(params.txEvent) : 0;
 
