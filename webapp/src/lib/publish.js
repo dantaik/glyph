@@ -97,27 +97,44 @@ export async function storeImage(bytes, wallet, account) {
 }
 
 /**
- * Replace `upload:KEY` refs in markdown with `eth:0x<txhash>` after uploading.
- * Only image refs are rewritten — naive split() would also hit text/code fences.
+ * Markdown image refs to one attached file: `![alt](upload:KEY)`. Only image
+ * refs match — a naive split() would also hit prose and code fences — and the
+ * trailing lookahead keeps `img1` from matching inside `upload:img10`.
+ */
+function imageRefRe(key, flags) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(!\\[[^\\]]*\\]\\()upload:${escaped}(?=[\\s)])`, flags);
+}
+
+/**
+ * The keys of `files` the markdown actually displays. Every image is its own
+ * transaction, so an attachment the body doesn't show would buy calldata no
+ * reader ever sees — those never go on chain.
+ * @returns {string[]} keys, in `files` order
+ */
+export function usedImageKeys(markdown, files) {
+  const md = markdown || '';
+  return Object.keys(files || {}).filter((key) => imageRefRe(key).test(md));
+}
+
+/**
+ * Replace `upload:KEY` refs in markdown with `eth:0x<txhash>` after uploading
+ * the images the body shows (see usedImageKeys — the rest are left alone).
  * Optional `onProgress(key, i, total)` fires before each image upload
  * (i is 1-based) so the UI can show per-image progress.
  */
 export async function embedImages(markdown, files, { quality = 0.6, onProgress } = {}) {
+  const used = usedImageKeys(markdown, files);
+  if (used.length === 0) return markdown; // nothing to pay for
   const { wallet, account } = await getWallet();
   let out = markdown;
-  const entries = Object.entries(files);
   let i = 0;
-  for (const [key, file] of entries) {
+  for (const key of used) {
     i += 1;
-    onProgress?.(key, i, entries.length);
-    const bytes = await processImage(file, { quality });
+    onProgress?.(key, i, used.length);
+    const bytes = await processImage(files[key], { quality });
     const hash = await storeImage(bytes, wallet, account);
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(
-      `(!\\[[^\\]]*\\]\\()upload:${escapedKey}(?=[\\s)])`,
-      'g',
-    );
-    out = out.replace(re, `$1eth:${hash}`);
+    out = out.replace(imageRefRe(key, 'g'), `$1eth:${hash}`);
   }
   return out;
 }
