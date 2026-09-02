@@ -15,7 +15,7 @@ export default function PostMeta({ block, clock, prefix, className = '' }) {
       <span>{chainName()}</span>
       {rel && (
         <>
-          <span aria-hidden="true">·</span>
+          <span className="select-none" aria-hidden="true">·</span>
           <span>{rel}</span>
         </>
       )}
