@@ -4,7 +4,7 @@ import { client } from '../lib/blogReader';
 import { getAuthorCount } from '../lib/data';
 import { useWallet } from '../lib/wallet';
 import { CHAIN_ID } from '../lib/config';
-import { chainName, etherscanTxUrl } from '../lib/format';
+import { etherscanTxUrl } from '../lib/format';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
 import CostPanel from './CostPanel';
@@ -345,7 +345,7 @@ export default function Publisher() {
 
       <div className="pt-6">
         <p className="mb-4 text-xs text-ink-faint">
-          一经发布，文章将永久公开发布于 {chainName()}区块链；不可修改、不可删除。
+          一经发布，文章将永久公开发布于区块链；不可修改、不可删除。
         </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
           {status === 'processing' && statusMsg && (

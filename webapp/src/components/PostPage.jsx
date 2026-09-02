@@ -8,7 +8,6 @@ import {
   shortAddr,
   estimateBlockTime,
   fmtRelTime,
-  chainName,
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
@@ -214,8 +213,6 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
       {loaded && (
         <footer className="mt-14 text-center">
           <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
-            <span>{chainName()}</span>
-            <span className="select-none" aria-hidden="true">·</span>
             <span>区块 {fmtBlock(meta.block)}</span>
             <span className="select-none" aria-hidden="true">·</span>
             <a

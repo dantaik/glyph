@@ -1,9 +1,9 @@
-import { estimateBlockTime, fmtRelTime, chainName } from '../lib/format';
+import { estimateBlockTime, fmtRelTime } from '../lib/format';
 
 /**
- * Chain name · relative time — the shared meta line for article rows and
- * the featured entry. `lead` (e.g. the author link) renders first,
- * `prefix` (e.g. 第 N 篇) before the chain name. Plain text everywhere.
+ * Relative time — the shared meta line for article rows and the featured
+ * entry. `lead` (e.g. the author link) renders first, `prefix` (e.g.
+ * 第 N 篇) before the time. The chain name lives in the app footer only.
  */
 export default function PostMeta({ block, clock, prefix, className = '', lead }) {
   const rel = fmtRelTime(estimateBlockTime(clock, block));
@@ -12,16 +12,10 @@ export default function PostMeta({ block, clock, prefix, className = '', lead })
       className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint tabular-nums ${className}`}
     >
       {lead}
-      {lead && <span className="select-none" aria-hidden="true">·</span>}
+      {lead && (prefix || rel) && <span className="select-none" aria-hidden="true">·</span>}
       {prefix && <span className="text-ink-ghost">{prefix}</span>}
-      {prefix && <span className="select-none" aria-hidden="true">·</span>}
-      <span>{chainName()}</span>
-      {rel && (
-        <>
-          <span className="select-none" aria-hidden="true">·</span>
-          <span>{rel}</span>
-        </>
-      )}
+      {prefix && rel && <span className="select-none" aria-hidden="true">·</span>}
+      {rel && <span>{rel}</span>}
     </span>
   );
 }

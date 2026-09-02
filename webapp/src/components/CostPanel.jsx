@@ -22,7 +22,6 @@ export default function CostPanel({ estimate, market, chainId }) {
           ) : (
             <> · 美元价格不可用</>
           )}
-          {chainId !== 1 && <> · 链 {chainId}</>}
         </span>
       </div>
 

@@ -6,7 +6,7 @@ import Settings from './components/Settings';
 import { FIXTURES_MODE } from './lib/data';
 import { GLYPH_ADDRESS, CHAIN_ID } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
-import { etherscanAddrUrl, shortAddr } from './lib/format';
+import { etherscanAddrUrl, shortAddr, chainName } from './lib/format';
 
 const CONTRACT_CONFIGURED = GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
 
@@ -62,15 +62,19 @@ export default function App() {
       </main>
       <footer className="border-t border-edge py-10 text-center">
         {CONTRACT_CONFIGURED && (
-          <a
-            href={etherscanAddrUrl(GLYPH_ADDRESS)}
-            target="_blank"
-            rel="noreferrer"
-            title="在 Etherscan 查看合约"
-            className="mt-3 inline-block font-mono text-2xs tabular-nums text-ink-faint bg-paper-sunken rounded px-1.5 py-0.5 hover:text-accent transition-colors"
-          >
-            合约：{shortAddr(GLYPH_ADDRESS)}
-          </a>
+          <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
+            <span>{chainName()}</span>
+            <span className="select-none" aria-hidden="true">·</span>
+            <a
+              href={etherscanAddrUrl(GLYPH_ADDRESS)}
+              target="_blank"
+              rel="noreferrer"
+              title="在 Etherscan 查看合约"
+              className="inline-block font-mono text-2xs tabular-nums text-ink-faint bg-paper-sunken rounded px-1.5 py-0.5 hover:text-accent transition-colors"
+            >
+              合约：{shortAddr(GLYPH_ADDRESS)}
+            </a>
+          </p>
         )}
       </footer>
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
