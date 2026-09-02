@@ -113,6 +113,36 @@ export function ExternalLink({ size, ...rest }) {
   );
 }
 
+/**
+ * 雁过留声 — a V formation of wild geese with echo arcs trailing the lead
+ * bird. Empty-state placeholder: similar in spirit to the hand-drawn
+ * line illustrations other writing products use, but unique to the brand.
+ */
+export function GeeseMark({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} viewBox="0 0 200 100" {...rest}>
+      {/* 留声 — echo arcs left behind by the lead goose */}
+      <path d="M112 10 A10 10 0 0 0 112 30" />
+      <path d="M102 4 A16 16 0 0 0 102 36" />
+      {/* lead goose */}
+      <path d="M126 14 Q134.5 5.5 143 14" />
+      <path d="M143 14 Q134.5 11 126 14" />
+      {/* left wing */}
+      <path d="M92 32 Q98.5 25.5 105 32" />
+      <path d="M105 32 Q98.5 29.8 92 32" />
+      <path d="M56 50 Q62.5 43.5 69 50" />
+      <path d="M69 50 Q62.5 47.8 56 50" />
+      {/* right wing */}
+      <path d="M158 32 Q164.5 25.5 171 32" />
+      <path d="M171 32 Q164.5 29.8 158 32" />
+      <path d="M184 50 Q190.5 43.5 197 50" />
+      <path d="M197 50 Q190.5 47.8 184 50" />
+      {/* horizon */}
+      <path d="M28 86 H172" strokeDasharray="1 7" opacity="0.5" />
+    </svg>
+  );
+}
+
 export function Sliders({ size, ...rest }) {
   return (
     <svg {...iconProps(size)} {...rest}>

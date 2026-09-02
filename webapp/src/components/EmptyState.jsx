@@ -1,4 +1,4 @@
-import { GlyphMark, AlertCircle } from './Icons';
+import { GeeseMark, AlertCircle } from './Icons';
 
 /** Centered empty/error placeholder: glyph mark, serif title, optional action pill */
 export default function EmptyState({ title, body, actionLabel, onAction, tone }) {
@@ -8,7 +8,7 @@ export default function EmptyState({ title, body, actionLabel, onAction, tone })
       {danger ? (
         <AlertCircle size={36} className="mx-auto text-danger" />
       ) : (
-        <GlyphMark size={44} className="mx-auto text-ink-ghost" />
+        <GeeseMark size={110} className="mx-auto text-ink-ghost" />
       )}
       <h2 className="mt-5 font-serif text-lg text-ink-soft">{title}</h2>
       {body && (
