@@ -58,6 +58,17 @@ init code hash: 0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402b5
 - **合约验证**：`forge verify-contract 0x000000AE2f2249c497cfc5F262dd1491634C361C src/Blog.sol:Glyph --chain <chainid> --etherscan-api-key $KEY`
 - **普通部署**（地址随链而变）：`forge script script/Deploy.s.sol:DeployBlog --rpc-url $ETH_RPC --broadcast`
 
+## 部署记录
+
+合约地址（所有链相同）：`0x000000AE2f2249c497cfc5F262dd1491634C361C`
+
+| 链 | Chain ID | 部署交易 | 部署者 | 日期 | 验证 |
+|---|---|---|---|---|---|
+| Ethereum mainnet | 1 | [0x5f16…ce9a](https://etherscan.io/tx/0x5f16b4d2375109968578502bdf899ded4cc7fc6c2608bbb738ffa7dbdc3bce9a) | `0x327f…c458` | 2026-09-02 | ✅ [Etherscan](https://etherscan.io/address/0x000000AE2f2249c497cfc5F262dd1491634C361C#code) |
+| Taiko mainnet | 167000 | [0x6c66…dae7](https://taikoscan.io/tx/0x6c6645e2258432d01fae5e9e0f6b5c33bccade234a9628afced413e600e0dae7) | `0x327f…c458` | 2026-09-02 | ✅ [Taikoscan](https://taikoscan.io/address/0x000000AE2f2249c497cfc5F262dd1491634C361C#code) |
+
+部署者地址 `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` 对合约没有任何特权（合约无所有者、不可升级）。
+
 ## 许可
 
 MIT
