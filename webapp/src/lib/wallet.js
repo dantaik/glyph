@@ -49,6 +49,60 @@ export function hasProvider() {
   return typeof window !== 'undefined' && !!window.ethereum;
 }
 
+/** Chain metadata for wallet_addEthereumChain (only known chains). */
+const KNOWN_CHAINS = {
+  1: {
+    chainName: 'Ethereum Mainnet',
+    rpcUrls: ['https://eth.drpc.org'],
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://etherscan.io'],
+  },
+  11155111: {
+    chainName: 'Sepolia',
+    rpcUrls: ['https://sepolia.drpc.org'],
+    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://sepolia.etherscan.io'],
+  },
+  167000: {
+    chainName: 'Taiko Mainnet',
+    rpcUrls: ['https://rpc.mainnet.taiko.xyz'],
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://taikoscan.io'],
+  },
+  167013: {
+    chainName: 'Taiko Hoodi',
+    rpcUrls: ['https://rpc.hoodi.taiko.xyz'],
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://hoodi.taikoscan.io'],
+  },
+};
+
+/**
+ * Ask the wallet to switch to `chainId`. If the wallet doesn't know the
+ * chain yet (4902), add it first and the switch follows automatically.
+ * The provider's chainChanged event updates the shared store afterwards.
+ */
+export async function switchToConfiguredChain(chainId) {
+  const eth = window.ethereum;
+  if (!eth) throw new Error('未检测到钱包');
+  const hex = `0x${chainId.toString(16)}`;
+  try {
+    await eth.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: hex }],
+    });
+  } catch (err) {
+    if (err?.code === 4902 && KNOWN_CHAINS[chainId]) {
+      await eth.request({
+        method: 'wallet_addEthereumChain',
+        params: [{ chainId: hex, ...KNOWN_CHAINS[chainId] }],
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
 export async function connect() {
   const eth = window.ethereum;
   if (!eth) throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
