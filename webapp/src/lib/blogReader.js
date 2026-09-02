@@ -136,36 +136,59 @@ async function readHead(author) {
   });
 }
 
-/** Load `author`'s most recent `n` post-metadata records (newest first). */
+/**
+ * Load `author`'s most recent `n` post-metadata records (newest first).
+ * Incremental: an unchanged author head serves the persisted rows with
+ * zero getLogs; blocks covered by the global feed scan or the author's
+ * own persisted scan are reused without RPC.
+ */
 export async function loadTitleList(author, n) {
-  return walkBack(author, await readHead(author), null, n);
+  const key = String(author).toLowerCase();
+  const stored = readAuthorScans()[key];
+  const head = await readHead(author);
+  if (stored?.head != null && head <= BigInt(stored.head)) {
+    return stored.rows.slice(0, n);
+  }
+
+  const out = await walkAuthorTitles(author, head, null, n);
+  const seen = new Set(out.map((m) => String(m.index)));
+  for (const m of stored?.rows ?? []) {
+    if (seen.has(String(m.index))) continue;
+    seen.add(String(m.index));
+    out.push(m);
+    if (out.length >= n) break;
+  }
+  writeAuthorScan(author, { head: head.toString(), rows: out.slice(0, 100) });
+  return out.slice(0, n);
 }
 
 /** Continue walking from the oldest title already shown. */
 export async function loadMoreTitles(author, oldestShown, n) {
   if (!oldestShown) return [];
-  return walkBack(author, oldestShown.block, oldestShown.index, n);
+  return walkAuthorTitles(author, oldestShown.block, oldestShown.index, n);
 }
 
 /**
  * Find the metadata for a single (author, index) — used for deep links.
- * Walks the per-author reverse chain backwards until we find it or pass it.
+ * Walks the per-author reverse chain backwards until we find it or pass it,
+ * reusing cached rows (global + per-author) per block.
  */
 export async function findTitleMeta(author, targetIndex) {
   // Guard against garbage from the URL (?i=abc): BigInt(NaN) throws, and
   // negative / fractional indexes can never match a real post.
   if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return null;
   const target = BigInt(targetIndex);
+  const fetchRows = makeRowLookup(author);
   let block = await readHead(author);
   while (block > 0n) {
-    const logs = await postsInBlock(author, block);
-    if (logs.length === 0) return null;
-    for (const log of logs) {
-      if (log.args.index === target) return logToMeta(log, block);
+    const rows = await fetchRows(block);
+    if (rows.length === 0) return null;
+    for (const m of rows) {
+      if (m.index === target) return m;
     }
-    const oldestIdxInBlock = logs[logs.length - 1].args.index;
+    const oldestIdxInBlock = rows[rows.length - 1].index;
     if (oldestIdxInBlock < target) return null; // walked past
-    block = logs[logs.length - 1].args.prevBlock;
+    block = rows[rows.length - 1].prevBlock;
   }
   return null;
 }
@@ -186,7 +209,9 @@ export async function findTitleMeta(author, targetIndex) {
 // covered head and never rescans already-covered ranges. Previously
 // discovered rows are merged back so the feed stays full between scans.
 const FEED_SCAN_KEY = 'glyph.feedScan.v1';
+const MERGE_CAP = 300; // persisted global rows (storage bound)
 const FEED_SCAN_EVT = 'glyph:feedscan';
+const AUTHOR_SCAN_KEY = 'glyph.authorScan.v1';
 
 /** Persisted feed-scan state: { head, frontier, rows } or null. */
 export function readFeedScan() {
@@ -211,6 +236,87 @@ function writeFeedScan(scan) {
   } catch {
     /* non-browser context */
   }
+}
+
+// --- Per-author persisted scans ({ address: { head, rows } }) ---
+//
+// Each visited author gets their own covered range, so revisiting an
+// author with no new posts costs zero getLogs, and the global feed scan
+// above is reused instead of re-walking blocks every address shares.
+
+function readAuthorScans() {
+  try {
+    const v = JSON.parse(localStorage.getItem(AUTHOR_SCAN_KEY) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAuthorScan(author, scan) {
+  try {
+    const all = readAuthorScans();
+    all[String(author).toLowerCase()] = scan;
+    localStorage.setItem(AUTHOR_SCAN_KEY, JSON.stringify(all));
+  } catch {
+    /* quota / privacy mode — falls back to the TTL layer */
+  }
+}
+
+/**
+ * Row lookup for one author that consults the GLOBAL feed scan and the
+ * author's own persisted scan first (no RPC), falling back to a single-
+ * block getLogs for uncovered blocks. Blocks already covered by either
+ * layer are never re-fetched.
+ */
+function makeRowLookup(author) {
+  const key = String(author).toLowerCase();
+  const stored = readAuthorScans()[key];
+  const global = readFeedScan();
+  const byBlock = new Map();
+  const seen = new Set();
+  const push = (rows) => {
+    for (const r of rows) {
+      const id = `${r.block}:${r.index}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const list = byBlock.get(String(r.block)) ?? [];
+      list.push(r);
+      byBlock.set(String(r.block), list);
+    }
+  };
+  push((global?.rows ?? []).filter((r) => String(r.author).toLowerCase() === key));
+  push(stored?.rows ?? []);
+
+  return async (block) => {
+    const cached = byBlock.get(String(block));
+    if (cached) return cached;
+    const logs = await postsInBlock(author, block);
+    const rows = logs.map((log) => logToMeta(log, block));
+    push(rows);
+    return byBlock.get(String(block));
+  };
+}
+
+/** Walk the author's reverse block chain, reusing cached rows per block. */
+async function walkAuthorTitles(author, startBlock, skipIndex, n) {
+  const fetchRows = makeRowLookup(author);
+  let block = startBlock;
+  let skip = skipIndex;
+  const out = [];
+  while (out.length < n && block > 0n) {
+    const rows = await fetchRows(block);
+    if (rows.length === 0) break;
+    rows.sort((a, b) => Number(b.index - a.index));
+    for (const m of rows) {
+      if (skip != null && m.index >= skip) continue;
+      out.push(m);
+      if (out.length >= n) break;
+    }
+    skip = null;
+    block = rows[rows.length - 1].prevBlock;
+  }
+  return out;
 }
 
 // NOTE: a TTL cache for this scan also lives in data.js (configurable in
@@ -274,7 +380,8 @@ export async function loadRecentAcrossAuthors(
   }
 
   // Merge with previously discovered rows (newest first), dedupe by
-  // txHash + eventIndex, cap at n.
+  // txHash + eventIndex. Persist up to MERGE_CAP rows so per-author
+  // scans can reuse the global coverage; the feed itself returns n.
   const seen = new Set();
   const merged = [];
   for (const row of [...out, ...cachedRows]) {
@@ -282,7 +389,7 @@ export async function loadRecentAcrossAuthors(
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(row);
-    if (merged.length >= n) break;
+    if (merged.length >= MERGE_CAP) break;
   }
 
   if (coveredFrontier != null) {
@@ -292,7 +399,7 @@ export async function loadRecentAcrossAuthors(
       rows: merged,
     });
   }
-  return merged;
+  return merged.slice(0, n);
 }
 
 // --- ENS names — cached; null when the address has none, or when the
