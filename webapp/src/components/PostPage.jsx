@@ -134,15 +134,15 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         </h1>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span>{fmtIndex(meta.index)}</span>
-          <span className="text-ink-ghost" aria-hidden="true">·</span>
+          <span aria-hidden="true">·</span>
           <span title={meta.author}>{ensName || shortAddr(meta.author)}</span>
           {relTime && (
             <>
-              <span className="text-ink-ghost" aria-hidden="true">·</span>
+              <span aria-hidden="true">·</span>
               <span>{relTime}</span>
             </>
           )}
-          <span className="text-ink-ghost" aria-hidden="true">·</span>
+          <span aria-hidden="true">·</span>
           <span>{chainName()}</span>
         </div>
         {body?.tags && body.tags.length > 0 && (
@@ -210,9 +210,9 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <footer className="mt-14 text-center">
           <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
             <span>{chainName()}</span>
-            <span className="text-ink-ghost" aria-hidden="true">·</span>
+            <span aria-hidden="true">·</span>
             <span>区块 {fmtBlock(meta.block)}</span>
-            <span className="text-ink-ghost" aria-hidden="true">·</span>
+            <span aria-hidden="true">·</span>
             <a
               href={etherscanTxUrl(meta.txHash)}
               target="_blank"
