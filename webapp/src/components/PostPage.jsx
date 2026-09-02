@@ -208,8 +208,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
 
       {loaded && (
         <footer className="mt-14 text-center">
-          <p className="text-ink-ghost" aria-hidden="true">—</p>
-          <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
             <span>{chainName()}</span>
             <span className="text-ink-ghost" aria-hidden="true">·</span>
             <span>区块 {fmtBlock(meta.block)}</span>
