@@ -30,10 +30,7 @@ export function fmtBlock(block) {
   return BigInt(block).toLocaleString('en-US');
 }
 
-/** 0-based on-chain index → 1-based display: `2n` → `"第 3 篇"`. */
-export function fmtIndex(index) {
-  return `第 ${Number(index) + 1} 篇`;
-}
+
 
 /** `0x12345678…cdef` → first 6 + `…` + last 4 chars. */
 export function shortAddr(addr) {

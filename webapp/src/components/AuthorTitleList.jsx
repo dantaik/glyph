@@ -89,9 +89,7 @@ export default function AuthorTitleList({
                   }}
                   className="group flex items-baseline gap-4 py-4"
                 >
-                  <span className="min-w-[2.5rem] font-mono text-xs text-ink-ghost tabular-nums">
-                    #{Number(t.index) + 1}
-                  </span>
+
                   <span className="flex-1 font-serif text-[1.05rem] leading-snug group-hover:text-accent transition-colors">
                     {fmtTitle(t.title) ?? <span className="text-ink-ghost">无标题</span>}
                   </span>

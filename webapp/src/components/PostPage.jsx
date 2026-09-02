@@ -3,7 +3,6 @@ import { loadPostBody, resolveImages, getChainClock } from '../lib/data';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
-  fmtIndex,
   fmtTitle,
   estimateBlockTime,
   fmtRelTime,
@@ -123,14 +122,12 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
-          <span>{fmtIndex(meta.index)}</span>
           {relTime && (
             <>
-              <span className="text-ink-ghost" aria-hidden="true">·</span>
               <span>{relTime}</span>
+              <span className="text-ink-ghost" aria-hidden="true">·</span>
             </>
           )}
-          <span className="text-ink-ghost" aria-hidden="true">·</span>
           <span>区块 {fmtBlock(meta.block)}</span>
           {body?.tags && body.tags.length > 0 && (
             <>
@@ -192,7 +189,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <footer className="mt-14 text-center">
           <p className="font-serif text-ink-ghost" aria-hidden="true">※</p>
           <p className="mt-3 text-xs text-ink-faint tabular-nums">
-            {fmtIndex(meta.index)} · 存于以太坊区块 {fmtBlock(meta.block)}
+            存于以太坊区块 {fmtBlock(meta.block)}
           </p>
           <a
             href={etherscanTxUrl(meta.txHash)}
