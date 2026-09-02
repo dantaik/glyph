@@ -3,6 +3,7 @@ import { friendlyError } from '../lib/format';
 import { resolveEnsName } from '../lib/data';
 import EmptyState from './EmptyState';
 import ArticleListItem from './ArticleListItem';
+import FeaturedPost from './FeaturedPost';
 
 /**
  * Author page: address header, post count, title list with relative times,
@@ -73,17 +74,22 @@ export default function AuthorTitleList({
       )}
 
       {titles.length > 0 && (
-        <ul className="divide-y divide-edge">
-          {titles.map((t) => (
-            <ArticleListItem
-              key={`${t.block}-${t.index}`}
-              post={t}
-              clock={clock}
-              navigate={navigate}
-              showIndex
-            />
-          ))}
-        </ul>
+        <>
+          <FeaturedPost post={titles[0]} clock={clock} navigate={navigate} />
+          {titles.length > 1 && (
+            <ul className="divide-y divide-edge">
+              {titles.slice(1).map((t) => (
+                <ArticleListItem
+                  key={`${t.block}-${t.index}`}
+                  post={t}
+                  clock={clock}
+                  navigate={navigate}
+                  showIndex
+                />
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       {error && titles.length > 0 && (

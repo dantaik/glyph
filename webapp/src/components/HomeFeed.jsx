@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   loadRecentAcrossAuthors,
-  loadPostBody,
   getChainClock,
 } from '../lib/data';
-import { fmtTitle, excerpt, friendlyError } from '../lib/format';
+import { friendlyError } from '../lib/format';
 import EmptyState from './EmptyState';
 import ArticleListItem from './ArticleListItem';
-import PostMeta from './PostMeta';
+import FeaturedPost from './FeaturedPost';
 
 const FEED_SIZE = 20;
 const EXCERPT_CHARS = 80;
@@ -23,7 +22,6 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [clock, setClock] = useState(null);
-  const [featuredBody, setFeaturedBody] = useState(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -50,24 +48,8 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     };
   }, [tick]);
 
-  // Featured entry body (tags + excerpt); silently degrade to title-only.
-  useEffect(() => {
-    setFeaturedBody(null);
-    const first = rows[0];
-    if (!first) return undefined;
-    let cancelled = false;
-    loadPostBody(first.txHash)
-      .then((res) => !cancelled && setFeaturedBody(res.body))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [rows]);
-
-  const openPost = (r) => navigate({ tx: r.txHash });
   const featured = rows[0];
   const rest = rows.slice(1);
-  const teaser = featuredBody ? excerpt(featuredBody.markdown, EXCERPT_CHARS) : '';
 
   return (
     <div>
@@ -103,38 +85,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
         />
       ) : (
         <>
-          <article className="border-b border-edge pb-8">
-            {featuredBody?.tags?.length > 0 && (
-              <div className="mb-2.5 flex flex-wrap gap-1.5">
-                {featuredBody.tags.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs text-accent-strong"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            )}
-            <h3>
-              <a
-                href={`/tx/${featured.txHash}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  openPost(featured);
-                }}
-                className="font-serif text-xl leading-[1.4] font-bold sm:text-2xl hover:text-accent transition-colors"
-              >
-                {fmtTitle(featured.title) ?? <span className="text-ink-ghost">无标题</span>}
-              </a>
-            </h3>
-            {teaser && (
-              <p className="mt-2 font-serif text-base leading-relaxed text-ink-soft line-clamp-2">
-                {teaser}
-              </p>
-            )}
-            <PostMeta block={featured.block} clock={clock} className="mt-3" />
-          </article>
+          <FeaturedPost post={featured} clock={clock} navigate={navigate} excerptChars={EXCERPT_CHARS} />
 
           <ul className="divide-y divide-edge">
             {rest.map((r) => (
