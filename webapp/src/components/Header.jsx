@@ -47,7 +47,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
           <span className="flex shrink-0 select-none items-center gap-1.5">
             <GlyphMark size={20} className="text-accent" />
             <span className="text-lg font-bold tracking-wide">
-              雁过留声
+              留声
             </span>
           </span>
           <nav className="flex items-center gap-2 sm:gap-4">
