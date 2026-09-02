@@ -9,8 +9,8 @@ const ICON_BTN =
   'inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-faint hover:text-ink hover:bg-paper-sunken transition-colors';
 
 const TABS = [
-  ['read', '阅读'],
-  ['write', '写作'],
+  ['read', '读'],
+  ['write', '写'],
 ];
 
 /** Sticky masthead: brand, tabs, wallet pill, theme toggle, settings */
