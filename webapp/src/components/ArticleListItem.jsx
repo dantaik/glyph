@@ -5,7 +5,7 @@ import PostMeta from './PostMeta';
  * One article row in a reading list — shared by the home feed and the
  * author title list. `showIndex` prepends 第 N 篇 for author views.
  */
-export default function ArticleListItem({ post, clock, navigate, showIndex = false }) {
+export default function ArticleListItem({ post, clock, navigate, showIndex = false, chainBadge = true }) {
   return (
     <li>
       <a
@@ -24,6 +24,7 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
           clock={clock}
           prefix={showIndex ? fmtIndex(post.index) : undefined}
           className="whitespace-nowrap"
+          chainBadge={chainBadge}
         />
       </a>
     </li>

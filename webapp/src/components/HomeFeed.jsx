@@ -133,7 +133,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
                 {teaser}
               </p>
             )}
-            <PostMeta block={featured.block} clock={clock} className="mt-3" />
+            <PostMeta block={featured.block} clock={clock} className="mt-3" chainBadge={false} />
           </article>
 
           <ul className="divide-y divide-edge">
@@ -143,6 +143,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
                 post={r}
                 clock={clock}
                 navigate={navigate}
+                chainBadge={false}
               />
             ))}
           </ul>
