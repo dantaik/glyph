@@ -29,7 +29,7 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
           prefix={showIndex ? fmtIndex(post.index) : undefined}
           lead={
             <a
-              href={`?author=${post.author}`}
+              href={`/author/${post.author}`}
               onClick={(e) => {
                 e.preventDefault();
                 navigate({ author: post.author });

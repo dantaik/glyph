@@ -141,7 +141,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
           <span className="flex items-center gap-1">
             <span>作者：</span>
             <a
-              href={`?author=${meta.author}`}
+              href={`/author/${meta.author}`}
               onClick={(e) => {
                 e.preventDefault();
                 onOpenAuthor?.();

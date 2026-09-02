@@ -105,12 +105,12 @@ export default function Reader({ onStartWriting }) {
     };
   }, [author, isConfigured]);
 
-  // Legacy ?author=…&i=N links: the query post view is gone — drop the
-  // i param so the author list URL stays clean.
+  // Legacy ?author= query links converge onto the /author/<addr> path
+  // (replace, so history stays clean).
   useEffect(() => {
-    if (tx || !author || i == null) return;
+    if (!params.authorFromQuery) return;
     navigate({ author }, { replace: true });
-  }, [tx, author, i, navigate]);
+  }, [params.authorFromQuery, author, navigate]);
 
 
   // Neighbors for the open post: seed synchronously from the titles cache,

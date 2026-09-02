@@ -15,9 +15,15 @@ function readParams() {
   const sp = new URLSearchParams(window.location.search);
   const out = {};
   for (const [k, v] of sp.entries()) out[k] = v;
-  // /tx/0x<hash> deep links map to the `tx` param.
-  const m = window.location.pathname.match(/^\/tx\/(0x[0-9a-fA-F]{64})\/?$/);
-  if (m) out.tx = m[1];
+  // Path deep links: /tx/0x<hash> → tx; /author/0x<addr> → author.
+  const mTx = window.location.pathname.match(/^\/tx\/(0x[0-9a-fA-F]{64})\/?$/);
+  if (mTx) out.tx = mTx[1];
+  const mAuthor = window.location.pathname.match(/^\/author\/(0x[0-9a-fA-F]{40})\/?$/);
+  if (mAuthor) {
+    out.author = mAuthor[1];
+  } else if (out.author) {
+    out.authorFromQuery = true; // legacy ?author= link
+  }
   return out;
 }
 
@@ -42,16 +48,17 @@ export function useUrlState() {
   const navigate = useCallback((next, { replace = false } = {}) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(next)) {
-      // `tx` lives in the path (/tx/<hash>), never in the query string.
-      if (k === 'tx') continue;
+      // `tx` and `author` live in the path (/tx/<hash>, /author/<addr>),
+      // never in the query string.
+      if (k === 'tx' || k === 'author') continue;
       if (v != null && v !== '') sp.set(k, String(v));
     }
     // Dev demo mode (fixtures) follows in-app navigation.
     if (next.fixtures == null && state.fixtures) sp.set('fixtures', state.fixtures);
     const search = sp.toString();
-    // A tx deep link uses the /tx/<hash> path; everything else is the
-    // root path with query params.
-    const path = next.tx ? `/tx/${next.tx}` : '/';
+    // Deep links use their paths; everything else is the root path
+    // with query params.
+    const path = next.tx ? `/tx/${next.tx}` : next.author ? `/author/${next.author}` : '/';
     const url = `${path}${search ? `?${search}` : ''}`;
     if (replace) window.history.replaceState({}, '', url);
     else window.history.pushState({}, '', url);
