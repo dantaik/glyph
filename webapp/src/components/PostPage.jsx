@@ -162,18 +162,6 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
             )}
           </span>
         </div>
-        {body?.tags && body.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-            {body.tags.map((t) => (
-              <span
-                key={t}
-                className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
         </div>
       </header>
 
@@ -245,6 +233,18 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
               </>
             )}
           </p>
+          {body?.tags && body.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {body.tags.map((t) => (
+                <span
+                  key={t}
+                  className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </footer>
       )}
 

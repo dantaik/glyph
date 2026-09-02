@@ -25,18 +25,6 @@ export default function FeaturedPost({ post, clock, navigate, excerptChars = 80 
 
   return (
     <article className="border-b border-edge pb-8">
-      {body?.tags?.length > 0 && (
-        <div className="mb-2.5 flex flex-wrap gap-1.5">
-          {body.tags.map((t) => (
-            <span
-              key={t}
-              className="inline-flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs text-accent-strong"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
       <h3>
         <a
           href={`/tx/${post.txHash}`}
