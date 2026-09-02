@@ -203,7 +203,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
 
       {loaded && (
         <footer className="mt-14 text-center">
-          <p className="font-serif text-ink-ghost" aria-hidden="true">※</p>
+          <p className="text-ink-ghost" aria-hidden="true">※</p>
           <p className="mt-3 text-xs text-ink-faint tabular-nums">
             {chainName()} · 区块 {fmtBlock(meta.block)}
           </p>

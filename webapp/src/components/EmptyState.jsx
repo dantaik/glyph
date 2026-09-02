@@ -10,7 +10,7 @@ export default function EmptyState({ title, body, actionLabel, onAction, tone })
       ) : (
         <GeeseMark size={110} className="mx-auto text-ink-ghost" />
       )}
-      <h2 className="mt-5 font-serif text-lg text-ink-soft">{title}</h2>
+      <h2 className="mt-5 text-lg text-ink-soft">{title}</h2>
       {body && (
         <p className="mt-2 text-sm leading-relaxed text-ink-faint">{body}</p>
       )}

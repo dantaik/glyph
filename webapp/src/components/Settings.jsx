@@ -95,7 +95,7 @@ export default function Settings({ open, onClose }) {
         }`}
       >
         <div className="flex items-baseline justify-between mb-1">
-          <h2 className="font-serif text-xl font-semibold">节点设置</h2>
+          <h2 className="text-xl font-semibold">节点设置</h2>
           {hasOverride && <span className="text-xs text-success">已自定义</span>}
         </div>
         <p className="text-xs text-ink-faint mb-6">

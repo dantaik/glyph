@@ -76,7 +76,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   return (
     <div>
       <section className="mb-9 text-center">
-        <h1 className="font-serif text-2xl font-bold leading-snug tracking-wide text-ink sm:text-[1.75rem]">
+        <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-[1.75rem]">
           人过留名，雁过留声。
           <br />
           人海亿万，唯留字者不朽。
@@ -84,7 +84,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
       </section>
 
       <header className="mb-8 flex items-baseline justify-between border-b border-edge pb-3">
-        <h2 className="font-serif text-xl font-semibold">最新文章</h2>
+        <h2 className="text-xl font-semibold">最新文章</h2>
         <p className="text-xs text-ink-ghost">来自所有作者的最近 {FEED_SIZE} 篇</p>
       </header>
 

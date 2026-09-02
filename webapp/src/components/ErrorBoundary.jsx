@@ -24,7 +24,7 @@ export default class ErrorBoundary extends Component {
       return (
         <div className="flex min-h-dvh items-center justify-center p-6">
           <div className="max-w-sm py-20 text-center">
-            <h1 className="font-serif text-lg text-ink-soft">页面出错了</h1>
+            <h1 className="text-lg text-ink-soft">页面出错了</h1>
             <p className="mt-2 break-all text-sm leading-relaxed text-ink-faint">
               {String(this.state.error?.message || this.state.error)}
             </p>

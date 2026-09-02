@@ -35,7 +35,7 @@ export default function App() {
       <footer className="border-t border-edge py-10 text-center">
         <div className="flex items-center justify-center gap-1.5">
           <GlyphMark size={16} className="text-ink-ghost" />
-          <span className="font-serif text-sm text-ink-soft">雁过留声</span>
+          <span className="text-sm text-ink-soft">雁过留声</span>
         </div>
 
         {CONTRACT_CONFIGURED && (
