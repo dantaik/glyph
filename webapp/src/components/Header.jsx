@@ -10,7 +10,7 @@ const ICON_BTN =
 
 const TABS = [
   ['read', '阅读'],
-  ['write', '刻字'],
+  ['write', '写作'],
 ];
 
 /** Sticky masthead: brand, tabs, wallet pill, theme toggle, settings */
