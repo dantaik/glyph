@@ -220,6 +220,7 @@ export default function Reader({ onStartWriting }) {
         onBack={() => navigate({ author })}
         neighbors={neighbors}
         onNavigateIndex={(j) => navigate({ author, i: String(j) })}
+        onOpenAuthor={() => navigate({ author: currentMeta.author })}
       />
     );
   }

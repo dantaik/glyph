@@ -30,7 +30,7 @@ const SKELETON_GROUPS = [
  * Fetches the body (tags + markdown) from the publish() tx calldata, then
  * resolves any eth:<txhash> image refs to blob URLs before rendering.
  */
-export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
+export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onOpenAuthor }) {
   const [body, setBody] = useState(null); // { tags, markdown }
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
@@ -135,7 +135,17 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span>{fmtIndex(meta.index)}</span>
           <span className="select-none" aria-hidden="true">·</span>
-          <span title={meta.author}>{ensName || shortAddr(meta.author)}</span>
+          <a
+            href={`?author=${meta.author}`}
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenAuthor?.();
+            }}
+            title={meta.author}
+            className="hover:text-accent transition-colors"
+          >
+            {ensName || shortAddr(meta.author)}
+          </a>
           {relTime && (
             <>
               <span className="select-none" aria-hidden="true">·</span>
