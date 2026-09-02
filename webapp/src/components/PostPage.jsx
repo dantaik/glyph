@@ -133,11 +133,9 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
-          <span className="text-ink-ghost">{fmtIndex(meta.index)}</span>
+          <span>{fmtIndex(meta.index)}</span>
           <span className="text-ink-ghost" aria-hidden="true">·</span>
-          <span className="font-mono text-2xs tabular-nums" title={meta.author}>
-            {ensName || shortAddr(meta.author)}
-          </span>
+          <span title={meta.author}>{ensName || shortAddr(meta.author)}</span>
           {relTime && (
             <>
               <span className="text-ink-ghost" aria-hidden="true">·</span>
