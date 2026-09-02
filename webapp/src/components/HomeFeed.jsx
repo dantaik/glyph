@@ -83,9 +83,6 @@ export default function HomeFeed({ navigate, onStartWriting }) {
         <p className="mx-auto mt-3 max-w-md font-serif text-[0.95rem] leading-relaxed text-ink-soft">
           给未来的人类留一句话——你不是一个数字，你是来过的人。
         </p>
-        <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-ink-ghost">
-          One of billions. One word forever.
-        </p>
       </section>
 
       <header className="mb-8 flex items-baseline justify-between border-b border-edge pb-3">

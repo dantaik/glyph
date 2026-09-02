@@ -50,8 +50,8 @@ export default function Publisher() {
   const { account, chainId: walletChainId, connect } = useWallet();
   const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
   const chainLabel =
-    { 1: '以太坊', 11155111: 'Sepolia', 167000: 'Taiko', 167013: 'Taiko Hoodi' }[CHAIN_ID] ||
-    `chain ${CHAIN_ID}`;
+    { 1: '以太坊', 11155111: 'Sepolia 测试网', 167000: 'Taiko 主网', 167013: 'Taiko Hoodi 测试网' }[CHAIN_ID] ||
+    `链 ${CHAIN_ID}`;
 
   const titleBytes = titleByteLength(title);
   const titleOver = titleBytes > TITLE_MAX_BYTES;
@@ -455,7 +455,7 @@ function CostPanel({ estimate, market, chainId }) {
           ) : (
             <> · 美元价格不可用</>
           )}
-          {chainId !== 1 && <> · chain {chainId}</>}
+          {chainId !== 1 && <> · 链 {chainId}</>}
         </span>
       </div>
 

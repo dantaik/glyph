@@ -20,7 +20,7 @@ const chain = CHAIN_ID === 11155111 ? sepolia : mainnet;
 
 export async function getWallet() {
   if (!window.ethereum) {
-    throw new Error('No wallet found. Install MetaMask or another browser wallet.');
+    throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
   }
   const wallet = createWalletClient({ chain, transport: custom(window.ethereum) });
   const [account] = await wallet.getAddresses();

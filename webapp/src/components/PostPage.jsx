@@ -79,7 +79,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
   useEffect(() => {
     document.title = `${fmtTitle(meta.title) || '无标题'} · 岩刻`;
     return () => {
-      document.title = '岩刻 · Glyph';
+      document.title = '岩刻';
     };
   }, [meta.title]);
 

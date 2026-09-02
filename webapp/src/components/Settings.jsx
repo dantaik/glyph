@@ -99,18 +99,18 @@ export default function Settings({ open, onClose }) {
           {hasOverride && <span className="text-xs text-success">已自定义</span>}
         </div>
         <p className="text-xs text-ink-faint mb-6">
-          自定义 Ethereum RPC 端点；保存后会刷新页面。
+          自定义以太坊 RPC 端点；保存后会刷新页面。
         </p>
 
         <label className="block mb-4">
           <span className="block text-xs tracking-label text-ink-faint mb-1.5">
-            RPC URL
+            RPC 地址
           </span>
           <input
             type="text"
             value={rpcUrl}
             onChange={(e) => setRpcUrl(e.target.value)}
-            placeholder="https://your-node/rpc"
+            placeholder="https://你的节点地址"
             autoFocus
             className={INPUT_CLS}
           />
@@ -118,7 +118,7 @@ export default function Settings({ open, onClose }) {
 
         <label className="block mb-6">
           <span className="block text-xs tracking-label text-ink-faint mb-1.5">
-            Chain ID
+            链 ID
           </span>
           <input
             type="number"
@@ -127,7 +127,7 @@ export default function Settings({ open, onClose }) {
             className={INPUT_CLS}
           />
           <span className="block text-xs text-ink-faint mt-1">
-            1 = 主网 · 11155111 = Sepolia
+            1 = 主网 · 11155111 = Sepolia 测试网
           </span>
         </label>
 
