@@ -72,7 +72,7 @@ export default function AuthorTitleList({
       )}
 
       {!loading && titles.length === 0 && !error && (
-        <EmptyState title="还没有岩刻" body="这位作者还没有在链上刻过字。" />
+        <EmptyState title="还没有文章" body="这位作者还没有在链上发表过文章。" />
       )}
 
       {titles.length > 0 && (
@@ -122,7 +122,7 @@ export default function AuthorTitleList({
               {loadingMore ? '正在加载…' : '加载更多'}
             </button>
           ) : (
-            <p className="text-xs text-ink-ghost">已是全部岩刻</p>
+            <p className="text-xs text-ink-ghost">已是全部文章</p>
           )}
         </div>
       )}

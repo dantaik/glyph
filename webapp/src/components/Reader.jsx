@@ -207,7 +207,7 @@ export default function Reader({ onStartWriting }) {
     if (currentMeta === null) {
       return (
         <EmptyState
-          title="没有找到这篇岩刻"
+          title="没有找到这篇文章"
           body="链接里的序号不存在（可能已越界或格式有误）。"
           actionLabel="返回作者列表"
           onAction={() => navigate({ author })}

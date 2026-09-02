@@ -85,8 +85,8 @@ export default function HomeFeed({ navigate, onStartWriting }) {
       </section>
 
       <header className="mb-8 flex items-baseline justify-between border-b border-edge pb-3">
-        <h2 className="font-serif text-xl font-semibold">最新岩刻</h2>
-        <p className="text-xs text-ink-ghost">来自所有作者的最近 {FEED_SIZE} 封</p>
+        <h2 className="font-serif text-xl font-semibold">最新文章</h2>
+        <p className="text-xs text-ink-ghost">来自所有作者的最近 {FEED_SIZE} 篇</p>
       </header>
 
       {loading ? (
@@ -101,8 +101,8 @@ export default function HomeFeed({ navigate, onStartWriting }) {
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="此刻还没有岩刻"
-          body="最近的区块里没有发现新的岩刻。连接钱包，刻下第一篇。"
+          title="此刻还没有文章"
+          body="最近的区块里没有发现新的文章。连接钱包，刻下第一篇。"
           actionLabel="刻第一篇"
           onAction={onStartWriting}
         />

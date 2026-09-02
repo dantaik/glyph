@@ -65,7 +65,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
                 navigate({ author: account });
                 onTabChange('read');
               }}
-              aria-label="查看我的岩刻"
+              aria-label="查看我的文章"
               className="inline-flex items-center gap-1.5 rounded-full bg-paper-sunken px-3 py-1 font-mono text-xs text-ink-soft hover:text-ink transition-colors"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
