@@ -4,15 +4,10 @@ import {
   loadPostBody,
   getChainClock,
 } from '../lib/data';
-import {
-  fmtTitle,
-  estimateBlockTime,
-  fmtRelTime,
-  excerpt,
-  chainName,
-  friendlyError,
-} from '../lib/format';
+import { fmtTitle, excerpt, friendlyError } from '../lib/format';
 import EmptyState from './EmptyState';
+import ArticleListItem from './ArticleListItem';
+import PostMeta from './PostMeta';
 
 const FEED_SIZE = 20;
 const EXCERPT_CHARS = 80;
@@ -138,26 +133,17 @@ export default function HomeFeed({ navigate, onStartWriting }) {
                 {teaser}
               </p>
             )}
-            <MetaLine row={featured} clock={clock} className="mt-3" />
+            <PostMeta block={featured.block} clock={clock} className="mt-3" />
           </article>
 
           <ul className="divide-y divide-edge">
             {rest.map((r) => (
-              <li key={`${r.txHash}-${r.index}`}>
-                <a
-                  href={`?author=${r.author}&i=${r.index}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openPost(r);
-                  }}
-                  className="group block py-5"
-                >
-                  <span className="block font-serif text-lg leading-snug group-hover:text-accent transition-colors line-clamp-2">
-                    {fmtTitle(r.title) ?? <span className="text-ink-ghost">无标题</span>}
-                  </span>
-                  <MetaLine row={r} clock={clock} className="mt-2" />
-                </a>
-              </li>
+              <ArticleListItem
+                key={`${r.txHash}-${r.index}`}
+                post={r}
+                clock={clock}
+                navigate={navigate}
+              />
             ))}
           </ul>
         </>
@@ -166,23 +152,6 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   );
 }
 
-/** chain badge · 约-relative-time (suppressed when unknown) */
-function MetaLine({ row, clock, className = '' }) {
-  const rel = fmtRelTime(estimateBlockTime(clock, row.block));
-  return (
-    <span
-      className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint tabular-nums ${className}`}
-    >
-      <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
-      {rel && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span>{rel}</span>
-        </>
-      )}
-    </span>
-  );
-}
 
 function FeedSkeleton() {
   return (
