@@ -184,10 +184,10 @@ export async function findTitleMeta(author, targetIndex) {
     const rows = await fetchRows(block);
     if (rows.length === 0) return null;
     for (const m of rows) {
-      if (m.index === target) return m;
+      if (BigInt(m.index) === target) return m;
     }
     const oldestIdxInBlock = rows[rows.length - 1].index;
-    if (oldestIdxInBlock < target) return null; // walked past
+    if (BigInt(oldestIdxInBlock) < target) return null; // walked past
     block = rows[rows.length - 1].prevBlock;
   }
   return null;
@@ -212,6 +212,21 @@ const FEED_SCAN_KEY = 'glyph.feedScan.v1';
 const MERGE_CAP = 300; // persisted global rows (storage bound)
 const FEED_SCAN_EVT = 'glyph:feedscan';
 const AUTHOR_SCAN_KEY = 'glyph.authorScan.v1';
+const AUTHOR_SCAN_EVT = 'glyph:authorscan';
+
+// Rows are BigInt-heavy metas (block/index/prevBlock) while they live in
+// memory, but localStorage is JSON-only and JSON.stringify throws on BigInt —
+// so rows must be flattened to plain numbers (block heights and indexes stay
+// far below 2^53) before persisting, or the incremental state silently vanishes.
+const plainRow = (r) => ({
+  author: r.author,
+  index: Number(r.index),
+  block: Number(r.block),
+  prevBlock: Number(r.prevBlock),
+  title: r.title,
+  txHash: r.txHash,
+  eventIndex: r.eventIndex ?? 0,
+});
 
 /** Persisted feed-scan state: { head, frontier, rows } or null. */
 export function readFeedScan() {
@@ -226,7 +241,14 @@ export function readFeedScan() {
 
 function writeFeedScan(scan) {
   try {
-    localStorage.setItem(FEED_SCAN_KEY, JSON.stringify(scan));
+    localStorage.setItem(
+      FEED_SCAN_KEY,
+      JSON.stringify({
+        head: scan.head,
+        frontier: scan.frontier,
+        rows: (scan.rows ?? []).map(plainRow),
+      }),
+    );
   } catch {
     /* quota / privacy mode — scan stays in-memory via the TTL layer */
   }
@@ -256,11 +278,40 @@ function readAuthorScans() {
 function writeAuthorScan(author, scan) {
   try {
     const all = readAuthorScans();
-    all[String(author).toLowerCase()] = scan;
+    all[String(author).toLowerCase()] = {
+      head: scan.head,
+      rows: (scan.rows ?? []).map(plainRow),
+    };
     localStorage.setItem(AUTHOR_SCAN_KEY, JSON.stringify(all));
+    // Let listeners (e.g. the scan-range page) re-read the persisted state.
+    window.dispatchEvent(new CustomEvent(AUTHOR_SCAN_EVT));
   } catch {
     /* quota / privacy mode — falls back to the TTL layer */
   }
+}
+
+/** Persisted per-author scans as display entries: { address, head, oldest, count }. */
+export function readAuthorScanEntries() {
+  const all = readAuthorScans();
+  const out = [];
+  for (const [address, scan] of Object.entries(all)) {
+    const rows = Array.isArray(scan?.rows) ? scan.rows : [];
+    const blocks = rows.map((r) => BigInt(String(r.block))).filter((b) => b > 0n);
+    out.push({
+      address,
+      head: typeof scan?.head === 'string' ? scan.head : null,
+      oldest: blocks.length ? Number(blocks.reduce((a, b) => (a < b ? a : b))) : null,
+      count: rows.length,
+    });
+  }
+  // Most recently written head first.
+  out.sort((a, b) => {
+    if (a.head == null || b.head == null) return 0;
+    const ha = BigInt(a.head);
+    const hb = BigInt(b.head);
+    return hb > ha ? 1 : hb < ha ? -1 : 0;
+  });
+  return out;
 }
 
 /**
@@ -307,7 +358,7 @@ async function walkAuthorTitles(author, startBlock, skipIndex, n) {
   while (out.length < n && block > 0n) {
     const rows = await fetchRows(block);
     if (rows.length === 0) break;
-    rows.sort((a, b) => Number(b.index - a.index));
+    rows.sort((a, b) => Number(BigInt(b.index) - BigInt(a.index)));
     for (const m of rows) {
       if (skip != null && m.index >= skip) continue;
       out.push(m);
