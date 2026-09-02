@@ -145,7 +145,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
             </>
           )}
           <span className="text-ink-ghost" aria-hidden="true">·</span>
-          <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
+          <span>{chainName()}</span>
         </div>
         {body?.tags && body.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -212,7 +212,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <footer className="mt-14 text-center">
           <p className="text-ink-ghost" aria-hidden="true">—</p>
           <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
-            <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
+            <span>{chainName()}</span>
             <span className="text-ink-ghost" aria-hidden="true">·</span>
             <span>区块 {fmtBlock(meta.block)}</span>
             <span className="text-ink-ghost" aria-hidden="true">·</span>
