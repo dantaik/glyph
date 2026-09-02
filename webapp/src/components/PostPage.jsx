@@ -132,11 +132,11 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <FontSizeControl />
       </div>
 
-      <header className="mb-10">
+      <header className="mb-10 text-center">
         <h1 className="font-serif text-2xl leading-[1.45] font-bold sm:text-display">
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
-        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span className="text-ink-ghost">{fmtIndex(meta.index)}</span>
           <span className="text-ink-ghost" aria-hidden="true">·</span>
           <span className="font-mono text-2xs tabular-nums" title={meta.author}>
@@ -152,7 +152,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
           <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
         </div>
         {body?.tags && body.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap justify-center gap-1.5">
             {body.tags.map((t) => (
               <span
                 key={t}
@@ -163,7 +163,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
             ))}
           </div>
         )}
-        <div className="mt-7 h-[2px] w-12 rounded-full bg-accent" aria-hidden="true" />
+        <div className="mx-auto mt-7 h-[2px] w-12 rounded-full bg-accent" aria-hidden="true" />
       </header>
 
       {loading && (

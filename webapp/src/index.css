@@ -118,10 +118,11 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
 .prose-glyph h1, .prose-glyph h2, .prose-glyph h3 {
   text-align: left; letter-spacing: 0.01em; color: var(--color-ink);
 }
-.prose-glyph h1 { font-size: 1.5em;  line-height: 1.5;  font-weight: 700; margin: 2.2em 0 0.9em; }
-.prose-glyph h2 { font-size: 1.3em;  line-height: 1.55; font-weight: 700; margin: 2em 0 0.8em;
+/* Content headings sit clearly below the page title (24–28px). */
+.prose-glyph h1 { font-size: 1.35em; line-height: 1.5;  font-weight: 700; margin: 2.2em 0 0.9em; }
+.prose-glyph h2 { font-size: 1.25em; line-height: 1.55; font-weight: 700; margin: 2em 0 0.8em;
                   padding-left: 0.6em; border-left: 3px solid var(--color-accent); }
-.prose-glyph h3 { font-size: 1.15em; line-height: 1.6;  font-weight: 600; margin: 1.8em 0 0.6em; }
+.prose-glyph h3 { font-size: 1.12em; line-height: 1.6;  font-weight: 600; margin: 1.8em 0 0.6em; }
 
 .prose-glyph p { margin: 1.25em 0; overflow-wrap: break-word; }
 .prose-glyph > p:first-of-type { font-size: 1.06em; }   /* editorial opening lift */
