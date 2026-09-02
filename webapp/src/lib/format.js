@@ -102,6 +102,18 @@ export function excerpt(md, max = 80) {
   return `${chars.slice(0, max).join('').trimEnd()}…`;
 }
 
+const CHAIN_NAMES = {
+  1: '以太坊',
+  11155111: 'Sepolia 测试网',
+  167000: 'Taiko 主网',
+  167013: 'Taiko Hoodi 测试网',
+};
+
+/** Human-readable chain name for the configured chain id. */
+export function chainName(chainId = CHAIN_ID) {
+  return CHAIN_NAMES[chainId] || `链 ${chainId}`;
+}
+
 /** Etherscan transaction URL (sepolia subdomain when CHAIN_ID 11155111). */
 export function etherscanTxUrl(txHash) {
   return `${ETHERSCAN_BASE}/tx/${txHash}`;

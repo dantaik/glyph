@@ -5,12 +5,11 @@ import {
   getChainClock,
 } from '../lib/data';
 import {
-  fmtBlock,
   fmtTitle,
-  shortAddr,
   estimateBlockTime,
   fmtRelTime,
   excerpt,
+  chainName,
 } from '../lib/format';
 import EmptyState from './EmptyState';
 
@@ -139,7 +138,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
                 {teaser}
               </p>
             )}
-            <MetaLine row={featured} clock={clock} navigate={navigate} className="mt-3" />
+            <MetaLine row={featured} clock={clock} className="mt-3" />
           </article>
 
           <ul className="divide-y divide-edge">
@@ -156,7 +155,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
                   <span className="block font-serif text-lg leading-snug group-hover:text-accent transition-colors line-clamp-2">
                     {fmtTitle(r.title) ?? <span className="text-ink-ghost">无标题</span>}
                   </span>
-                  <MetaLine row={r} clock={clock} navigate={navigate} className="mt-2" />
+                  <MetaLine row={r} clock={clock} className="mt-2" />
                 </a>
               </li>
             ))}
@@ -167,33 +166,20 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   );
 }
 
-/** author-chip · 约-relative-time (suppressed when unknown) · 区块 N */
-function MetaLine({ row, clock, navigate, className = '' }) {
+/** chain badge · 约-relative-time (suppressed when unknown) */
+function MetaLine({ row, clock, className = '' }) {
   const rel = fmtRelTime(estimateBlockTime(clock, row.block));
   return (
     <span
       className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint tabular-nums ${className}`}
     >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          navigate({ author: row.author });
-        }}
-        className="font-mono text-[11px] tabular-nums text-ink-faint bg-paper-sunken rounded px-1.5 py-0.5 hover:text-accent transition-colors"
-        aria-label={`查看作者 ${row.author} 的岩刻`}
-      >
-        {shortAddr(row.author)}
-      </button>
+      <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-[11px]">{chainName()}</span>
       {rel && (
         <>
           <span aria-hidden="true">·</span>
           <span>{rel}</span>
         </>
       )}
-      <span aria-hidden="true">·</span>
-      <span>区块 {fmtBlock(row.block)}</span>
     </span>
   );
 }

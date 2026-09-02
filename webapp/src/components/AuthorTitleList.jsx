@@ -1,8 +1,8 @@
 import {
-  fmtBlock,
   fmtTitle,
   estimateBlockTime,
   fmtRelTime,
+  chainName,
 } from '../lib/format';
 import EmptyState from './EmptyState';
 
@@ -82,8 +82,9 @@ export default function AuthorTitleList({
                   <span className="flex-1 font-serif text-[1.05rem] leading-snug group-hover:text-accent transition-colors">
                     {fmtTitle(t.title) ?? <span className="text-ink-ghost">无标题</span>}
                   </span>
-                  <span className="text-xs text-ink-faint tabular-nums whitespace-nowrap">
-                    {rel ?? `区块 ${fmtBlock(t.block)}`}
+                  <span className="flex items-center gap-1.5 text-xs text-ink-faint tabular-nums whitespace-nowrap">
+                    {rel && <span>{rel}</span>}
+                    <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-[11px]">{chainName()}</span>
                   </span>
                 </a>
               </li>
