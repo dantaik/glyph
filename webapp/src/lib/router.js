@@ -44,6 +44,8 @@ export function useUrlState() {
     for (const [k, v] of Object.entries(next)) {
       if (v != null && v !== '') sp.set(k, String(v));
     }
+    // Dev demo mode (fixtures) follows in-app navigation.
+    if (next.fixtures == null && state.fixtures) sp.set('fixtures', state.fixtures);
     const search = sp.toString();
     // A tx deep link uses the /tx/<hash> path; everything else is the
     // root path with query params.

@@ -9,10 +9,10 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
   return (
     <li>
       <a
-        href={`?author=${post.author}&i=${post.index}`}
+        href={`/tx/${post.txHash}`}
         onClick={(e) => {
           e.preventDefault();
-          navigate({ author: post.author, i: String(post.index) });
+          navigate({ tx: post.txHash });
         }}
         className="group flex items-baseline gap-4 py-4"
       >

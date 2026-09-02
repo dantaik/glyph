@@ -64,7 +64,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     };
   }, [rows]);
 
-  const openPost = (r) => navigate({ author: r.author, i: String(r.index) });
+  const openPost = (r) => navigate({ tx: r.txHash });
   const featured = rows[0];
   const rest = rows.slice(1);
   const teaser = featuredBody ? excerpt(featuredBody.markdown, EXCERPT_CHARS) : '';
@@ -118,7 +118,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
             )}
             <h3>
               <a
-                href={`?author=${featured.author}&i=${featured.index}`}
+                href={`/tx/${featured.txHash}`}
                 onClick={(e) => {
                   e.preventDefault();
                   openPost(featured);

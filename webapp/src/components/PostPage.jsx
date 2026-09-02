@@ -25,12 +25,12 @@ const SKELETON_GROUPS = [
  * Single post view — a letter set on the page.
  * Props: { meta: { author, index, block, title, txHash }, onBack,
  *          neighbors: { prev, next } (undefined=resolving, null=absent),
- *          onNavigateIndex(index) }
+ *          onNavigate(txHash), onOpenAuthor() }
  *
  * Fetches the body (tags + markdown) from the publish() tx calldata, then
  * resolves any eth:<txhash> image refs to blob URLs before rendering.
  */
-export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onOpenAuthor }) {
+export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAuthor }) {
   const [body, setBody] = useState(null); // { tags, markdown }
   const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
@@ -251,7 +251,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
       <PostNav
         prev={neighbors?.prev}
         next={neighbors?.next}
-        onGo={onNavigateIndex}
+        onGo={onNavigate}
       />
     </article>
   );

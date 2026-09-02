@@ -111,6 +111,13 @@ export default function Reader({ onStartWriting }) {
     };
   }, [author, isConfigured]);
 
+  // Legacy ?author=…&i=N post URLs converge onto the /tx/<hash> form
+  // (replace, so history stays clean).
+  useEffect(() => {
+    if (tx || i == null || currentMeta == null || !currentMeta.txHash) return;
+    navigate({ tx: currentMeta.txHash }, { replace: true });
+  }, [tx, i, currentMeta, navigate]);
+
   // Resolve the meta for the currently-selected post.
   useEffect(() => {
     if (!author || idx === undefined) {
@@ -238,7 +245,7 @@ export default function Reader({ onStartWriting }) {
         meta={txMeta}
         onBack={() => navigate({ author: txMeta.author })}
         neighbors={neighbors}
-        onNavigateIndex={(j) => navigate({ author: txMeta.author, i: String(j) })}
+        onNavigate={(txHash) => navigate({ tx: txHash })}
         onOpenAuthor={() => navigate({ author: txMeta.author })}
       />
     );
@@ -273,7 +280,7 @@ export default function Reader({ onStartWriting }) {
         meta={currentMeta}
         onBack={() => navigate({ author })}
         neighbors={neighbors}
-        onNavigateIndex={(j) => navigate({ author, i: String(j) })}
+        onNavigate={(txHash) => navigate({ tx: txHash })}
         onOpenAuthor={() => navigate({ author: currentMeta.author })}
       />
     );

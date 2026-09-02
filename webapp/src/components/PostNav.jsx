@@ -25,7 +25,7 @@ function NeighborCard({ side, meta, onGo }) {
     <button
       type="button"
       rel={next ? 'next' : 'prev'}
-      onClick={() => onGo(Number(meta.index))}
+      onClick={() => onGo(meta.txHash)}
       className={`${CARD}${next ? ' sm:col-start-2' : ''}`}
     >
       <span
