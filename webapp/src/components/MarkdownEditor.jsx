@@ -14,7 +14,9 @@ import { useTheme } from '../lib/theme';
  * Theme-aware: follows the app light/dark theme and pins chrome colors to
  * the design tokens (Prec.highest so the builtin oneDark bg never wins).
  *
- * Props: { value, onChange, showPreview, disabled, height }
+ * Props: { value, onChange, showPreview, disabled, height, previewUrls }
+ * previewUrls: { key: blobUrl } for uploaded images, used to render
+ *   `upload:KEY` references in the live preview.
  */
 export default function MarkdownEditor({
   value,
@@ -22,6 +24,7 @@ export default function MarkdownEditor({
   showPreview,
   disabled,
   height = '26rem',
+  previewUrls = {},
 }) {
   const { isDark } = useTheme();
 
@@ -58,10 +61,16 @@ export default function MarkdownEditor({
     [isDark],
   );
 
-  const previewHtml = useMemo(
-    () => (showPreview ? renderMarkdown(value) : ''),
-    [showPreview, value],
-  );
+  const previewHtml = useMemo(() => {
+    if (!showPreview) return '';
+    // Resolve upload:KEY image references to blob URLs so the live
+    // preview actually shows the uploaded images.
+    const resolved = value.replace(/!\[([^\]]*)\]\(upload:([^)\s]+)\)/g, (m, alt, key) => {
+      const url = previewUrls[key];
+      return url ? `![${alt}](${url})` : m;
+    });
+    return renderMarkdown(resolved);
+  }, [showPreview, value, previewUrls]);
 
   return (
     <div className="grid grid-cols-1 gap-3">

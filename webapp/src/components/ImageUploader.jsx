@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, AlertCircle, Close } from './Icons';
 
 /**
@@ -29,19 +29,12 @@ async function copyToClipboard(text) {
   }
 }
 
-/** Sanitize a filename into an upload:KEY — ASCII alnum, `_`, `-`, CJK. */
-function toKey(name) {
-  return (
-    name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, '') ||
-    'img'
-  );
-}
 
 /**
  * Dropzone + thumbnail grid for draft images. The parent owns the `files`
  * map ({ key: File }); this component only renders and mutates via onChange.
  */
-export default function ImageUploader({ files, uploadRefs, onChange, disabled }) {
+export default function ImageUploader({ files, uploadRefs, onChange, disabled, previewUrls }) {
   const [isDragging, setIsDragging] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
   const fileInputRef = useRef(null);
@@ -60,29 +53,14 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled })
     });
   };
 
-  // Stable preview URLs, revoked when the set changes or on unmount.
-  const filePreviews = useMemo(() => {
-    const map = {};
-    for (const [key, file] of Object.entries(files)) {
-      map[key] = URL.createObjectURL(file);
-    }
-    return map;
-  }, [files]);
-  useEffect(
-    () => () =>
-      Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url)),
-    [filePreviews],
-  );
-
   const addFiles = (list) => {
     if (disabled) return;
     const next = { ...files };
+    // Keys are plain sequence numbers: img1, img2, … (not filenames).
     for (const f of list) {
-      const base = toKey(f.name);
-      let key = base;
-      let suffix = 2;
-      while (next[key]) key = `${base}-${suffix++}`;
-      next[key] = f;
+      let n = 1;
+      while (next[`img${n}`]) n += 1;
+      next[`img${n}`] = f;
     }
     onChange(next);
   };
@@ -164,7 +142,7 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled })
       {Object.keys(files).length > 0 && (
         <>
           <p className="mt-2 text-[10px] text-ink-ghost">
-            点击图片或名称，复制引用并粘贴到正文
+            图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文
           </p>
           <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
           {Object.entries(files).map(([key, file]) => (
@@ -184,7 +162,7 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled })
               className="relative group cursor-pointer rounded-lg"
             >
               <img
-                src={filePreviews[key]}
+                src={previewUrls[key]}
                 alt={key}
                 className="w-full h-24 object-cover rounded-lg border border-edge"
               />

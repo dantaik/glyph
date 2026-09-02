@@ -53,6 +53,21 @@ export default function Publisher() {
     { 1: '以太坊', 11155111: 'Sepolia 测试网', 167000: 'Taiko 主网', 167013: 'Taiko Hoodi 测试网' }[CHAIN_ID] ||
     `链 ${CHAIN_ID}`;
 
+  // Stable preview URLs for uploaded files — shared by the dropzone
+  // thumbnails and the editor's live preview pane.
+  const filePreviews = useMemo(() => {
+    const map = {};
+    for (const [key, file] of Object.entries(files)) {
+      map[key] = URL.createObjectURL(file);
+    }
+    return map;
+  }, [files]);
+  useEffect(
+    () => () =>
+      Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url)),
+    [filePreviews],
+  );
+
   const titleBytes = titleByteLength(title);
   const titleOver = titleBytes > TITLE_MAX_BYTES;
 
@@ -312,6 +327,7 @@ export default function Publisher() {
             showPreview={showPreview}
             disabled={status === 'processing'}
             height="26rem"
+            previewUrls={filePreviews}
           />
         </Suspense>
       </div>
@@ -326,6 +342,7 @@ export default function Publisher() {
           uploadRefs={uploadRefs}
           onChange={setFiles}
           disabled={status === 'processing'}
+          previewUrls={filePreviews}
         />
       </div>
 
