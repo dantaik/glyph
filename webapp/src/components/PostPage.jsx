@@ -135,6 +135,16 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span>{fmtIndex(meta.index)}</span>
           <span className="select-none" aria-hidden="true">·</span>
+          {relTime && (
+            <>
+              <span>{relTime}</span>
+              <span className="select-none" aria-hidden="true">·</span>
+            </>
+          )}
+          <span>{chainName()}</span>
+        </div>
+        <div className="mt-2 text-xs text-ink-faint tabular-nums">
+          <span>作者：</span>
           <a
             href={`?author=${meta.author}`}
             onClick={(e) => {
@@ -146,14 +156,6 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
           >
             {ensName || shortAddr(meta.author)}
           </a>
-          {relTime && (
-            <>
-              <span className="select-none" aria-hidden="true">·</span>
-              <span>{relTime}</span>
-            </>
-          )}
-          <span className="select-none" aria-hidden="true">·</span>
-          <span>{chainName()}</span>
         </div>
         {body?.tags && body.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-center gap-1.5">
