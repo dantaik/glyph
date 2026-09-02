@@ -27,6 +27,8 @@ function readParams() {
   } else if (out.author) {
     out.authorFromQuery = true; // legacy ?author= link
   }
+  // Local scan-range status page.
+  if (window.location.pathname.match(/^\/scan\/?$/)) out.scan = '1';
   return out;
 }
 
@@ -51,8 +53,8 @@ export function useUrlState() {
   const navigate = useCallback((next, { replace = false } = {}) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(next)) {
-      // `tx`, `txEvent` and `author` live in the path, never in the query.
-      if (k === 'tx' || k === 'txEvent' || k === 'author') continue;
+      // `tx`, `txEvent`, `author` and `scan` live in the path, never in the query.
+      if (k === 'tx' || k === 'txEvent' || k === 'author' || k === 'scan') continue;
       if (v != null && v !== '') sp.set(k, String(v));
     }
     // Dev demo mode (fixtures) follows in-app navigation.
@@ -64,7 +66,9 @@ export function useUrlState() {
       ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
       : next.author
         ? `/author/${next.author}`
-        : '/';
+        : next.scan
+          ? '/scan'
+          : '/';
     const url = `${path}${search ? `?${search}` : ''}`;
     if (replace) window.history.replaceState({}, '', url);
     else window.history.pushState({}, '', url);

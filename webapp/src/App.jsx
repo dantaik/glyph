@@ -8,6 +8,7 @@ import { GLYPH_ADDRESS, CHAIN_ID } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
 import { readFeedScan } from './lib/blogReader';
+import { useUrlState } from './lib/router';
 
 const CONTRACT_CONFIGURED = GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
 
@@ -15,6 +16,7 @@ export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { chainId: walletChainId } = useWallet();
+  const [, navigate] = useUrlState();
   const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState(null);
@@ -82,12 +84,21 @@ export default function App() {
             >
               合约：{shortAddr(GLYPH_ADDRESS)}
             </a>
-            {feedScan?.head != null && feedScan?.frontier != null && (
-              <>
-                <span className="select-none" aria-hidden="true">·</span>
-                <span>扫描范围 {fmtBlock(feedScan.frontier)} 至 {fmtBlock(feedScan.head)}</span>
-              </>
-            )}
+            <span className="select-none" aria-hidden="true">·</span>
+            <a
+              href="/scan"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate({ scan: '1' });
+              }}
+              title="查看扫描范围"
+              className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
+            >
+              扫描范围
+              {feedScan?.head != null && feedScan?.frontier != null
+                ? ` ${fmtBlock(feedScan.frontier)} 至 ${fmtBlock(feedScan.head)}`
+                : ''}
+            </a>
           </p>
         )}
       </footer>

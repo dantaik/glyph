@@ -15,6 +15,7 @@ import EmptyState from './EmptyState';
 import PostPage from './PostPage';
 import HomeFeed from './HomeFeed';
 import AuthorTitleList from './AuthorTitleList';
+import ScanPage from './ScanPage';
 
 const PAGE_SIZE = 20;
 
@@ -173,7 +174,7 @@ export default function Reader({ onStartWriting }) {
     setLoadingMore(true);
     try {
       const oldest = titles[titles.length - 1];
-      if (!oldest || oldest.index === 0n) {
+      if (!oldest || BigInt(oldest.index) === 0n) {
         setHasMore(false);
         return;
       }
@@ -204,6 +205,12 @@ export default function Reader({ onStartWriting }) {
         }
       />
     );
+  }
+
+  // --- /scan — local scan-range status page ---
+
+  if (params.scan) {
+    return <ScanPage navigate={navigate} />;
   }
 
   // --- /tx/<hash> deep link view ---
