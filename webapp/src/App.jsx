@@ -37,9 +37,7 @@ export default function App() {
           <GlyphMark size={16} className="text-ink-ghost" />
           <span className="font-serif text-sm text-ink-soft">岩刻</span>
         </div>
-        <p className="text-xs text-ink-faint mt-1.5">
-          文字与图片，皆存于以太坊 · 比作者更长久
-        </p>
+
         {CONTRACT_CONFIGURED && (
           <a
             href={etherscanAddrUrl(GLYPH_ADDRESS)}

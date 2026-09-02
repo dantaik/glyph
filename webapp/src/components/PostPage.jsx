@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { loadPostBody, resolveImages, getChainClock } from '../lib/data';
+import { loadPostBody, resolveImages, getChainClock, resolveEnsName } from '../lib/data';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
   fmtTitle,
+  shortAddr,
   estimateBlockTime,
   fmtRelTime,
+  chainName,
   etherscanTxUrl,
 } from '../lib/format';
 import { ArrowLeft, AlertCircle, ExternalLink } from './Icons';
@@ -98,6 +100,17 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
     };
   }, [meta.block]);
 
+  // Author display: ENS name when the address has one, else the address.
+  const [ensName, setEnsName] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setEnsName(null);
+    resolveEnsName(meta.author).then((name) => !cancelled && setEnsName(name));
+    return () => {
+      cancelled = true;
+    };
+  }, [meta.author]);
+
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
 
@@ -122,27 +135,30 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+          <span className="font-mono text-[11px] tabular-nums" title={meta.author}>
+            {ensName || shortAddr(meta.author)}
+          </span>
           {relTime && (
             <>
+              <span className="text-ink-ghost" aria-hidden="true">·</span>
               <span>{relTime}</span>
-              <span className="text-ink-ghost" aria-hidden="true">·</span>
             </>
           )}
-          <span>区块 {fmtBlock(meta.block)}</span>
-          {body?.tags && body.tags.length > 0 && (
-            <>
-              <span className="text-ink-ghost" aria-hidden="true">·</span>
-              {body.tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs text-accent-strong"
-                >
-                  {t}
-                </span>
-              ))}
-            </>
-          )}
+          <span className="text-ink-ghost" aria-hidden="true">·</span>
+          <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-[11px]">{chainName()}</span>
         </div>
+        {body?.tags && body.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {body.tags.map((t) => (
+              <span
+                key={t}
+                className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mt-7 h-[2px] w-12 rounded-full bg-accent" aria-hidden="true" />
       </header>
 
@@ -189,7 +205,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
         <footer className="mt-14 text-center">
           <p className="font-serif text-ink-ghost" aria-hidden="true">※</p>
           <p className="mt-3 text-xs text-ink-faint tabular-nums">
-            存于以太坊区块 {fmtBlock(meta.block)}
+            {chainName()} · 区块 {fmtBlock(meta.block)}
           </p>
           <a
             href={etherscanTxUrl(meta.txHash)}
