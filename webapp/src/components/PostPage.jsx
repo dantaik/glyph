@@ -134,14 +134,12 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
         </h1>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span>{fmtIndex(meta.index)}</span>
-          <span className="select-none" aria-hidden="true">·</span>
           {relTime && (
             <>
-              <span>{relTime}</span>
               <span className="select-none" aria-hidden="true">·</span>
+              <span>{relTime}</span>
             </>
           )}
-          <span>{chainName()}</span>
         </div>
         <div className="mt-2 text-xs text-ink-faint tabular-nums">
           <span>作者：</span>
