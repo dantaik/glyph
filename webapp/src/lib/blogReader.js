@@ -155,21 +155,12 @@ export async function findTitleMeta(author, targetIndex) {
  * limits) for at most `maxWindows` windows, or until we have `n` posts.
  * Quiet stretches with no posts are simply skipped over.
  */
-// Short-lived cache for the home-feed scan: revisiting 读 re-runs the
-// whole 30-window sweep otherwise, which burns free public-RPC quotas.
-const recentCache = { key: '', at: 0, rows: null };
-const FEED_CACHE_TTL_MS = 60_000;
-
+// NOTE: TTL caching for this scan lives in data.js (configurable in
+// Settings) — this function always hits the chain.
 export async function loadRecentAcrossAuthors(
   n,
   { windowSize = 800, maxWindows = 30 } = {},
 ) {
-  const key = `${n}:${windowSize}:${maxWindows}`;
-  const now = Date.now();
-  if (recentCache.key === key && recentCache.rows && now - recentCache.at < FEED_CACHE_TTL_MS) {
-    return recentCache.rows;
-  }
-
   const span = BigInt(windowSize);
   const head = await client.getBlockNumber();
   const out = [];
@@ -219,11 +210,7 @@ export async function loadRecentAcrossAuthors(
     if (fromBlock === 0n) break;
     toBlock = fromBlock - 1n;
   }
-  const rows = out.slice(0, n);
-  recentCache.key = key;
-  recentCache.at = Date.now();
-  recentCache.rows = rows;
-  return rows;
+  return out.slice(0, n);
 }
 
 // --- ENS names — cached; null when the address has none, or when the

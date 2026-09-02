@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { RPC_URL, CHAIN_ID, saveEndpointConfig, STORAGE_KEYS } from '../lib/config';
+import { RPC_URL, CHAIN_ID, getCacheTtlMs, saveEndpointConfig, STORAGE_KEYS } from '../lib/config';
 
 const INPUT_CLS =
   'w-full rounded-lg border border-edge-strong bg-paper px-3 py-2 font-mono text-sm placeholder:text-ink-ghost focus:border-accent';
@@ -15,6 +15,7 @@ const BTN_PRIMARY =
 export default function Settings({ open, onClose }) {
   const [rpcUrl, setRpcUrl] = useState(RPC_URL);
   const [chainId, setChainId] = useState(String(CHAIN_ID));
+  const [cacheTtl, setCacheTtl] = useState(String(getCacheTtlMs() / 60_000));
   const [entered, setEntered] = useState(false);
   const dialogRef = useRef(null);
 
@@ -69,11 +70,16 @@ export default function Settings({ open, onClose }) {
   if (!open) return null;
 
   const handleSave = () => {
-    saveEndpointConfig({ rpcUrl: rpcUrl.trim() || null, chainId: Number(chainId) || null });
+    const ttl = cacheTtl.trim() === '' ? null : Number(cacheTtl);
+    saveEndpointConfig({
+      rpcUrl: rpcUrl.trim() || null,
+      chainId: Number(chainId) || null,
+      cacheTtl: Number.isFinite(ttl) && ttl >= 0 ? ttl : null,
+    });
   };
 
   const handleReset = () => {
-    saveEndpointConfig({ rpcUrl: null, chainId: null });
+    saveEndpointConfig({ rpcUrl: null, chainId: null, cacheTtl: null });
   };
 
   const hasOverride =
@@ -128,6 +134,23 @@ export default function Settings({ open, onClose }) {
           />
           <span className="block text-xs text-ink-faint mt-1">
             1 = 主网 · 11155111 = Sepolia 测试网
+          </span>
+        </label>
+
+        <label className="block mb-6">
+          <span className="block text-xs tracking-label text-ink-faint mb-1.5">
+            缓存时长（分钟）
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={cacheTtl}
+            onChange={(e) => setCacheTtl(e.target.value)}
+            className={INPUT_CLS}
+          />
+          <span className="block text-xs text-ink-faint mt-1">
+            相同数据在 N 分钟内不重复请求；0 = 不缓存。默认 5 分钟。
           </span>
         </label>
 

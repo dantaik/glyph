@@ -10,6 +10,7 @@
 
 const KEY_RPC = 'glyph.rpc.v1';
 const KEY_CHAIN = 'glyph.chainId.v1';
+const KEY_CACHE_TTL = 'glyph.cacheTtl.v1';
 
 function lsGet(key) {
   try {
@@ -34,15 +35,24 @@ export const CHAIN_ID = Number(
   lsGet(KEY_CHAIN) || import.meta.env.VITE_CHAIN_ID || 1,
 );
 
-export const STORAGE_KEYS = { RPC: KEY_RPC, CHAIN: KEY_CHAIN };
+export const STORAGE_KEYS = { RPC: KEY_RPC, CHAIN: KEY_CHAIN, CACHE_TTL: KEY_CACHE_TTL };
 
-/** Persist a custom RPC URL + chain ID and reload so all viem clients pick it up. */
-export function saveEndpointConfig({ rpcUrl, chainId }) {
+/** Cache TTL in ms for repeat chain reads (0 = no caching). Default 5 min. */
+export function getCacheTtlMs() {
+  const raw = lsGet(KEY_CACHE_TTL);
+  const minutes = raw == null ? 5 : Number(raw);
+  return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 5) * 60_000;
+}
+
+/** Persist RPC URL / chain ID / cache TTL and reload so everything picks it up. */
+export function saveEndpointConfig({ rpcUrl, chainId, cacheTtl }) {
   try {
     if (rpcUrl) localStorage.setItem(KEY_RPC, rpcUrl);
     else localStorage.removeItem(KEY_RPC);
     if (chainId) localStorage.setItem(KEY_CHAIN, String(chainId));
     else localStorage.removeItem(KEY_CHAIN);
+    if (cacheTtl != null) localStorage.setItem(KEY_CACHE_TTL, String(cacheTtl));
+    else localStorage.removeItem(KEY_CACHE_TTL);
   } catch {
     // swallow — quota / disabled
   }

@@ -8,9 +8,8 @@
 // vite.config.js).
 
 import * as reader from './blogReader';
-import { GLYPH_ADDRESS } from './config';
-
-const CLOCK_TTL_MS = 60_000;
+import { GLYPH_ADDRESS, getCacheTtlMs } from './config';
+import { makeTtlCache } from './ttlCache';
 
 function detectFixturesMode() {
   try {
@@ -36,21 +35,10 @@ function getAuthorCountReal(author) {
   });
 }
 
-let clockCache = { at: 0, promise: null };
-
 function getChainClockReal() {
-  const now = Date.now();
-  if (clockCache.promise && now - clockCache.at < CLOCK_TTL_MS) {
-    return clockCache.promise;
-  }
-  const promise = reader.client
+  return reader.client
     .getBlock({ blockTag: 'latest' })
     .then((b) => ({ block: b.number, ts: Number(b.timestamp) }));
-  promise.catch(() => {
-    clockCache = { at: 0, promise: null };
-  });
-  clockCache = { at: now, promise };
-  return promise;
 }
 
 // --- Implementation object — fixtures replace it wholesale in DEV ---
@@ -72,15 +60,30 @@ if (import.meta.env.DEV && FIXTURES_MODE) {
 }
 
 // Every re-export routes through `impl` so fixtures swap transparently.
-export const loadTitleList = (author, n) => impl.loadTitleList(author, n);
+// Repeat chain reads (lists, counts, feed, clock) are deduped by a TTL
+// cache — default 5 minutes, configurable in Settings. Bodies and images
+// are permanently cached in IndexedDB, so they bypass this layer.
+const ttlCache = makeTtlCache(getCacheTtlMs);
+const authorKey = (a) => String(a || '').toLowerCase();
+
+export const loadTitleList = (author, n) =>
+  ttlCache(`titles:${authorKey(author)}:${n}`, () => impl.loadTitleList(author, n));
 export const loadMoreTitles = (author, oldestShown, n) =>
-  impl.loadMoreTitles(author, oldestShown, n);
+  ttlCache(
+    `more:${authorKey(author)}:${oldestShown?.index ?? ''}:${oldestShown?.block ?? ''}:${n}`,
+    () => impl.loadMoreTitles(author, oldestShown, n),
+  );
 export const findTitleMeta = (author, targetIndex) =>
-  impl.findTitleMeta(author, targetIndex);
+  ttlCache(`meta:${authorKey(author)}:${targetIndex}`, () =>
+    impl.findTitleMeta(author, targetIndex),
+  );
 export const loadRecentAcrossAuthors = (n, opts) =>
-  impl.loadRecentAcrossAuthors(n, opts);
+  ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
+    impl.loadRecentAcrossAuthors(n, opts),
+  );
 export const loadPostBody = (txHash) => impl.loadPostBody(txHash);
 export const resolveImages = (markdown) => impl.resolveImages(markdown);
 export const resolveEnsName = (author) => impl.resolveEnsName(author);
-export const getAuthorCount = (author) => impl.getAuthorCount(author);
-export const getChainClock = () => impl.getChainClock();
+export const getAuthorCount = (author) =>
+  ttlCache(`count:${authorKey(author)}`, () => impl.getAuthorCount(author));
+export const getChainClock = () => ttlCache('clock', () => impl.getChainClock());
