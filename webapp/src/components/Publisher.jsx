@@ -396,17 +396,6 @@ export default function Publisher() {
         )}
       </div>
 
-      {chainMismatch && (
-        <div
-          role="alert"
-          className="mt-4 flex items-start gap-2 rounded-lg bg-danger-wash px-4 py-3 text-sm text-danger"
-        >
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <span>
-            钱包连接的链（ID {walletChainId}）与应用配置的链（ID {CHAIN_ID}）不一致，请在钱包中切换网络后重试。
-          </span>
-        </div>
-      )}
 
       {status === 'error' && (
         <div
