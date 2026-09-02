@@ -3,6 +3,7 @@ import {
   loadTitleList,
   loadMoreTitles,
   findTitleMeta,
+  findMetaByTx,
   getAuthorCount,
   getChainClock,
   FIXTURES_MODE,
@@ -20,9 +21,31 @@ export default function Reader({ onStartWriting }) {
   const [params, navigate] = useUrlState();
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const i = params.i;
+  const tx = params.tx;
   // Selected index from the URL: undefined = none, invalid = null.
   const idx = i != null && i !== '' ? Number(i) : undefined;
   const idxValid = idx != null && Number.isSafeInteger(idx) && idx >= 0;
+
+  // /tx/<hash> deep link: undefined = resolving, null = not found, meta.
+  const [txMeta, setTxMeta] = useState(undefined);
+  useEffect(() => {
+    if (!tx) {
+      setTxMeta(undefined);
+      return undefined;
+    }
+    let cancelled = false;
+    setTxMeta(undefined);
+    findMetaByTx(tx).then((m) => !cancelled && setTxMeta(m ?? null));
+    return () => {
+      cancelled = true;
+    };
+  }, [tx]);
+
+  // The author/index the open post actually belongs to (from the URL or
+  // the resolved tx meta) — drives the neighbor resolution.
+  const postAuthor = author ?? (txMeta && txMeta !== null ? txMeta.author : null);
+  const postIdx = author != null && i != null && i !== '' ? Number(i) : txMeta && txMeta !== null ? Number(txMeta.index) : undefined;
+  const postIdxValid = postIdx != null && Number.isSafeInteger(postIdx) && postIdx >= 0;
 
   const [titles, setTitles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -115,7 +138,7 @@ export default function Reader({ onStartWriting }) {
   // resolve misses via findTitleMeta in parallel; j<0 → null immediately;
   // when authorCount is known, j>=authorCount → null without RPC.
   useEffect(() => {
-    if (!author || !idxValid) {
+    if (!postAuthor || !postIdxValid) {
       setNeighbors({ prev: undefined, next: undefined });
       return undefined;
     }
@@ -126,14 +149,14 @@ export default function Reader({ onStartWriting }) {
       if (authorCount != null && j >= Number(authorCount)) return null;
       const hit = titles.find((t) => Number(t.index) === j);
       if (hit) return hit;
-      const key = `${author}:${j}`;
+      const key = `${postAuthor}:${j}`;
       return neighborCache.current.has(key) ? neighborCache.current.get(key) : undefined;
     };
 
     const resolve = (j, side) => {
-      findTitleMeta(author, j)
+      findTitleMeta(postAuthor, j)
         .then((m) => {
-          neighborCache.current.set(`${author}:${j}`, m ?? null);
+          neighborCache.current.set(`${postAuthor}:${j}`, m ?? null);
           if (!cancelled) setNeighbors((cur) => ({ ...cur, [side]: m ?? null }));
         })
         .catch(() => {
@@ -141,16 +164,16 @@ export default function Reader({ onStartWriting }) {
         });
     };
 
-    const prev = seed(idx - 1);
-    const next = seed(idx + 1);
+    const prev = seed(postIdx - 1);
+    const next = seed(postIdx + 1);
     setNeighbors({ prev, next });
-    if (prev === undefined) resolve(idx - 1, 'prev');
-    if (next === undefined) resolve(idx + 1, 'next');
+    if (prev === undefined) resolve(postIdx - 1, 'prev');
+    if (next === undefined) resolve(postIdx + 1, 'next');
 
     return () => {
       cancelled = true;
     };
-  }, [author, idx, idxValid, titles, authorCount]);
+  }, [postAuthor, postIdx, postIdxValid, titles, authorCount]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !author) return;
@@ -186,6 +209,37 @@ export default function Reader({ onStartWriting }) {
             配置合约地址。
           </>
         }
+      />
+    );
+  }
+
+  // --- /tx/<hash> deep link view ---
+
+  if (tx) {
+    if (txMeta === undefined) {
+      return (
+        <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
+          加载中…
+        </div>
+      );
+    }
+    if (txMeta === null) {
+      return (
+        <EmptyState
+          title="没有找到这篇文章"
+          body="这笔交易里没有发布记录，或交易哈希有误。"
+          actionLabel="返回首页"
+          onAction={() => navigate({})}
+        />
+      );
+    }
+    return (
+      <PostPage
+        meta={txMeta}
+        onBack={() => navigate({ author: txMeta.author })}
+        neighbors={neighbors}
+        onNavigateIndex={(j) => navigate({ author: txMeta.author, i: String(j) })}
+        onOpenAuthor={() => navigate({ author: txMeta.author })}
       />
     );
   }

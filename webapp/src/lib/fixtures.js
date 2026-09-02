@@ -228,6 +228,10 @@ export function makeFixtures(mode) {
       : buildWorld();
 
   const postsOf = (author) => byAuthor.get(keyOf(author)) ?? [];
+  const metaByTx = new Map();
+  for (const posts of byAuthor.values()) {
+    for (const p of posts) metaByTx.set(p.txHash.toLowerCase(), { ...p });
+  }
 
   return {
     async loadTitleList(author, n) {
@@ -265,6 +269,11 @@ export function makeFixtures(mode) {
         body: { tags: [...body.tags], markdown: body.markdown },
         fromCache: false,
       };
+    },
+
+    async findMetaByTx(txHash) {
+      await delay();
+      return metaByTx.get(String(txHash).toLowerCase()) ?? null;
     },
 
     async resolveImages(markdown) {

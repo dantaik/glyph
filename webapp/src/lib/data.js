@@ -48,6 +48,7 @@ let impl = {
   loadMoreTitles: reader.loadMoreTitles,
   findTitleMeta: reader.findTitleMeta,
   loadRecentAcrossAuthors: reader.loadRecentAcrossAuthors,
+  findMetaByTx: reader.findMetaByTx,
   loadPostBody: reader.loadPostBody,
   resolveImages: reader.resolveImages,
   resolveEnsName: reader.resolveEnsName,
@@ -81,6 +82,8 @@ export const loadRecentAcrossAuthors = (n, opts) =>
   ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
     impl.loadRecentAcrossAuthors(n, opts),
   );
+export const findMetaByTx = (txHash) =>
+  ttlCache(`txmeta:${String(txHash).toLowerCase()}`, () => impl.findMetaByTx(txHash));
 export const loadPostBody = (txHash) => impl.loadPostBody(txHash);
 export const resolveImages = (markdown) => impl.resolveImages(markdown);
 export const resolveEnsName = (author) => impl.resolveEnsName(author);

@@ -18,6 +18,7 @@ import {
   parseAbi,
   hexToBytes,
   decodeFunctionData,
+  decodeEventLog,
 } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
 import { RPC_URL, GLYPH_ADDRESS, CHAIN_ID } from './config';
@@ -232,6 +233,32 @@ export function resolveEnsName(address) {
   promise.catch(() => ensCache.delete(key));
   ensCache.set(key, promise);
   return promise;
+}
+
+/**
+ * Resolve post metadata from a publish transaction hash: read the
+ * receipt, decode the Post event log — one RPC call, no scanning.
+ * Returns null when the tx has no Glyph Post event.
+ */
+export async function findMetaByTx(txHash) {
+  const receipt = await client.getTransactionReceipt({ hash: txHash });
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== GLYPH_ADDRESS.toLowerCase()) continue;
+    try {
+      const decoded = decodeEventLog({ abi, eventName: 'Post', data: log.data, topics: log.topics });
+      return {
+        author: decoded.args.author,
+        index: decoded.args.index,
+        block: receipt.blockNumber,
+        prevBlock: decoded.args.prevBlock,
+        title: decodeTitle(decoded.args.title),
+        txHash,
+      };
+    } catch {
+      continue; // some other event from the same contract
+    }
+  }
+  return null;
 }
 
 // --- Post body (tags + markdown) — fetched on demand from tx calldata,
