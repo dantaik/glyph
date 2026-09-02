@@ -30,7 +30,7 @@ const PLACEHOLDER_MD = `# 小标题
 
 写点什么...
 
-把图片拖入下方区域或点击上传，上传后正文里用对应键名引用即可。`;
+把图片拖入下方区域或点击上传；点击图片或名称即可复制引用，粘贴到正文。`;
 
 const SEGMENT_ON = 'rounded-full px-2.5 py-1 text-xs transition-colors bg-paper-sunken text-ink font-medium';
 const SEGMENT_OFF = 'rounded-full px-2.5 py-1 text-xs transition-colors text-ink-faint hover:text-ink';

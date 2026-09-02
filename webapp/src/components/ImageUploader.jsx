@@ -1,6 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, AlertCircle, Close } from './Icons';
 
+/**
+ * Copy text to the clipboard. Secure contexts use the async Clipboard API;
+ * falls back to a hidden textarea + execCommand for everything else.
+ * @returns {Promise<boolean>} whether the copy succeeded
+ */
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
 /** Sanitize a filename into an upload:KEY — ASCII alnum, `_`, `-`, CJK. */
 function toKey(name) {
   return (
@@ -15,7 +43,22 @@ function toKey(name) {
  */
 export default function ImageUploader({ files, uploadRefs, onChange, disabled }) {
   const [isDragging, setIsDragging] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(null);
   const fileInputRef = useRef(null);
+  const copyTimer = useRef(0);
+
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
+
+  // Clicking a thumbnail (or its name) copies the Markdown reference
+  // `![key](upload:key)` so it can be pasted straight into the editor.
+  const copyRef = (key) => {
+    copyToClipboard(`![${key}](upload:${key})`).then((ok) => {
+      if (!ok) return;
+      setCopiedKey(key);
+      window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => setCopiedKey(null), 1600);
+    });
+  };
 
   // Stable preview URLs, revoked when the set changes or on unmount.
   const filePreviews = useMemo(() => {
@@ -119,14 +162,39 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled })
       </div>
 
       {Object.keys(files).length > 0 && (
-        <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <>
+          <p className="mt-2 text-[10px] text-ink-ghost">
+            点击图片或名称，复制引用并粘贴到正文
+          </p>
+          <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
           {Object.entries(files).map(([key, file]) => (
-            <div key={key} className="relative group">
+            <div
+              key={key}
+              role="button"
+              tabIndex={0}
+              aria-label={`复制引用 ${key}`}
+              title="点击复制引用"
+              onClick={() => copyRef(key)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyRef(key);
+                }
+              }}
+              className="relative group cursor-pointer rounded-lg"
+            >
               <img
                 src={filePreviews[key]}
                 alt={key}
                 className="w-full h-24 object-cover rounded-lg border border-edge"
               />
+              {copiedKey === key && (
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-ink/50">
+                  <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-medium text-ink">
+                    已复制引用
+                  </span>
+                </span>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -145,7 +213,8 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled })
               </span>
             </div>
           ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
