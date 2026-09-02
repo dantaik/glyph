@@ -78,9 +78,9 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
 
   // Tab title mirrors the open letter; restore the site title on leave.
   useEffect(() => {
-    document.title = `${fmtTitle(meta.title) || '无标题'} · 岩刻`;
+    document.title = `${fmtTitle(meta.title) || '无标题'} · 雁过留声`;
     return () => {
-      document.title = '岩刻';
+      document.title = '雁过留声';
     };
   }, [meta.title]);
 
