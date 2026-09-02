@@ -235,7 +235,7 @@ export default function Publisher() {
   return (
     <div>
       {/* 一 · 标题 */}
-      <SectionHeader index="一" label="标题" />
+      <SectionHeader label="标题" />
       <div className="mb-10">
         <input
           id="post-title"
@@ -260,7 +260,7 @@ export default function Publisher() {
       </div>
 
       {/* 二 · 标签 */}
-      <SectionHeader index="二" label="标签" />
+      <SectionHeader label="标签" />
       <div className="mb-10">
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-edge-strong bg-paper-raised px-3 py-2 focus-within:border-accent transition-colors">
           {tags.map((t) => (
@@ -294,7 +294,6 @@ export default function Publisher() {
 
       {/* 三 · 正文 */}
       <SectionHeader
-        index="三"
         label="正文"
         right={
           <div
@@ -335,7 +334,7 @@ export default function Publisher() {
       </div>
 
       {/* 四 · 图片 */}
-      <SectionHeader index="四" label="图片" />
+      <SectionHeader label="图片" />
       <div className="mb-10">
         <ImageUploader
           files={files}
@@ -347,7 +346,7 @@ export default function Publisher() {
       </div>
 
       {/* 五 · 成本 */}
-      <SectionHeader index="五" label="成本" />
+      <SectionHeader label="成本" />
       <div className="mb-6">
         <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
         <p className="mt-4 text-xs text-ink-faint">
@@ -356,7 +355,7 @@ export default function Publisher() {
       </div>
 
       {/* 动作 */}
-      <div className="border-t border-edge pt-6">
+      <div className="pt-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
         {status === 'processing' && statusMsg && (
           <span role="status" className="text-sm text-ink-faint">
@@ -430,14 +429,11 @@ export default function Publisher() {
   );
 }
 
-/** Numbered section header (一 · 标题, …) with an optional right-side slot. */
-function SectionHeader({ index, label, right }) {
+/** Section header with an optional right-side slot — no number, no divider. */
+function SectionHeader({ label, right }) {
   return (
-    <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-edge pb-2">
-      <h2 className="flex items-baseline gap-2">
-        <span className="font-mono text-2xs tabular-nums text-ink-ghost">{index}</span>
-        <span className="text-sm font-medium tracking-label text-ink-soft">{label}</span>
-      </h2>
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <h2 className="text-sm font-medium tracking-label text-ink-soft">{label}</h2>
       {right}
     </div>
   );
