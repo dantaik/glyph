@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { friendlyError } from '../lib/format';
+import { friendlyError, shortAddr } from '../lib/format';
 import { resolveEnsName } from '../lib/data';
 import EmptyState from './EmptyState';
 import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
+import ListHeader from './ListHeader';
 
 /**
  * Author page: address header, post count, title list with relative times,
@@ -36,25 +37,11 @@ export default function AuthorTitleList({
 
   return (
     <div>
-      <header className="mb-8 border-b border-edge pb-5">
-        <p className="text-xs tracking-label text-ink-faint">作者</p>
-        <p className="mt-1 font-mono text-sm text-ink-soft break-all select-all" title={author}>
-          {ensName || author}
-        </p>
-        <p className="mt-2 text-xs text-ink-faint tabular-nums">
-          共{' '}
-          {authorCount == null ? (
-            <span
-              className={`text-ink-ghost${authorCount === undefined ? ' animate-pulse' : ''}`}
-            >
-              —
-            </span>
-          ) : (
-            Number(authorCount)
-          )}{' '}
-          篇
-        </p>
-      </header>
+      <ListHeader
+        title={`${ensName || shortAddr(author)} 的文章`}
+        titleAttr={author}
+        subtitle={authorCount != null ? `共 ${Number(authorCount)} 篇` : undefined}
+      />
 
       {loading && titles.length === 0 && <ListSkeleton />}
 
