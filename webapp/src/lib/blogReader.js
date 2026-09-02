@@ -186,8 +186,10 @@ export async function findTitleMeta(author, targetIndex) {
 // covered head and never rescans already-covered ranges. Previously
 // discovered rows are merged back so the feed stays full between scans.
 const FEED_SCAN_KEY = 'glyph.feedScan.v1';
+const FEED_SCAN_EVT = 'glyph:feedscan';
 
-function readFeedScan() {
+/** Persisted feed-scan state: { head, frontier, rows } or null. */
+export function readFeedScan() {
   try {
     const v = JSON.parse(localStorage.getItem(FEED_SCAN_KEY) || 'null');
     if (v && typeof v.head === 'string' && Array.isArray(v.rows)) return v;
@@ -202,6 +204,12 @@ function writeFeedScan(scan) {
     localStorage.setItem(FEED_SCAN_KEY, JSON.stringify(scan));
   } catch {
     /* quota / privacy mode — scan stays in-memory via the TTL layer */
+  }
+  // Let listeners (e.g. the footer) re-read the persisted range.
+  try {
+    window.dispatchEvent(new CustomEvent(FEED_SCAN_EVT));
+  } catch {
+    /* non-browser context */
   }
 }
 

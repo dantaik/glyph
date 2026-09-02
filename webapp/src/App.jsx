@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
@@ -6,7 +6,8 @@ import Settings from './components/Settings';
 import { FIXTURES_MODE } from './lib/data';
 import { GLYPH_ADDRESS, CHAIN_ID } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
-import { etherscanAddrUrl, shortAddr, chainName } from './lib/format';
+import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
+import { readFeedScan } from './lib/blogReader';
 
 const CONTRACT_CONFIGURED = GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
 
@@ -17,6 +18,13 @@ export default function App() {
   const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState(null);
+  // Persisted home-feed scan range (head + frontier), shown in the footer.
+  const [feedScan, setFeedScan] = useState(readFeedScan);
+  useEffect(() => {
+    const sync = () => setFeedScan(readFeedScan());
+    window.addEventListener('glyph:feedscan', sync);
+    return () => window.removeEventListener('glyph:feedscan', sync);
+  }, []);
 
   const handleSwitchChain = async () => {
     setSwitchError(null);
@@ -74,6 +82,12 @@ export default function App() {
             >
               合约：{shortAddr(GLYPH_ADDRESS)}
             </a>
+            {feedScan?.head != null && feedScan?.frontier != null && (
+              <>
+                <span className="select-none" aria-hidden="true">·</span>
+                <span>扫描范围 {fmtBlock(feedScan.frontier)} 至 {fmtBlock(feedScan.head)}</span>
+              </>
+            )}
           </p>
         )}
       </footer>
