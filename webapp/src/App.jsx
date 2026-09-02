@@ -3,7 +3,6 @@ import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import Settings from './components/Settings';
-import { GlyphMark } from './components/Icons';
 import { FIXTURES_MODE } from './lib/data';
 import { GLYPH_ADDRESS, CHAIN_ID } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
@@ -62,8 +61,6 @@ export default function App() {
         )}
       </main>
       <footer className="border-t border-edge py-10 text-center">
-        <GlyphMark size={16} className="text-ink-ghost" />
-
         {CONTRACT_CONFIGURED && (
           <a
             href={etherscanAddrUrl(GLYPH_ADDRESS)}
