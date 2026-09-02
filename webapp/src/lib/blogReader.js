@@ -60,6 +60,27 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
   }
 }
 
+/**
+ * One transaction can publish several posts (e.g. a multicall), so a
+ * txHash is not a unique post id. Tag each Post log with its 0-based
+ * ordinal among the Post events of its transaction (by logIndex order).
+ */
+function assignEventIndexes(logs) {
+  const byTx = new Map();
+  for (const log of logs) {
+    const list = byTx.get(log.transactionHash) ?? [];
+    list.push(log);
+    byTx.set(log.transactionHash, list);
+  }
+  for (const list of byTx.values()) {
+    list.sort((a, b) => a.logIndex - b.logIndex);
+    list.forEach((log, i) => {
+      log.__eventIndex = i;
+    });
+  }
+  return logs;
+}
+
 async function postsInBlock(author, block) {
   const logs = await withRetry(() =>
     client.getLogs({
@@ -70,6 +91,7 @@ async function postsInBlock(author, block) {
       toBlock: block,
     }),
   );
+  assignEventIndexes(logs);
   logs.sort((a, b) => Number(b.args.index - a.args.index));
   return logs;
 }
@@ -82,6 +104,7 @@ function logToMeta(log, block) {
     prevBlock: log.args.prevBlock,
     title: decodeTitle(log.args.title),
     txHash: log.transactionHash,
+    eventIndex: log.__eventIndex ?? 0,
   };
 }
 
@@ -188,6 +211,7 @@ export async function loadRecentAcrossAuthors(
     }),
   );
   newestFirst(logs);
+  assignEventIndexes(logs);
   for (const log of logs) {
     out.push(logToMeta(log, log.blockNumber));
     if (out.length >= n) break;
@@ -205,6 +229,7 @@ export async function loadRecentAcrossAuthors(
       }),
     );
     newestFirst(logs);
+    assignEventIndexes(logs);
     for (const log of logs) {
       out.push(logToMeta(log, log.blockNumber));
       if (out.length >= n) break;
@@ -237,29 +262,35 @@ export function resolveEnsName(address) {
 }
 
 /**
- * Resolve post metadata from a publish transaction hash: read the
- * receipt, decode the Post event log — one RPC call, no scanning.
- * Returns null when the tx has no Glyph Post event.
+ * Resolve post metadata from a publish transaction hash + the 0-based
+ * ordinal of the Post event within that transaction (one tx can publish
+ * several posts). Reads the receipt and decodes the chosen Post log —
+ * one RPC call, no scanning. Returns null when there is no such event.
  */
-export async function findMetaByTx(txHash) {
-  const receipt = await client.getTransactionReceipt({ hash: txHash });
+export async function findMetaByTx(txHash, eventIndex = 0) {
+  const receipt = await withRetry(() => client.getTransactionReceipt({ hash: txHash }));
+  const posts = [];
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== GLYPH_ADDRESS.toLowerCase()) continue;
     try {
       const decoded = decodeEventLog({ abi, eventName: 'Post', data: log.data, topics: log.topics });
-      return {
-        author: decoded.args.author,
-        index: decoded.args.index,
-        block: receipt.blockNumber,
-        prevBlock: decoded.args.prevBlock,
-        title: decodeTitle(decoded.args.title),
-        txHash,
-      };
+      posts.push({ log, args: decoded.args });
     } catch {
       continue; // some other event from the same contract
     }
   }
-  return null;
+  posts.sort((a, b) => a.log.logIndex - b.log.logIndex);
+  const chosen = posts[eventIndex];
+  if (!chosen) return null;
+  return {
+    author: chosen.args.author,
+    index: chosen.args.index,
+    block: receipt.blockNumber,
+    prevBlock: chosen.args.prevBlock,
+    title: decodeTitle(chosen.args.title),
+    txHash,
+    eventIndex,
+  };
 }
 
 // --- Post body (tags + markdown) — fetched on demand from tx calldata,

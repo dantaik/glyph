@@ -230,7 +230,7 @@ export function makeFixtures(mode) {
   const postsOf = (author) => byAuthor.get(keyOf(author)) ?? [];
   const metaByTx = new Map();
   for (const posts of byAuthor.values()) {
-    for (const p of posts) metaByTx.set(p.txHash.toLowerCase(), { ...p });
+    for (const p of posts) metaByTx.set(p.txHash.toLowerCase(), { ...p, eventIndex: 0 });
   }
 
   return {
@@ -271,8 +271,9 @@ export function makeFixtures(mode) {
       };
     },
 
-    async findMetaByTx(txHash) {
+    async findMetaByTx(txHash, eventIndex = 0) {
       await delay();
+      if (eventIndex !== 0) return null; // demo posts are one event per tx
       return metaByTx.get(String(txHash).toLowerCase()) ?? null;
     },
 

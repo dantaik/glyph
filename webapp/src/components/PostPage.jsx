@@ -23,9 +23,9 @@ const SKELETON_GROUPS = [
 
 /**
  * Single post view — a letter set on the page.
- * Props: { meta: { author, index, block, title, txHash }, onBack,
- *          neighbors: { prev, next } (undefined=resolving, null=absent),
- *          onNavigate(txHash), onOpenAuthor() }
+ * Props: { meta: { author, index, block, title, txHash, eventIndex },
+ *          onBack, neighbors: { prev, next } (undefined=resolving,
+ *          null=absent), onNavigate(neighborMeta), onOpenAuthor() }
  *
  * Fetches the body (tags + markdown) from the publish() tx calldata, then
  * resolves any eth:<txhash> image refs to blob URLs before rendering.

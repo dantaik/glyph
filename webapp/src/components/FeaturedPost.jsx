@@ -27,10 +27,10 @@ export default function FeaturedPost({ post, clock, navigate, excerptChars = 80 
     <article className="border-b border-edge pb-8">
       <h3>
         <a
-          href={`/tx/${post.txHash}`}
+          href={`/tx/${post.txHash}/${post.eventIndex ?? 0}`}
           onClick={(e) => {
             e.preventDefault();
-            navigate({ tx: post.txHash });
+            navigate({ tx: post.txHash, txEvent: post.eventIndex ?? 0 });
           }}
           className="font-serif text-xl leading-[1.4] font-bold sm:text-2xl hover:text-accent transition-colors"
         >

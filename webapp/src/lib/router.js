@@ -16,8 +16,11 @@ function readParams() {
   const out = {};
   for (const [k, v] of sp.entries()) out[k] = v;
   // Path deep links: /tx/0x<hash> → tx; /author/0x<addr> → author.
-  const mTx = window.location.pathname.match(/^\/tx\/(0x[0-9a-fA-F]{64})\/?$/);
-  if (mTx) out.tx = mTx[1];
+  const mTx = window.location.pathname.match(/^\/tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/);
+  if (mTx) {
+    out.tx = mTx[1];
+    if (mTx[2] != null) out.txEvent = mTx[2];
+  }
   const mAuthor = window.location.pathname.match(/^\/author\/(0x[0-9a-fA-F]{40})\/?$/);
   if (mAuthor) {
     out.author = mAuthor[1];
@@ -48,9 +51,8 @@ export function useUrlState() {
   const navigate = useCallback((next, { replace = false } = {}) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(next)) {
-      // `tx` and `author` live in the path (/tx/<hash>, /author/<addr>),
-      // never in the query string.
-      if (k === 'tx' || k === 'author') continue;
+      // `tx`, `txEvent` and `author` live in the path, never in the query.
+      if (k === 'tx' || k === 'txEvent' || k === 'author') continue;
       if (v != null && v !== '') sp.set(k, String(v));
     }
     // Dev demo mode (fixtures) follows in-app navigation.
@@ -58,7 +60,11 @@ export function useUrlState() {
     const search = sp.toString();
     // Deep links use their paths; everything else is the root path
     // with query params.
-    const path = next.tx ? `/tx/${next.tx}` : next.author ? `/author/${next.author}` : '/';
+    const path = next.tx
+      ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
+      : next.author
+        ? `/author/${next.author}`
+        : '/';
     const url = `${path}${search ? `?${search}` : ''}`;
     if (replace) window.history.replaceState({}, '', url);
     else window.history.pushState({}, '', url);

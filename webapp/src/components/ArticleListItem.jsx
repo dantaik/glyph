@@ -12,10 +12,10 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
     <li className="py-4">
       <div className="flex items-baseline gap-3">
         <a
-          href={`/tx/${post.txHash}`}
+          href={`/tx/${post.txHash}/${post.eventIndex ?? 0}`}
           onClick={(e) => {
             e.preventDefault();
-            navigate({ tx: post.txHash });
+            navigate({ tx: post.txHash, txEvent: post.eventIndex ?? 0 });
           }}
           className="flex-1 font-serif text-lg leading-snug group-hover:text-accent transition-colors line-clamp-1"
         >

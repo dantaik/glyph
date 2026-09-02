@@ -72,11 +72,14 @@ const authorKey = (a) => String(a || '').toLowerCase();
  * via findTitleMeta pre-warms its /tx/<hash> entry (and vice versa), so
  * prev/next navigation hits the cache instantly.
  */
+const txMetaKey = (txHash, eventIndex = 0) =>
+  `txmeta:${String(txHash).toLowerCase()}:${eventIndex}`;
+
 function cacheMetaBoth(meta) {
   if (!meta) return meta;
   // Touch both cache keys with the same resolved meta.
   ttlCache(`meta:${authorKey(meta.author)}:${meta.index}`, () => Promise.resolve(meta));
-  ttlCache(`txmeta:${String(meta.txHash).toLowerCase()}`, () => Promise.resolve(meta));
+  ttlCache(txMetaKey(meta.txHash, meta.eventIndex ?? 0), () => Promise.resolve(meta));
   return meta;
 }
 
@@ -95,9 +98,9 @@ export const loadRecentAcrossAuthors = (n, opts) =>
   ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
     impl.loadRecentAcrossAuthors(n, opts),
   );
-export const findMetaByTx = (txHash) =>
-  ttlCache(`txmeta:${String(txHash).toLowerCase()}`, async () =>
-    cacheMetaBoth(await impl.findMetaByTx(txHash)),
+export const findMetaByTx = (txHash, eventIndex = 0) =>
+  ttlCache(txMetaKey(txHash, eventIndex), async () =>
+    cacheMetaBoth(await impl.findMetaByTx(txHash, eventIndex)),
   );
 export const loadPostBody = (txHash) => impl.loadPostBody(txHash);
 export const resolveImages = (markdown) => impl.resolveImages(markdown);

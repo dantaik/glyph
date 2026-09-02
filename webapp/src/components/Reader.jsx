@@ -8,6 +8,7 @@ import {
   getChainClock,
   FIXTURES_MODE,
 } from '../lib/data';
+import { friendlyError } from '../lib/format';
 import { GLYPH_ADDRESS } from '../lib/config';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
 import EmptyState from './EmptyState';
@@ -22,21 +23,28 @@ export default function Reader({ onStartWriting }) {
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const i = params.i;
   const tx = params.tx;
+  const txEvent = params.txEvent != null ? Number(params.txEvent) : 0;
 
   // /tx/<hash> deep link: undefined = resolving, null = not found, meta.
   const [txMeta, setTxMeta] = useState(undefined);
+  const [txError, setTxError] = useState(null);
+  const [txTick, setTxTick] = useState(0);
   useEffect(() => {
     if (!tx) {
       setTxMeta(undefined);
+      setTxError(null);
       return undefined;
     }
     let cancelled = false;
     setTxMeta(undefined);
-    findMetaByTx(tx).then((m) => !cancelled && setTxMeta(m ?? null));
+    setTxError(null);
+    findMetaByTx(tx, txEvent)
+      .then((m) => !cancelled && setTxMeta(m ?? null))
+      .catch((err) => !cancelled && setTxError(err?.message || '加载失败'));
     return () => {
       cancelled = true;
     };
-  }, [tx]);
+  }, [tx, txEvent, txTick]);
 
   // The author/index the open post belongs to — from the resolved tx meta.
   const postAuthor = txMeta && txMeta !== null ? txMeta.author : null;
@@ -111,6 +119,13 @@ export default function Reader({ onStartWriting }) {
     if (!params.authorFromQuery) return;
     navigate({ author }, { replace: true });
   }, [params.authorFromQuery, author, navigate]);
+
+  // Canonical tx URLs carry the event index: /tx/<hash> converges to
+  // /tx/<hash>/0 (replace, so history stays clean).
+  useEffect(() => {
+    if (!tx || params.txEvent != null) return;
+    navigate({ tx, txEvent: 0 }, { replace: true });
+  }, [tx, params.txEvent, navigate]);
 
 
   // Neighbors for the open post: seed synchronously from the titles cache,
@@ -195,6 +210,18 @@ export default function Reader({ onStartWriting }) {
   // --- /tx/<hash> deep link view ---
 
   if (tx) {
+    if (txError) {
+      return (
+        <EmptyState
+          tone="danger"
+          title="加载失败"
+          body={friendlyError(txError)}
+          detail={txError}
+          actionLabel="重试"
+          onAction={() => setTxTick((t) => t + 1)}
+        />
+      );
+    }
     if (txMeta === undefined) {
       return (
         <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
@@ -217,7 +244,7 @@ export default function Reader({ onStartWriting }) {
         meta={txMeta}
         onBack={() => navigate({ author: txMeta.author })}
         neighbors={neighbors}
-        onNavigate={(txHash) => navigate({ tx: txHash })}
+        onNavigate={(m) => navigate({ tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
         onOpenAuthor={() => navigate({ author: txMeta.author })}
       />
     );
