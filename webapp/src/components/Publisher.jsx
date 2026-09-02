@@ -254,15 +254,14 @@ export default function Publisher() {
                      focus:outline-none placeholder:text-ink-ghost transition-colors
                      ${titleOver ? 'border-danger' : 'border-edge-strong focus:border-accent'}`}
         />
-        <div
-          id="post-title-bytes"
-          className={`text-[11px] mt-1 tabular-nums ${
-            titleOver ? 'text-danger' : 'text-ink-faint'
-          }`}
-        >
-          {titleBytes} / {TITLE_MAX_BYTES} 字节
-          {titleOver && ' — 太长，无法编码为 bytes32'}
-        </div>
+        {titleOver && (
+          <div
+            id="post-title-bytes"
+            className="text-[11px] mt-1 tabular-nums text-danger"
+          >
+            标题太长，无法编码为 bytes32
+          </div>
+        )}
       </div>
 
       {/* Tags */}
