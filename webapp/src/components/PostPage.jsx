@@ -12,7 +12,7 @@ import {
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
-import { ArrowLeft, AlertCircle, ExternalLink } from './Icons';
+import { ArrowLeft, AlertCircle } from './Icons';
 import FontSizeControl from './FontSizeControl';
 import PostNav from './PostNav';
 
@@ -211,16 +211,18 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex }) {
       {loaded && (
         <footer className="mt-14 text-center">
           <p className="text-ink-ghost" aria-hidden="true">—</p>
-          <p className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-            <span>{chainName()} · 区块 {fmtBlock(meta.block)}</span>
+          <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+            <span className="rounded-full bg-paper-sunken px-2 py-0.5 text-2xs">{chainName()}</span>
+            <span className="text-ink-ghost" aria-hidden="true">·</span>
+            <span>区块 {fmtBlock(meta.block)}</span>
+            <span className="text-ink-ghost" aria-hidden="true">·</span>
             <a
               href={etherscanTxUrl(meta.txHash)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 hover:text-accent transition-colors"
+              className="hover:text-accent transition-colors"
             >
               在 Etherscan 查看
-              <ExternalLink size={12} />
             </a>
           </p>
         </footer>
