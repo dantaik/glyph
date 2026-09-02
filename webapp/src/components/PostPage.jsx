@@ -229,7 +229,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
               rel="noopener noreferrer"
               className="hover:text-accent transition-colors"
             >
-              在 Etherscan 查看
+              交易
             </a>
           </p>
         </footer>
