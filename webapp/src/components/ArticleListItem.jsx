@@ -22,22 +22,24 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
           {fmtTitle(post.title) ?? <span className="text-ink-ghost">无标题</span>}
         </a>
       </div>
-      <div className="mt-1.5 flex items-baseline justify-between gap-3">
-        <a
-          href={`?author=${post.author}`}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate({ author: post.author });
-          }}
-          title={post.author}
-          className="font-mono text-2xs text-ink-faint hover:text-accent transition-colors"
-        >
-          {shortAddr(post.author)}
-        </a>
+      <div className="mt-1.5">
         <PostMeta
           block={post.block}
           clock={clock}
           prefix={showIndex ? fmtIndex(post.index) : undefined}
+          lead={
+            <a
+              href={`?author=${post.author}`}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate({ author: post.author });
+              }}
+              title={post.author}
+              className="font-mono text-2xs text-ink-faint hover:text-accent transition-colors"
+            >
+              {shortAddr(post.author)}
+            </a>
+          }
         />
       </div>
     </li>
