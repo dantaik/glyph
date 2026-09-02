@@ -16,7 +16,7 @@ const TABS = [
 /** Sticky masthead: brand, tabs, wallet pill, theme toggle, settings */
 export default function Header({ tab, onTabChange, onOpenSettings }) {
   const { account, connect } = useWallet();
-  const [, navigate] = useUrlState();
+  const [params, navigate] = useUrlState();
   const { isDark, setTheme } = useTheme();
 
   const handleConnect = useCallback(async () => {
@@ -26,6 +26,19 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
       if (err?.code !== 4001) console.warn('wallet connect failed:', err);
     }
   }, [connect]);
+
+  // 读 tab = the default all-content view: clear any author/post params
+  // so clicking it always returns to the home feed. The fixtures flag
+  // (dev demo mode) is preserved.
+  const handleTabChange = useCallback(
+    (key) => {
+      if (key === 'read') {
+        navigate(params.fixtures ? { fixtures: params.fixtures } : {}, { replace: true });
+      }
+      onTabChange(key);
+    },
+    [navigate, onTabChange, params.fixtures],
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b border-edge bg-paper/85 backdrop-blur">
@@ -41,7 +54,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
             {TABS.map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => onTabChange(key)}
+                onClick={() => handleTabChange(key)}
                 aria-current={tab === key ? 'page' : undefined}
                 className={`relative min-w-[3rem] whitespace-nowrap px-2 py-4 text-center text-sm transition-colors ${
                   tab === key

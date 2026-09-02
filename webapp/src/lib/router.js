@@ -1,9 +1,14 @@
 // router.js — tiny URL-state hook. No deps.
 //
-// Reads and writes `window.location.search` as a key/value map. Components
-// re-render on popstate (back / forward) and on programmatic navigate().
+// Reads and writes `window.location.search` as a key/value map. The state
+// lives at module level and every hook instance subscribes to the same
+// updates, so a navigate() from ANY component (Header, Reader, …) re-renders
+// all of them — history.replaceState fires no popstate, so a per-instance
+// state would silently drift apart.
 
 import { useEffect, useState, useCallback } from 'react';
+
+const EVT = 'cairn:urlstate';
 
 function readParams() {
   if (typeof window === 'undefined') return {};
@@ -13,13 +18,22 @@ function readParams() {
   return out;
 }
 
+let state = readParams();
+
 export function useUrlState() {
-  const [params, setParams] = useState(readParams);
+  const [, force] = useState(0);
 
   useEffect(() => {
-    const onPop = () => setParams(readParams());
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    const sync = () => {
+      state = readParams();
+      force((n) => n + 1);
+    };
+    window.addEventListener('popstate', sync);
+    window.addEventListener(EVT, sync);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener(EVT, sync);
+    };
   }, []);
 
   const navigate = useCallback((next, { replace = false } = {}) => {
@@ -31,10 +45,11 @@ export function useUrlState() {
     const url = `${window.location.pathname}${search ? `?${search}` : ''}`;
     if (replace) window.history.replaceState({}, '', url);
     else window.history.pushState({}, '', url);
-    setParams(readParams());
+    state = readParams();
+    window.dispatchEvent(new CustomEvent(EVT));
   }, []);
 
-  return [params, navigate];
+  return [state, navigate];
 }
 
 export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
