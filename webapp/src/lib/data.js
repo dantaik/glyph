@@ -62,6 +62,7 @@ let impl = {
   loadRecentAcrossAuthors: reader.loadRecentAcrossAuthors,
   loadPostBody: reader.loadPostBody,
   resolveImages: reader.resolveImages,
+  resolveEnsName: reader.resolveEnsName,
   getAuthorCount: getAuthorCountReal,
   getChainClock: getChainClockReal,
 };
@@ -80,5 +81,6 @@ export const loadRecentAcrossAuthors = (n, opts) =>
   impl.loadRecentAcrossAuthors(n, opts);
 export const loadPostBody = (txHash) => impl.loadPostBody(txHash);
 export const resolveImages = (markdown) => impl.resolveImages(markdown);
+export const resolveEnsName = (author) => impl.resolveEnsName(author);
 export const getAuthorCount = (author) => impl.getAuthorCount(author);
 export const getChainClock = () => impl.getChainClock();

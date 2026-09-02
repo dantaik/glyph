@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import {
   fmtTitle,
   estimateBlockTime,
   fmtRelTime,
   chainName,
 } from '../lib/format';
+import { resolveEnsName } from '../lib/data';
 import EmptyState from './EmptyState';
 
 /**
@@ -24,12 +26,23 @@ export default function AuthorTitleList({
   onRetry,
   navigate,
 }) {
+  // Show the author's ENS name when the address has one, else the address.
+  const [ensName, setEnsName] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setEnsName(null);
+    resolveEnsName(author).then((name) => !cancelled && setEnsName(name));
+    return () => {
+      cancelled = true;
+    };
+  }, [author]);
+
   return (
     <div>
       <header className="mb-8 border-b border-edge pb-5">
         <p className="text-xs tracking-label text-ink-faint">作者</p>
-        <p className="mt-1 font-mono text-sm text-ink-soft break-all select-all">
-          {author}
+        <p className="mt-1 font-mono text-sm text-ink-soft break-all select-all" title={author}>
+          {ensName || author}
         </p>
         <p className="mt-2 text-xs text-ink-faint tabular-nums">
           共{' '}

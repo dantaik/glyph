@@ -268,6 +268,10 @@ export function makeFixtures(mode) {
       return { markdown, urls: [] };
     },
 
+    async resolveEnsName(address) {
+      return null; // demo data has no ENS names
+    },
+
     async getAuthorCount(author) {
       await delay();
       return BigInt(postsOf(author).length);

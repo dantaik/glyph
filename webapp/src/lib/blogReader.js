@@ -185,6 +185,27 @@ export async function loadRecentAcrossAuthors(
   return out.slice(0, n);
 }
 
+// --- ENS names — cached; null when the address has none, or when the
+//     chain doesn't host ENS (only Ethereum mainnet does). ---
+
+const ensCache = new Map(); // address (lowercase) -> Promise<string | null>
+
+export function resolveEnsName(address) {
+  const key = String(address).toLowerCase();
+  if (ensCache.has(key)) return ensCache.get(key);
+  const promise = (async () => {
+    try {
+      const name = await client.getEnsName({ address });
+      return name ?? null;
+    } catch {
+      return null; // ENS absent on this chain or RPC hiccup
+    }
+  })();
+  promise.catch(() => ensCache.delete(key));
+  ensCache.set(key, promise);
+  return promise;
+}
+
 // --- Post body (tags + markdown) — fetched on demand from tx calldata,
 //     with IndexedDB permanent cache (posts are immutable on-chain). ---
 
