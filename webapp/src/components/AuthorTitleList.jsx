@@ -73,7 +73,7 @@ export default function AuthorTitleList({
       )}
 
       {!loading && titles.length === 0 && !error && (
-        <EmptyState title="还没有文章" body="这位作者还没有在链上发表过文章。" />
+        <EmptyState title="该地址没发表过文章" />
       )}
 
       {titles.length > 0 && (
