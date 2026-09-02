@@ -136,28 +136,30 @@ export default function PostPage({ meta, onBack, neighbors, onNavigateIndex, onO
         <h1 className="font-serif text-2xl leading-[1.45] font-bold sm:text-display">
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
-          <span>{fmtIndex(meta.index)}</span>
-          {relTime && (
-            <>
-              <span className="select-none" aria-hidden="true">·</span>
-              <span>{relTime}</span>
-            </>
-          )}
-        </div>
-        <div className="mt-2 text-xs text-ink-faint tabular-nums">
-          <span>作者：</span>
-          <a
-            href={`?author=${meta.author}`}
-            onClick={(e) => {
-              e.preventDefault();
-              onOpenAuthor?.();
-            }}
-            title={meta.author}
-            className="hover:text-accent transition-colors"
-          >
-            {ensName || shortAddr(meta.author)}
-          </a>
+        <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+          <span className="flex items-center gap-1">
+            <span>作者：</span>
+            <a
+              href={`?author=${meta.author}`}
+              onClick={(e) => {
+                e.preventDefault();
+                onOpenAuthor?.();
+              }}
+              title={meta.author}
+              className="hover:text-accent transition-colors"
+            >
+              {ensName || shortAddr(meta.author)}
+            </a>
+          </span>
+          <span className="flex items-center gap-2">
+            <span>{fmtIndex(meta.index)}</span>
+            {relTime && (
+              <>
+                <span className="select-none" aria-hidden="true">·</span>
+                <span>{relTime}</span>
+              </>
+            )}
+          </span>
         </div>
         {body?.tags && body.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-center gap-1.5">
