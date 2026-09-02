@@ -82,18 +82,27 @@ function assignEventIndexes(logs) {
 }
 
 async function postsInBlock(author, block) {
+  // Block heights must reach viem as bigints — it hex-encodes bigints and
+  // passes anything else through verbatim, so a plain number would go out
+  // as a JSON number and every node rejects that.
+  const at = BigInt(block);
   const logs = await withRetry(() =>
     client.getLogs({
       address: GLYPH_ADDRESS,
       event: POST_EVENT,
-      args: { author },
-      fromBlock: block,
-      toBlock: block,
+      fromBlock: at,
+      toBlock: at,
     }),
   );
+  // Event indexes have to count EVERY Post event in the transaction, not
+  // just this author's: /tx/<hash>/<i> is resolved by findMetaByTx(), which
+  // decodes the receipt without an author filter. Number them first, then
+  // narrow to the author (one tx can carry posts from several senders).
   assignEventIndexes(logs);
-  logs.sort((a, b) => Number(b.args.index - a.args.index));
-  return logs;
+  const key = String(author).toLowerCase();
+  const mine = logs.filter((log) => String(log.args.author).toLowerCase() === key);
+  mine.sort((a, b) => Number(b.args.index - a.args.index));
+  return mine;
 }
 
 function logToMeta(log, block) {
@@ -106,25 +115,6 @@ function logToMeta(log, block) {
     txHash: log.transactionHash,
     eventIndex: log.__eventIndex ?? 0,
   };
-}
-
-async function walkBack(author, startBlock, beforeIndex, n) {
-  let block = startBlock;
-  let skipIndex = beforeIndex;
-  const out = [];
-  while (out.length < n && block > 0n) {
-    const logs = await postsInBlock(author, block);
-    if (logs.length === 0) break;
-    for (const log of logs) {
-      const meta = logToMeta(log, block);
-      if (skipIndex !== null && meta.index >= skipIndex) continue;
-      out.push(meta);
-      if (out.length >= n) break;
-    }
-    skipIndex = null;
-    block = logs[logs.length - 1].args.prevBlock;
-  }
-  return out;
 }
 
 async function readHead(author) {
@@ -150,15 +140,18 @@ export async function loadTitleList(author, n) {
     return stored.rows.slice(0, n);
   }
 
+  // Merge previously discovered rows back in (they are older than the fresh
+  // walk, which starts at the head) up to the persistence cap, not to `n` —
+  // the cache is what lets the next visit skip getLogs entirely.
   const out = await walkAuthorTitles(author, head, null, n);
   const seen = new Set(out.map((m) => String(m.index)));
   for (const m of stored?.rows ?? []) {
     if (seen.has(String(m.index))) continue;
     seen.add(String(m.index));
     out.push(m);
-    if (out.length >= n) break;
+    if (out.length >= AUTHOR_ROW_CAP) break;
   }
-  writeAuthorScan(author, { head: head.toString(), rows: out.slice(0, 100) });
+  writeAuthorScan(author, { head: head.toString(), rows: out.slice(0, AUTHOR_ROW_CAP) });
   return out.slice(0, n);
 }
 
@@ -179,16 +172,18 @@ export async function findTitleMeta(author, targetIndex) {
   if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return null;
   const target = BigInt(targetIndex);
   const fetchRows = makeRowLookup(author);
-  let block = await readHead(author);
+  let block = BigInt(await readHead(author));
   while (block > 0n) {
-    const rows = await fetchRows(block);
+    const rows = await fetchRows(block); // already newest-first
     if (rows.length === 0) return null;
     for (const m of rows) {
       if (BigInt(m.index) === target) return m;
     }
-    const oldestIdxInBlock = rows[rows.length - 1].index;
-    if (BigInt(oldestIdxInBlock) < target) return null; // walked past
-    block = rows[rows.length - 1].prevBlock;
+    const oldest = rows[rows.length - 1];
+    if (BigInt(oldest.index) < target) return null; // walked past
+    const next = BigInt(oldest.prevBlock);
+    if (next >= block) return null; // chain doesn't descend — give up
+    block = next;
   }
   return null;
 }
@@ -213,6 +208,7 @@ const MERGE_CAP = 300; // persisted global rows (storage bound)
 const FEED_SCAN_EVT = 'glyph:feedscan';
 const AUTHOR_SCAN_KEY = 'glyph.authorScan.v1';
 const AUTHOR_SCAN_EVT = 'glyph:authorscan';
+const AUTHOR_ROW_CAP = 100; // persisted rows per author (storage bound)
 
 // Rows are BigInt-heavy metas (block/index/prevBlock) while they live in
 // memory, but localStorage is JSON-only and JSON.stringify throws on BigInt —
@@ -339,33 +335,60 @@ function makeRowLookup(author) {
   push((global?.rows ?? []).filter((r) => String(r.author).toLowerCase() === key));
   push(stored?.rows ?? []);
 
+  // Newest post first, so the last entry is the block's oldest post — the
+  // one whose prevBlock continues the author's chain.
+  const newestFirst = (rows) =>
+    rows.sort((a, b) => (BigInt(a.index) < BigInt(b.index) ? 1 : -1));
+
+  // Both caches are capped and can be truncated mid-block, so holding *a*
+  // row for a block does not mean holding *all* of them. Within one block
+  // only the author's oldest post links back to an earlier block (any later
+  // one points at the block itself), so a list whose oldest row self-links
+  // is incomplete — serving it would walk the chain back into the same
+  // block forever. Re-fetch those.
+  const isWholeBlock = (rows) => {
+    if (rows.length === 0) return false;
+    const oldest = rows[rows.length - 1];
+    return BigInt(oldest.prevBlock) !== BigInt(oldest.block);
+  };
+
   return async (block) => {
-    const cached = byBlock.get(String(block));
-    if (cached) return cached;
-    const logs = await postsInBlock(author, block);
-    const rows = logs.map((log) => logToMeta(log, block));
-    push(rows);
-    return byBlock.get(String(block));
+    const at = String(block);
+    const cached = byBlock.get(at);
+    if (cached && isWholeBlock(newestFirst(cached))) return cached;
+    // The fetch is authoritative for this block — it replaces whatever
+    // partial list the caches contributed.
+    const rows = (await postsInBlock(author, block)).map((log) => logToMeta(log, block));
+    for (const r of rows) seen.add(`${r.block}:${r.index}`);
+    byBlock.set(at, newestFirst(rows));
+    return byBlock.get(at);
   };
 }
 
-/** Walk the author's reverse block chain, reusing cached rows per block. */
+/**
+ * Walk the author's reverse block chain, reusing cached rows per block.
+ * Rows persisted to localStorage carry plain numbers, so every height and
+ * index is normalized to BigInt before it is compared or sent to a node.
+ */
 async function walkAuthorTitles(author, startBlock, skipIndex, n) {
   const fetchRows = makeRowLookup(author);
-  let block = startBlock;
-  let skip = skipIndex;
+  let block = BigInt(startBlock);
+  let skip = skipIndex == null ? null : BigInt(skipIndex);
   const out = [];
   while (out.length < n && block > 0n) {
-    const rows = await fetchRows(block);
+    const rows = await fetchRows(block); // already newest-first
     if (rows.length === 0) break;
-    rows.sort((a, b) => Number(BigInt(b.index) - BigInt(a.index)));
     for (const m of rows) {
-      if (skip != null && m.index >= skip) continue;
+      if (skip != null && BigInt(m.index) >= skip) continue;
       out.push(m);
       if (out.length >= n) break;
     }
     skip = null;
-    block = rows[rows.length - 1].prevBlock;
+    // The chain must strictly descend; anything else (a truncated cache, a
+    // reorg, an inconsistent node) would loop forever.
+    const next = BigInt(rows[rows.length - 1].prevBlock);
+    if (next >= block) break;
+    block = next;
   }
   return out;
 }
@@ -574,11 +597,17 @@ export function loadImageBlob(hash, mime = 'image/webp') {
 export async function resolveImages(markdown) {
   const re = /!\[([^\]]*)\]\(eth:(0x[0-9a-fA-F]{64})[^)]*\)/g;
   const matches = [...markdown.matchAll(re)];
-  const blobs = await Promise.all(matches.map((m) => loadImageBlob(m[2])));
-  const urls = blobs.map((blob) => URL.createObjectURL(blob));
+  // Settled, not all: an image the node can't serve must not take the whole
+  // article down with it — its ref is left alone and renders as alt text.
+  const results = await Promise.allSettled(matches.map((m) => loadImageBlob(m[2])));
+  const urls = [];
   let out = markdown;
   matches.forEach((m, i) => {
-    out = out.split(m[0]).join('![' + m[1] + '](' + urls[i] + ')');
+    const r = results[i];
+    if (r.status !== 'fulfilled') return;
+    const url = URL.createObjectURL(r.value);
+    urls.push(url);
+    out = out.split(m[0]).join('![' + m[1] + '](' + url + ')');
   });
   return { markdown: out, urls };
 }
