@@ -78,7 +78,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     <div>
       <section className="mb-9 text-center">
         <h1 className="font-serif text-2xl font-bold tracking-wide text-ink sm:text-[1.75rem]">
-          人海亿万，唯刻痕不朽
+          人海亿万，唯留字者被铭记
         </h1>
         <p className="mx-auto mt-3 max-w-md font-serif text-[0.95rem] leading-relaxed text-ink-soft">
           给未来的人类留一句话——你不是一个数字，你是来过的人。
