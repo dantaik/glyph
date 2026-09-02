@@ -174,3 +174,9 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
 .prose-glyph th { font-weight: 600; }
 
 .prose-compact { --article-size: 1rem; }
+
+/* Editor preview pane — full width, no article measure or centering */
+.prose-glyph.prose-preview {
+  max-width: none;
+  margin-inline: 0;
+}

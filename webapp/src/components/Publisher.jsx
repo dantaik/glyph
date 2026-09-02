@@ -298,7 +298,7 @@ export default function Publisher() {
               aria-pressed={showPreview}
               className={showPreview ? SEGMENT_ON : SEGMENT_OFF}
             >
-              双栏
+              预览
             </button>
           </div>
         </div>

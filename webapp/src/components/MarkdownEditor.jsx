@@ -8,8 +8,8 @@ import { useTheme } from '../lib/theme';
 
 /**
  * CodeMirror Markdown source editor with an optional live preview pane.
- * On wide screens the preview sits beside the editor; on narrow screens it
- * stacks below. Preview re-renders as you type (it's cheap — pure string).
+ * The preview renders full-width below the editor (no side-by-side split).
+ * It re-renders as you type (it's cheap — pure string).
  *
  * Theme-aware: follows the app light/dark theme and pins chrome colors to
  * the design tokens (Prec.highest so the builtin oneDark bg never wins).
@@ -64,7 +64,7 @@ export default function MarkdownEditor({
   );
 
   return (
-    <div className={`grid gap-3 ${showPreview ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+    <div className="grid grid-cols-1 gap-3">
       <div className="rounded-xl border border-edge bg-paper-raised overflow-hidden focus-within:border-edge-strong transition-colors">
         <CodeMirror
           value={value}
@@ -85,7 +85,7 @@ export default function MarkdownEditor({
 
       {showPreview && (
         <div
-          className="rounded-xl border border-edge bg-paper-raised px-6 py-5 prose-glyph prose-compact overflow-auto"
+          className="rounded-xl border border-edge bg-paper-raised px-6 py-5 prose-glyph prose-compact prose-preview overflow-auto"
           style={{ maxHeight: height }}
           dangerouslySetInnerHTML={{ __html: previewHtml }}
         />
