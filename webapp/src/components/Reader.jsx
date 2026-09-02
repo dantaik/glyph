@@ -22,9 +22,6 @@ export default function Reader({ onStartWriting }) {
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const i = params.i;
   const tx = params.tx;
-  // Selected index from the URL: undefined = none, invalid = null.
-  const idx = i != null && i !== '' ? Number(i) : undefined;
-  const idxValid = idx != null && Number.isSafeInteger(idx) && idx >= 0;
 
   // /tx/<hash> deep link: undefined = resolving, null = not found, meta.
   const [txMeta, setTxMeta] = useState(undefined);
@@ -41,10 +38,9 @@ export default function Reader({ onStartWriting }) {
     };
   }, [tx]);
 
-  // The author/index the open post actually belongs to (from the URL or
-  // the resolved tx meta) — drives the neighbor resolution.
-  const postAuthor = author ?? (txMeta && txMeta !== null ? txMeta.author : null);
-  const postIdx = author != null && i != null && i !== '' ? Number(i) : txMeta && txMeta !== null ? Number(txMeta.index) : undefined;
+  // The author/index the open post belongs to — from the resolved tx meta.
+  const postAuthor = txMeta && txMeta !== null ? txMeta.author : null;
+  const postIdx = txMeta && txMeta !== null ? Number(txMeta.index) : undefined;
   const postIdxValid = postIdx != null && Number.isSafeInteger(postIdx) && postIdx >= 0;
 
   const [titles, setTitles] = useState([]);
@@ -52,8 +48,6 @@ export default function Reader({ onStartWriting }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(null);
-  // undefined = resolving, null = not found, meta = found.
-  const [currentMeta, setCurrentMeta] = useState(undefined);
   // undefined = resolving, null = unavailable, bigint = known.
   const [authorCount, setAuthorCount] = useState(undefined);
   const [clock, setClock] = useState(null);
@@ -111,35 +105,13 @@ export default function Reader({ onStartWriting }) {
     };
   }, [author, isConfigured]);
 
-  // Legacy ?author=…&i=N post URLs converge onto the /tx/<hash> form
-  // (replace, so history stays clean).
+  // Legacy ?author=…&i=N links: the query post view is gone — drop the
+  // i param so the author list URL stays clean.
   useEffect(() => {
-    if (tx || i == null || currentMeta == null || !currentMeta.txHash) return;
-    navigate({ tx: currentMeta.txHash }, { replace: true });
-  }, [tx, i, currentMeta, navigate]);
+    if (tx || !author || i == null) return;
+    navigate({ author }, { replace: true });
+  }, [tx, author, i, navigate]);
 
-  // Resolve the meta for the currently-selected post.
-  useEffect(() => {
-    if (!author || idx === undefined) {
-      setCurrentMeta(undefined);
-      return undefined;
-    }
-    if (!idxValid) {
-      setCurrentMeta(null); // not found — index is not a valid number
-      return undefined;
-    }
-    const cached = titles.find((t) => Number(t.index) === idx);
-    if (cached) {
-      setCurrentMeta(cached);
-      return undefined;
-    }
-    let cancelled = false;
-    setCurrentMeta(undefined);
-    findTitleMeta(author, idx).then((m) => !cancelled && setCurrentMeta(m ?? null));
-    return () => {
-      cancelled = true;
-    };
-  }, [author, idx, idxValid, titles]);
 
   // Neighbors for the open post: seed synchronously from the titles cache,
   // resolve misses via findTitleMeta in parallel; j<0 → null immediately;
@@ -253,37 +225,6 @@ export default function Reader({ onStartWriting }) {
 
   if (!author) {
     return <HomeFeed navigate={navigate} onStartWriting={onStartWriting} />;
-  }
-
-  // --- Single post view ---
-
-  if (i != null) {
-    if (currentMeta === undefined) {
-      return (
-        <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
-          加载中…
-        </div>
-      );
-    }
-    if (currentMeta === null) {
-      return (
-        <EmptyState
-          title="没有找到这篇文章"
-          body="链接里的序号不存在（可能已越界或格式有误）。"
-          actionLabel="返回作者列表"
-          onAction={() => navigate({ author })}
-        />
-      );
-    }
-    return (
-      <PostPage
-        meta={currentMeta}
-        onBack={() => navigate({ author })}
-        neighbors={neighbors}
-        onNavigate={(txHash) => navigate({ tx: txHash })}
-        onOpenAuthor={() => navigate({ author: currentMeta.author })}
-      />
-    );
   }
 
   // --- Title list view ---

@@ -68,9 +68,9 @@ const ttlCache = makeTtlCache(getCacheTtlMs);
 const authorKey = (a) => String(a || '').toLowerCase();
 
 /**
- * Warm BOTH meta cache keys for a resolved post, so ?author=…&i=N and
- * /tx/<hash> views share one cached entry regardless of which URL
- * resolved it first.
+ * Warm BOTH meta cache keys for a resolved post: resolving a neighbor
+ * via findTitleMeta pre-warms its /tx/<hash> entry (and vice versa), so
+ * prev/next navigation hits the cache instantly.
  */
 function cacheMetaBoth(meta) {
   if (!meta) return meta;
