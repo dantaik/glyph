@@ -15,17 +15,13 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <div className="min-h-dvh flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <Header
         tab={tab}
         onTabChange={setTab}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <main
-        className={`flex-1 w-full mx-auto px-5 sm:px-6 pt-8 pb-16 ${
-          tab === 'read' ? 'max-w-[44rem]' : 'max-w-5xl'
-        }`}
-      >
+      <main className="flex-1 w-full mx-auto max-w-5xl px-5 sm:px-6 pt-8 pb-16">
         {tab === 'read' ? (
           <Reader onStartWriting={() => setTab('write')} />
         ) : (
