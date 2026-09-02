@@ -37,11 +37,11 @@ export const CHAIN_ID = Number(
 
 export const STORAGE_KEYS = { RPC: KEY_RPC, CHAIN: KEY_CHAIN, CACHE_TTL: KEY_CACHE_TTL };
 
-/** Cache TTL in ms for repeat chain reads (0 = no caching). Default 5 min. */
+/** Cache TTL in ms for repeat chain reads (0 = no caching). Default 1 min. */
 export function getCacheTtlMs() {
   const raw = lsGet(KEY_CACHE_TTL);
-  const minutes = raw == null ? 5 : Number(raw);
-  return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 5) * 60_000;
+  const minutes = raw == null ? 1 : Number(raw);
+  return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 1) * 60_000;
 }
 
 /** Persist RPC URL / chain ID / cache TTL and reload so everything picks it up. */

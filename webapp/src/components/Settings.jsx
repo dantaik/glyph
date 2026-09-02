@@ -150,7 +150,7 @@ export default function Settings({ open, onClose }) {
             className={INPUT_CLS}
           />
           <span className="block text-xs text-ink-faint mt-1">
-            相同数据在 N 分钟内不重复请求；0 = 不缓存。默认 5 分钟。
+            相同数据在 N 分钟内不重复请求；0 = 不缓存。默认 1 分钟。
           </span>
         </label>
 
