@@ -9,7 +9,7 @@ export default function CostPanel({ estimate, market, chainId }) {
       </div>
     );
   }
-  const { postCost, imageCosts, totalCost, estCompressed } = estimate;
+  const { postCost, imageCosts, totalCost, estCompressed, limitBytes, nearLimit } = estimate;
   const usdAvailable = totalCost.usd != null;
 
   return (
@@ -50,6 +50,13 @@ export default function CostPanel({ estimate, market, chainId }) {
           </li>
         ))}
       </ul>
+
+      {nearLimit && (
+        <p className="mt-3 text-2xs leading-relaxed text-danger">
+          正文接近单笔交易上限（约 {Math.floor(limitBytes / 1024)} KB 压缩后）。
+          超出时发布会被节点拒绝，请精简正文或拆成多篇。
+        </p>
+      )}
 
       <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-edge pt-2.5 text-sm font-medium text-ink">
         <span>合计</span>

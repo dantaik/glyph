@@ -431,6 +431,7 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 **协议常量（截至 2026-06）**
 - **EIP-7623（Pectra）** calldata 地板价：`tokens = 零字节 + 4×非零字节`，地板 `10 gas/token` → 非零 40、零 10。
 - **EIP-7825（Fusaka, 2025-12）** 单笔交易 gas 上限：`2²⁴ = 16,777,216`。→ 一笔最多约 `(16,777,216 − 21,000) / 40 ≈ 418,905` 字节 ≈ **~409 KB** 图。
+- **交易池体积上限（非共识规则）** geth `txMaxSize = 4 × 32 KiB = 131,072` 字节，超出即以 `oversized data` 拒收。公共节点都跑这个默认值，因此**实际上限是 ~128 KiB / 笔**——远早于上面的 gas 上限触发，上面的 ~409 KB 只是理论值。前端以此为准（`publish.js` 的 `MAX_TX_BYTES` / `MAX_CALLDATA_BYTES`）：图片压到该预算以内，正文在上传任何图片之前先压一遍量大小。
 - **EIP-170** 合约代码上限 24,576 字节（仅在用 SSTORE2 时相关）。
 
 **依赖**

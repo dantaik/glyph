@@ -1,5 +1,11 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
-import { embedImages, publishPost } from '../lib/publish';
+import {
+  embedImages,
+  publishPost,
+  usedImageKeys,
+  measurePayload,
+  MAX_CALLDATA_BYTES,
+} from '../lib/publish';
 import { client } from '../lib/blogReader';
 import { getAuthorCount } from '../lib/data';
 import { useWallet } from '../lib/wallet';
@@ -77,6 +83,12 @@ export default function Publisher() {
     [markdown],
   );
 
+  // Only the images the body actually displays are published — an attachment
+  // whose ref was deleted from the draft would be a transaction for bytes no
+  // reader ever sees. Drives the cost panel as well, so the estimate matches
+  // what publishing will really sign.
+  const usedKeys = useMemo(() => usedImageKeys(markdown, files), [markdown, files]);
+
   // First-post status (drives the cold-SSTORE estimate), from the shared
   // wallet store instead of a one-off eth_accounts poll.
   useEffect(() => {
@@ -125,9 +137,8 @@ export default function Publisher() {
 
     // Image costs: estimate post-processing size at 50 KB if not yet processed
     // (real value depends on the source image; we use a placeholder until uploaded)
-    const imageEntries = Object.entries(files);
-    const imageCosts = imageEntries.map(([key, file]) => {
-      const estBytes = Math.min(200_000, Math.ceil(file.size * 0.3));
+    const imageCosts = usedKeys.map((key) => {
+      const estBytes = Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3));
       const g = estimateImageGas(estBytes);
       return { key, ...gasToCost(g, market.gasPriceWei, market.ethUsd), gas: g };
     });
@@ -135,8 +146,18 @@ export default function Publisher() {
     const totalGas = postGas + imageCosts.reduce((a, c) => a + c.gas, 0);
     const totalCost = gasToCost(totalGas, market.gasPriceWei, market.ethUsd);
 
-    return { postGas, postCost, imageCosts, totalGas, totalCost, estCompressed };
-  }, [market, tags, markdown, files, isFirstPost]);
+    return {
+      postGas,
+      postCost,
+      imageCosts,
+      totalGas,
+      totalCost,
+      estCompressed,
+      // Rough — the exact size is measured with brotli at publish time.
+      limitBytes: MAX_CALLDATA_BYTES,
+      nearLimit: estCompressed > MAX_CALLDATA_BYTES * 0.9,
+    };
+  }, [market, tags, markdown, files, usedKeys, isFirstPost]);
 
   // --- Tag handling ---
   // Delimiters: Enter, half/full-width comma (,) and semicolon (;).
@@ -202,8 +223,22 @@ export default function Publisher() {
     try {
       await ensureWallet();
       setStatus('processing');
+
+      // Images are uploaded one paid transaction at a time, so check the
+      // body against the transaction ceiling while failing is still free.
+      setStatusMsg('正在压缩正文…');
+      const size = await measurePayload({ tags, markdown, files });
+      if (!size.ok) {
+        const kb = (n) => `${Math.ceil(n / 1024)} KB`;
+        setStatus('error');
+        setStatusMsg(
+          `正文压缩后 ${kb(size.bytes)}，超过单笔交易上限 ${kb(size.limit)}。请精简正文，或拆成多篇发布。`,
+        );
+        return;
+      }
+
       let finalMd = markdown;
-      if (Object.keys(files).length > 0) {
+      if (usedKeys.length > 0) {
         setStatusMsg('正在上传图片到链上…');
         finalMd = await embedImages(markdown, files, {
           onProgress: (key, i, total) =>
@@ -332,6 +367,7 @@ export default function Publisher() {
         <ImageUploader
           files={files}
           uploadRefs={uploadRefs}
+          usedKeys={usedKeys}
           onChange={setFiles}
           disabled={status === 'processing'}
           previewUrls={filePreviews}
