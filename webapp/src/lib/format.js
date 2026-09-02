@@ -120,6 +120,9 @@ export function friendlyError(message) {
   if (/archive|token|personal/i.test(m)) {
     return '当前 RPC 节点不支持这类查询，请到右上角设置更换节点。';
   }
+  if (/can'?t route|suitable provider|no provider/i.test(m)) {
+    return 'RPC 节点暂时无法响应，请稍后重试。';
+  }
   if (/network|fetch|econn|refused|failed/i.test(m)) {
     return '网络连接出现问题，请检查网络后重试。';
   }

@@ -52,7 +52,8 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
     } catch (err) {
       const msg = String(err?.message || err);
       const retriable =
-        err?.status === 429 || /rate limit|429|too many requests|timeout|underlying network/i.test(msg);
+        err?.status === 429 ||
+        /rate limit|429|too many requests|timeout|underlying network|can'?t route|suitable provider/i.test(msg);
       if (!retriable || attempt >= retries) throw err;
       await sleep(baseDelayMs * 2 ** attempt);
     }
