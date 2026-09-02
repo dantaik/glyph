@@ -5,6 +5,7 @@ import EmptyState from './EmptyState';
 import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
+import LoadMoreButton from './LoadMoreButton';
 
 /**
  * Author page: address header, post count, title list with relative times,
@@ -84,20 +85,7 @@ export default function AuthorTitleList({
       )}
 
       {titles.length > 0 && (
-        <div className="mt-8 text-center">
-          {hasMore ? (
-            <button
-              type="button"
-              onClick={onLoadMore}
-              disabled={loadingMore}
-              className="rounded-full border border-edge px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {loadingMore ? '正在加载…' : '加载更多'}
-            </button>
-          ) : (
-            <p className="text-xs text-ink-ghost">已是全部文章</p>
-          )}
-        </div>
+        <LoadMoreButton onClick={onLoadMore} loading={loadingMore} hasMore={hasMore} />
       )}
     </div>
   );

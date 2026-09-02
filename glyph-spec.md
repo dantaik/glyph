@@ -423,6 +423,8 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 | 编辑器 | CodeMirror 源码编辑 + 实时预览 | Markdown 语法高亮 + 边写边看；预览复用渲染器 |
 | 永久性兜底 | 链上锚定 + IndexedDB 缓存 + 自留备份 | 三层冗余；应对未来滚动历史过期 |
 | 本地缓存 | IndexedDB，永不过期 | 内容不可变；缓存命中零 RPC；万篇仅 ~20 MB |
+| 扫描覆盖 | localStorage 记录**多段**已扫区块范围（而非单一 frontier） | 往前翻只补未读区间；已扫过的段落永不重扫 |
+| 请求去重 | 会话内按 (author, index) / (txHash, 事件序号) 索引 | 同一篇文章一次会话内最多向节点请求一次，无论从哪个页面进入 |
 
 ---
 

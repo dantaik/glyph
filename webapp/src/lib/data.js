@@ -48,6 +48,7 @@ let impl = {
   loadMoreTitles: reader.loadMoreTitles,
   findTitleMeta: reader.findTitleMeta,
   loadRecentAcrossAuthors: reader.loadRecentAcrossAuthors,
+  loadMoreAcrossAuthors: reader.loadMoreAcrossAuthors,
   findMetaByTx: reader.findMetaByTx,
   loadPostBody: reader.loadPostBody,
   resolveImages: reader.resolveImages,
@@ -98,6 +99,11 @@ export const loadRecentAcrossAuthors = (n, opts) =>
   ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
     impl.loadRecentAcrossAuthors(n, opts),
   );
+// Deliberately NOT TTL-cached: a click that comes up empty is meant to be
+// clicked again, and each repeat sweeps further back. Ranges already read
+// are skipped by the scan store, so repeating costs nothing anyway.
+export const loadMoreAcrossAuthors = (oldestShown, n, opts) =>
+  impl.loadMoreAcrossAuthors(oldestShown, n, opts);
 export const findMetaByTx = (txHash, eventIndex = 0) =>
   ttlCache(txMetaKey(txHash, eventIndex), async () =>
     cacheMetaBoth(await impl.findMetaByTx(txHash, eventIndex)),
