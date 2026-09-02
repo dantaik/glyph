@@ -8,7 +8,7 @@ export default function EmptyState({ title, body, actionLabel, onAction, tone })
       {danger ? (
         <AlertCircle size={36} className="mx-auto text-danger" />
       ) : (
-        <GeeseMark size={110} className="mx-auto text-ink-ghost" />
+        <GeeseMark size={168} className="mx-auto text-ink-ghost/50" />
       )}
       <h2 className="mt-5 text-lg text-ink-soft">{title}</h2>
       {body && (

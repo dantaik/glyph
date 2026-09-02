@@ -120,7 +120,13 @@ export function ExternalLink({ size, ...rest }) {
  */
 export function GeeseMark({ size, ...rest }) {
   return (
-    <svg {...iconProps(size)} viewBox="0 0 200 100" {...rest}>
+    <svg
+      {...iconProps(size)}
+      width={size ?? 20}
+      height={(size ?? 20) / 2}
+      viewBox="0 0 200 100"
+      {...rest}
+    >
       {/* 留声 — echo arcs left behind by the lead goose */}
       <path d="M112 10 A10 10 0 0 0 112 30" />
       <path d="M102 4 A16 16 0 0 0 102 36" />
