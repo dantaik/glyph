@@ -15,7 +15,7 @@ forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
 # 2. 配置前端
 cat > webapp/.env.local <<EOF
 VITE_GLYPH_ADDRESS=0x000000AE2f2249c497cfc5F262dd1491634C361C
-VITE_RPC_URL=https://ethereum-rpc.publicnode.com
+VITE_RPC_URL=https://eth.drpc.org
 VITE_CHAIN_ID=1
 EOF
 

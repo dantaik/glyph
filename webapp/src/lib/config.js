@@ -22,10 +22,13 @@ function lsGet(key) {
 export const GLYPH_ADDRESS =
   import.meta.env.VITE_GLYPH_ADDRESS || '0xYourGlyphContractAddress';
 
+// Default public endpoint: dRPC supports eth_getLogs (needed by the home
+// feed and author pages); publicnode.com rejects getLogs without a paid
+// token ('Archive requests require a personal token').
 export const RPC_URL =
   lsGet(KEY_RPC) ||
   import.meta.env.VITE_RPC_URL ||
-  'https://ethereum-rpc.publicnode.com';
+  'https://eth.drpc.org';
 
 export const CHAIN_ID = Number(
   lsGet(KEY_CHAIN) || import.meta.env.VITE_CHAIN_ID || 1,

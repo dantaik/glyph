@@ -137,24 +137,44 @@ export async function loadRecentAcrossAuthors(
   n,
   { windowSize = 800, maxWindows = 30 } = {},
 ) {
-  const head = await client.getBlockNumber();
   const span = BigInt(windowSize);
-  let toBlock = head;
+  const head = await client.getBlockNumber();
   const out = [];
 
-  for (let w = 0; w < maxWindows && out.length < n && toBlock > 0n; w++) {
+  const newestFirst = (logs) =>
+    logs.sort((a, b) => {
+      if (a.blockNumber !== b.blockNumber) return Number(b.blockNumber - a.blockNumber);
+      return b.logIndex - a.logIndex;
+    });
+
+  // The first window ends at 'latest' instead of the captured head: public
+  // RPC clusters (dRPC, etc.) can serve getBlockNumber and getLogs from
+  // different nodes, and a numeric toBlock captured a moment earlier may
+  // already exceed the answering node's head ("block range extends beyond
+  // current head block"). Subsequent windows are far below the head, so
+  // numeric bounds are safe there.
+  let logs = await client.getLogs({
+    address: GLYPH_ADDRESS,
+    event: POST_EVENT,
+    fromBlock: head >= span ? head - span + 1n : 0n,
+    toBlock: 'latest',
+  });
+  newestFirst(logs);
+  for (const log of logs) {
+    out.push(logToMeta(log, log.blockNumber));
+    if (out.length >= n) break;
+  }
+
+  let toBlock = head >= span ? head - span : 0n;
+  for (let w = 1; w < maxWindows && out.length < n && toBlock > 0n; w++) {
     const fromBlock = toBlock >= span ? toBlock - span + 1n : 0n;
-    const logs = await client.getLogs({
+    logs = await client.getLogs({
       address: GLYPH_ADDRESS,
       event: POST_EVENT,
       fromBlock,
       toBlock,
     });
-    // newest-first within the window: block desc, then logIndex desc
-    logs.sort((a, b) => {
-      if (a.blockNumber !== b.blockNumber) return Number(b.blockNumber - a.blockNumber);
-      return b.logIndex - a.logIndex;
-    });
+    newestFirst(logs);
     for (const log of logs) {
       out.push(logToMeta(log, log.blockNumber));
       if (out.length >= n) break;
