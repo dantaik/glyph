@@ -190,14 +190,6 @@ export function ChevronUp({ size, ...rest }) {
   );
 }
 
-export function Plus({ size, ...rest }) {
-  return (
-    <svg {...iconProps(size)} {...rest}>
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
 export function Trash({ size, ...rest }) {
   return (
     <svg {...iconProps(size)} {...rest}>
