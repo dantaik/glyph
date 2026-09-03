@@ -44,8 +44,8 @@ describe('SettingsPage — backup and restore', () => {
   it('a partly usable file applies its good part and lists the rest', async () => {
     render(<SettingsPage navigate={vi.fn()} />);
     pickFile(file({ glyph: { settings: 1 }, rpcs: { 1: ['https://eth.example', 'nope'] }, fontSize: 'huge' }));
-    expect(await screen.findByText('以太坊：1 个自定义节点')).toBeTruthy();
-    expect(screen.getByText('以太坊：忽略 1 个不是 http(s) 地址的节点。')).toBeTruthy();
+    expect(await screen.findByText('Ethereum：1 个自定义节点')).toBeTruthy();
+    expect(screen.getByText('Ethereum：忽略 1 个不是 http(s) 地址的节点。')).toBeTruthy();
     expect(screen.getByText('fontSize 应是 s、m 或 l。')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '应用' }));
     expect(hasCustomRpcs(1)).toBe(true);

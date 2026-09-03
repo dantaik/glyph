@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { EXCERPT_CHARS } from '../../src/components/ArticleListItem';
 import AuthorPage from '../../src/components/AuthorPage';
-import { AUTHORS } from '../../src/lib/fixtureWorld';
-import { fmtIndex } from '../../src/lib/format';
+import { AUTHORS, buildWorlds } from '../../src/lib/fixtureWorld';
+import { excerpt, fmtIndex } from '../../src/lib/format';
 import { hrefFor } from '../../src/lib/router';
 import { createView } from '../../src/lib/view';
-import { settle, worldReader } from './mergedHelpers';
+import { NOW, settle, worldReader } from './mergedHelpers';
 
 afterEach(cleanup);
 // Scan stores persist to localStorage; every case starts from nothing.
@@ -47,5 +48,13 @@ describe('AuthorPage', () => {
     // The author link is the way into the author's page.
     fireEvent.click(rowsOnPage[0].querySelector(`a[href="${authorHref}"]`));
     expect(navigate).toHaveBeenCalledWith({ author: rows[0].author });
+
+    // Under its title, every row previews the body as the row's excerpt.
+    const worlds = buildWorlds([1, 167000], { now: NOW });
+    await waitFor(() => {
+      expect(rowsOnPage.map((li) => li.querySelector('p')?.textContent)).toEqual(
+        rows.map((r) => excerpt(worlds.get(r.chainId).bodyByTx.get(r.txHash).markdown, EXCERPT_CHARS)),
+      );
+    });
   });
 });

@@ -5,7 +5,7 @@ test.describe('when a node misbehaves', () => {
   test('one chain down: the other chain\'s letters show, and the failure is named with a retry', async ({ page }) => {
     await prepare(page, { scenario: 'taiko-down' });
     await page.goto('/');
-    await expect(chip(page, '以太坊').first()).toBeVisible({ timeout: 60_000 });
+    await expect(chip(page, 'Ethereum').first()).toBeVisible({ timeout: 60_000 });
     await expect(chip(page, 'Taiko')).toHaveCount(0);
     await expect(page.locator('main')).toContainText('Taiko 读取失败');
     await expect(page.getByRole('button', { name: '重试' }).first()).toBeVisible();
@@ -16,7 +16,7 @@ test.describe('when a node misbehaves', () => {
     await reset(request, 'flaky');
     await prepare(page, { scenario: 'flaky' });
     await page.goto('/');
-    await expect(chip(page, '以太坊').first()).toBeVisible({ timeout: 60_000 });
+    await expect(chip(page, 'Ethereum').first()).toBeVisible({ timeout: 60_000 });
     await expect(chip(page, 'Taiko').first()).toBeVisible({ timeout: 60_000 });
   });
 

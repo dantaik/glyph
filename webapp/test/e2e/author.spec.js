@@ -7,7 +7,7 @@ test.describe('an author', () => {
     const { counts } = await oracle(request);
     const [author, c] = Object.entries(counts).find(([, v]) => v.byChain[1] > 0 && v.byChain[167000] > 0);
     await page.goto(`/author/${author}`);
-    await expect(page.locator('main')).toContainText(`共 ${c.total} 篇 · 以太坊 ${c.byChain[1]} · Taiko ${c.byChain[167000]}`);
+    await expect(page.locator('main')).toContainText(`共 ${c.total} 篇 · Ethereum ${c.byChain[1]} · Taiko ${c.byChain[167000]}`);
     await expect.poll(async () => (await postHrefs(page)).length, { timeout: 60_000 }).toBe(c.total);
     await expect(page.locator('main')).toContainText('第 1 篇');
     await expect(page.locator('[data-frontier]')).toHaveCount(0);
@@ -18,6 +18,9 @@ test.describe('an author', () => {
     await expect(first.locator('a[href^="/author/"]')).toHaveAttribute('href', new RegExp(`^/author/${author}$`, 'i'));
     await expect(first).toContainText(/第 \d+ 篇/);
     await expect(page.locator('main a[href^="/author/"]')).toHaveCount(c.total);
+    // …and every row previews its body under the title.
+    await expect(page.locator('main li:has(a[href*="/tx/"]) p')).toHaveCount(c.total);
+    await expect(page.locator('main li:has(a[href*="/tx/"]) p').first()).toHaveText(/\S/);
 
     await page.goto(`/taiko/author/${author}`);
     await expect(page.locator('main')).toContainText('只看Taiko');

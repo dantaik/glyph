@@ -42,7 +42,7 @@ test.describe('a post', () => {
     await prepare(page);
     await page.goto(`/tx/0x${'ee'.repeat(32)}/0`);
     await expect(page.getByText('没有找到这篇文章')).toBeVisible();
-    await expect(page.locator('main')).toContainText('在以太坊和Taiko上都没有找到');
+    await expect(page.locator('main')).toContainText('在Ethereum和Taiko上都没有找到');
     await page.getByRole('button', { name: '返回首页' }).click();
     await expect(page).toHaveURL(/\/$/);
   });

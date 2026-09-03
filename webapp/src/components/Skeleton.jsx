@@ -6,13 +6,14 @@ export function Bar({ className = '' }) {
   return <div className={`animate-pulse rounded bg-paper-sunken ${className}`} />;
 }
 
-/** A reading list — the home feed or an author's: rows of a title over a meta line (ArticleListItem). */
+/** A reading list — the home feed or an author's: rows of a title, a preview line, a meta line (ArticleListItem). */
 export function ListSkeleton() {
   return (
     <ul className="divide-y divide-edge" aria-hidden="true">
       {[0, 1, 2, 3, 4].map((k) => (
         <li key={k} className="py-4">
-          <Bar className="h-5 w-2/3" />
+          <Bar className="h-6 w-2/3" />
+          <Bar className="mt-3 h-4 w-11/12" />
           <Bar className="mt-3 h-3 w-1/3" />
         </li>
       ))}

@@ -10,7 +10,7 @@ test.describe('the single-file copy, opened from disk', () => {
     const { posts } = await oracle(request);
     await page.goto(FILE);
     await expect(chip(page, 'Taiko').first()).toBeVisible({ timeout: 60_000 });
-    await expect(chip(page, '以太坊').first()).toBeVisible({ timeout: 60_000 });
+    await expect(chip(page, 'Ethereum').first()).toBeVisible({ timeout: 60_000 });
     expect(await chip(page, 'Taiko').first().getAttribute('href')).toBe('#/taiko');
     await expect(page.locator('footer')).not.toContainText('离线版');
 
@@ -22,7 +22,7 @@ test.describe('the single-file copy, opened from disk', () => {
 
     await page.locator('header a[aria-label="回到首页"]').click();
     await expect(page).toHaveURL(/#\/$/);
-    await expect(chip(page, '以太坊').first()).toBeVisible();
+    await expect(chip(page, 'Ethereum').first()).toBeVisible();
   });
 
   test('a chainless fragment link is redirected to the chain that holds the post', async ({ page, request }) => {

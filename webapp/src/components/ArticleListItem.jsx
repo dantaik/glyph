@@ -4,7 +4,7 @@ import { hrefFor } from '../lib/router';
 import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
 
-const EXCERPT_CHARS = 256;
+export const EXCERPT_CHARS = 256;
 
 /**
  * One article row in a reading list — shared by the home feed and the
