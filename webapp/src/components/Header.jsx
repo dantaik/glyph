@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { hrefFor, useUrlState } from '../lib/router';
 import { useTheme } from '../lib/theme';
-import { useWallet } from '../lib/wallet';
 import { GlyphMark, Sun, Moon, Sliders, MoreHorizontal } from './Icons';
-import AddressLabel from './Address';
-import ChainMenu from './ChainMenu';
 
 // No display utility here on purpose: call sites choose between `inline-flex`
 // and `hidden sm:inline-flex`, and both set `display`. Baking `inline-flex`
@@ -19,38 +16,32 @@ const TABS = [
 ];
 
 /**
- * Sticky masthead: brand, tabs, chain switcher, wallet pill, theme, settings.
+ * Sticky masthead: brand, tabs, theme, settings. Nothing about chains or
+ * wallets: the reader reads every chain at once (a post's chain label is
+ * the way into one chain's view), and the wallet belongs to the 写 tab,
+ * the only place it is needed.
  *
- * A phone has ~288px of usable width and the controls want ~350px, so below
- * `sm` the two rarest ones — theme and settings — fold into the ⋯ menu, and
- * the 雪泥 wordmark waits for 380px. Everything else stays on one 56px row.
+ * A phone has ~288px of usable width, so below `sm` the two rarest
+ * controls — theme and settings — fold into the ⋯ menu, and the 雪泥
+ * wordmark waits for 380px. Everything else stays on one 56px row.
  *
  * Every child of the row is `shrink-0` and the trailing group is pushed out
- * with `ml-auto`. That matters: the old header let the leading group shrink
- * below its own content, so the tabs were painted UNDER the chain switcher
- * and 写 could not be tapped at all on a 390px screen.
+ * with `ml-auto`, so the leading group can never shrink below its own
+ * content and paint the tabs under the trailing controls.
  */
 export default function Header({ tab, onTabChange, onOpenSettings }) {
-  const { account, connect } = useWallet();
   const [, navigate] = useUrlState();
   const { isDark, setTheme } = useTheme();
 
-  const handleConnect = useCallback(async () => {
-    try {
-      await connect();
-    } catch (err) {
-      if (err?.code !== 4001) console.warn('wallet connect failed:', err);
-    }
-  }, [connect]);
-
-  // 读 tab = the default all-content view: clear any author/post params
-  // so clicking it always returns to the home feed (the router preserves
-  // the fixtures demo flag automatically).
+  // The brand is the front door: the merged feed, every chain, no filter.
   const goHome = useCallback(() => {
-    navigate({}, { replace: true });
+    navigate({ chain: null }, { replace: true });
     onTabChange('read');
   }, [navigate, onTabChange]);
 
+  // 读 = the feed as it was being read: any author/post params are cleared,
+  // the chain filter (if one is on) stays. The router keeps the fixtures
+  // demo flag automatically.
   const handleTabChange = useCallback(
     (key) => {
       if (key === 'read') navigate({}, { replace: true });
@@ -64,7 +55,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
         {/* Brand — the way back to the front page from anywhere. */}
         <a
-          href={hrefFor({})}
+          href={hrefFor({ chain: null })}
           onClick={(e) => {
             e.preventDefault();
             goHome();
@@ -112,31 +103,8 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
           ))}
         </nav>
 
-        {/* Everything after this is pushed to the trailing edge: who you are,
-            then which chain you are on, then the rest. */}
+        {/* Everything after this is pushed to the trailing edge. */}
         <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
-          {account ? (
-            <button
-              onClick={() => {
-                navigate({ author: account });
-                onTabChange('read');
-              }}
-              title={account}
-              aria-label="查看我的文章"
-              className="inline-flex h-9 shrink-0 items-center rounded-full bg-paper-sunken px-1.5 text-ink-soft hover:text-accent transition-colors sm:px-2.5"
-            >
-              <AddressLabel address={account} size={14} tailClassName="text-xs" />
-            </button>
-          ) : (
-            <button
-              onClick={handleConnect}
-              className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-accent-wash px-2.5 text-xs font-medium text-accent-strong hover:bg-accent hover:text-paper transition-colors sm:px-3"
-            >
-              连接钱包
-            </button>
-          )}
-          <ChainMenu />
-
           {/* sm+: theme and settings as their own buttons. */}
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
@@ -168,8 +136,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
 
 /**
  * The ⋯ menu — theme and settings on screens with no room for them as
- * separate buttons. Same dismiss behaviour as the chain switcher: outside
- * click or Escape.
+ * separate buttons. Dismissed by an outside click or Escape.
  */
 function OverflowMenu({ className = '', isDark, onToggleTheme, onOpenSettings }) {
   const [open, setOpen] = useState(false);

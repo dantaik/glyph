@@ -1,17 +1,16 @@
 // data.js — the readers, one per chain, and the DEV fixtures switch.
 //
-// Components get their reader from here — `useReader()` for the chain being
-// shown, `getReader(chainId)` for any chain — so that, in DEV, `?fixtures=1`
-// / `?fixtures=empty` (or VITE_FIXTURES=1) can swap the chain I/O for an
-// in-memory chain. The dynamic import sits behind a literal
+// Components get their readers from here — `getReader(chainId)`, and
+// view.js composes them into the merged view — so that, in DEV,
+// `?fixtures=1` / `?fixtures=empty` (or VITE_FIXTURES=1) can swap the chain
+// I/O for an in-memory chain. The dynamic import sits behind a literal
 // `import.meta.env.DEV` check, so production builds tree-shake fixtures.js
 // away entirely (top-level await is enabled in vite.config.js).
 //
 // Readers live for the page: a scan one of them is running keeps going, and
-// keeps caching, no matter which chain the page switches to.
+// keeps caching, whatever the page shows meanwhile.
 
 import { createReader } from './reader';
-import { useActiveChainId } from './config';
 
 function detectFixturesMode() {
   try {
@@ -45,7 +44,3 @@ export function getReader(chainId) {
   return reader;
 }
 
-/** React hook: the reader for the chain currently being shown. */
-export function useReader() {
-  return getReader(useActiveChainId());
-}

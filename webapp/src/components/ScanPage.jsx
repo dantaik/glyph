@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import { CHAINS, SELECTABLE_CHAIN_IDS } from '../lib/chains';
-import { useActiveChainId } from '../lib/config';
+import { CHAINS } from '../lib/chains';
+import { READ_CHAIN_IDS } from '../lib/config';
 import { getReader } from '../lib/data';
 import { lowest, highest, blockCount } from '../lib/segments';
 import { fmtBlock } from '../lib/format';
@@ -21,12 +21,6 @@ const MAX_SHOWN = 8;
  * already held. Read-only diagnostics: the data exists only in this browser.
  */
 export default function ScanPage({ navigate }) {
-  const activeId = useActiveChainId();
-  const ids = SELECTABLE_CHAIN_IDS.includes(activeId)
-    ? SELECTABLE_CHAIN_IDS
-    : [...SELECTABLE_CHAIN_IDS, activeId];
-  const ordered = [activeId, ...ids.filter((id) => id !== activeId)];
-
   return (
     <div>
       <div className="mb-8">
@@ -38,12 +32,12 @@ export default function ScanPage({ navigate }) {
       <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">
         为了在公共 RPC 上增量读取链上文章，浏览器会在本地记录已经扫描过的区块范围，刷新后只拉取新出现的区块，不再重复请求。
         记录的是多段范围而不是一整段：先扫过 1–100、后来扫过 200–300，再往前翻时只会补上中间的 101–199。
-        每条链各自记录，互不影响；切换网络时，正在进行的扫描会在后台继续完成并缓存结果。
+        每条链各自记录，互不影响；两条链同时扫描，离开页面后正在进行的扫描也会在后台继续完成并缓存结果。
         全局流最多缓存 300 篇、每位作者最多缓存最近 200 篇标题；缓存被裁剪时对应的范围也会一并收回，避免「以为扫过」而漏掉文章。
       </p>
 
-      {ordered.map((id) => (
-        <ChainScan key={id} chainId={id} active={id === activeId} navigate={navigate} />
+      {READ_CHAIN_IDS.map((id) => (
+        <ChainScan key={id} chainId={id} navigate={navigate} />
       ))}
 
       <p className="text-xs leading-relaxed text-ink-ghost">
@@ -55,7 +49,7 @@ export default function ScanPage({ navigate }) {
 }
 
 /** One chain's coverage: the global feed ranges, then the visited authors. */
-function ChainScan({ chainId, active, navigate }) {
+function ChainScan({ chainId, navigate }) {
   const reader = getReader(chainId);
   const feed = useSyncExternalStore(
     reader.feed.subscribe,
@@ -74,11 +68,7 @@ function ChainScan({ chainId, active, navigate }) {
       <SectionHeader
         label={`${chain?.name ?? `链 ${chainId}`} · ${chainId}`}
         right={
-          active ? (
-            <span className="text-xs text-accent">当前网络</span>
-          ) : feed.job ? (
-            <span className="animate-pulse text-xs text-ink-ghost">后台扫描中</span>
-          ) : undefined
+          feed.job ? <span className="animate-pulse text-xs text-ink-ghost">后台扫描中</span> : undefined
         }
       />
       <p className="mb-4 text-xs tabular-nums text-ink-ghost">

@@ -1,30 +1,26 @@
 import { useEffect } from 'react';
-import { useReader } from '../lib/data';
+import { getReader } from '../lib/data';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
-import PostRoute from './PostRoute';
-import HomeFeed from './HomeFeed';
+import { useView } from '../lib/view';
 import AuthorPage from './AuthorPage';
+import HomeFeed from './HomeFeed';
+import PostLocator from './PostLocator';
+import PostRoute from './PostRoute';
 import ScanPage from './ScanPage';
 
 /**
- * The reading surfaces, picked by URL: `/` the home feed, `/author/<addr>`
- * one author's list, `/tx/<hash>/<n>` one post, `/scan` the local scan
- * status. Every surface reads through the reader of the chain being shown;
- * switching chains swaps the reader in place.
+ * The reading surface: which page the URL asks for, over the view it asks
+ * for. `/` and `/author/…` read every chain at once; `/taiko` and
+ * `/taiko/author/…` read one. A post is on one chain, so `/taiko/tx/…`
+ * goes to that chain's reader; a chainless `/tx/…` is looked up on every
+ * chain first.
  */
 export default function Reader({ onStartWriting }) {
   const [params, navigate] = useUrlState();
-  const reader = useReader();
+  const view = useView();
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const tx = params.tx;
   const txEvent = params.txEvent != null ? Number(params.txEvent) : 0;
-
-  // A transaction belongs to one chain, but nothing has to be done about it
-  // here any more: the chain is a segment of the URL, so it cannot change
-  // without a navigation that already says where it is going — the chain
-  // menu sends a post to the new chain's feed, and /taiko/tx/… asks for that
-  // post on Taiko. Bouncing to the feed on a chain change would undo the
-  // second one.
 
   // Legacy ?author= query links converge onto the /author/<addr> path
   // (replace, so history stays clean).
@@ -33,15 +29,20 @@ export default function Reader({ onStartWriting }) {
     navigate({ author }, { replace: true });
   }, [params.authorFromQuery, author, navigate]);
 
-  // Canonical tx URLs carry the event index: /tx/<hash> converges to
-  // /tx/<hash>/0 (replace, so history stays clean).
+  // Canonical post URLs carry the event index: /taiko/tx/<hash> converges
+  // to /taiko/tx/<hash>/0 (replace, so history stays clean).
   useEffect(() => {
-    if (!tx || params.txEvent != null) return;
-    navigate({ tx, txEvent: 0 }, { replace: true });
-  }, [tx, params.txEvent, navigate]);
+    if (!tx || params.chain == null || params.txEvent != null) return;
+    navigate({ chain: params.chain, tx, txEvent: 0 }, { replace: true });
+  }, [tx, params.chain, params.txEvent, navigate]);
 
   if (params.scan) return <ScanPage navigate={navigate} />;
-  if (tx) return <PostRoute reader={reader} txHash={tx} eventIndex={txEvent} navigate={navigate} />;
-  if (author) return <AuthorPage reader={reader} author={author} navigate={navigate} />;
-  return <HomeFeed reader={reader} navigate={navigate} onStartWriting={onStartWriting} />;
+  if (tx && params.chain == null) {
+    return <PostLocator view={view} txHash={tx} eventIndex={txEvent} navigate={navigate} />;
+  }
+  if (tx) {
+    return <PostRoute reader={getReader(params.chain)} txHash={tx} eventIndex={txEvent} navigate={navigate} />;
+  }
+  if (author) return <AuthorPage view={view} author={author} navigate={navigate} currentChain={params.chain} />;
+  return <HomeFeed view={view} navigate={navigate} currentChain={params.chain} onStartWriting={onStartWriting} />;
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAsync } from '../lib/hooks';
 import { chainFromSlug } from '../lib/chains';
+import ChainChip from './ChainChip';
 import { hrefFor } from '../lib/router';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
@@ -140,6 +141,8 @@ export default function PostPage({
             </a>
           </span>
           <span className="flex items-center gap-2">
+            <ChainChip chainId={reader.chainId} navigate={navigate} />
+            <span className="select-none" aria-hidden="true">·</span>
             <span>{fmtIndex(meta.index)}</span>
             {relTime && (
               <>
@@ -194,7 +197,7 @@ export default function PostPage({
             if (!m) return; // an ordinary link — let the browser have it
             e.preventDefault();
             navigate?.({
-              chain: chainFromSlug(m[1]) ?? undefined,
+              chain: chainFromSlug(m[1]) ?? reader.chainId,
               tx: m[2],
               txEvent: m[3] != null ? Number(m[3]) : 0,
             });

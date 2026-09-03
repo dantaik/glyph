@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
-import { CHAINS, SELECTABLE_CHAIN_IDS, defaultRpcs } from '../lib/chains';
+import { CHAINS, defaultRpcs } from '../lib/chains';
 import {
   GLYPH_ADDRESS,
+  READ_CHAIN_IDS,
   getRescanDelayMs,
   getRpcUrls,
   hasCustomRpcs,
   hasOverrides,
-  getActiveChainId,
   resetEndpointConfig,
   saveRescanDelay,
   saveRpcUrls,
-  useActiveChainId,
   useRpcVersion,
 } from '../lib/config';
 import { shortAddr } from '../lib/format';
-import { Check, ChevronDown, ChevronUp, Plus, Trash } from './Icons';
+import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
 import ListHeader from './ListHeader';
 import OfflineSection from './OfflineSection';
@@ -29,26 +28,21 @@ const BTN_PRIMARY =
 const ICON_BTN =
   'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-ghost hover:text-accent hover:bg-paper-sunken disabled:opacity-25 disabled:hover:text-ink-ghost disabled:hover:bg-transparent transition-colors';
 
-const selectableWith = (activeId) =>
-  SELECTABLE_CHAIN_IDS.includes(activeId)
-    ? SELECTABLE_CHAIN_IDS
-    : [...SELECTABLE_CHAIN_IDS, activeId];
+const chainIds = READ_CHAIN_IDS;
 
-const readLists = (ids) => Object.fromEntries(ids.map((id) => [id, getRpcUrls(id)]));
+const readLists = () => Object.fromEntries(chainIds.map((id) => [id, getRpcUrls(id)]));
 
 /**
- * Settings page (/settings): the active chain, each chain's ordered RPC
- * endpoints, and the read-cache TTL. Endpoints are tried top-down and the
- * reader falls back to the next when one fails, so order is the setting —
- * hence move-up / move-down rather than a single URL field. Saving takes
- * effect at once, without a reload: even a scan already running moves to
- * the new endpoints at its next request.
+ * Settings page (/settings): each chain's ordered RPC endpoints and the
+ * rescan delay. Endpoints are tried top-down and the reader falls back to
+ * the next when one fails, so order is the setting — hence move-up /
+ * move-down rather than a single URL field. Saving takes effect at once,
+ * without a reload: even a scan already running moves to the new
+ * endpoints at its next request.
  */
 export default function SettingsPage({ navigate }) {
-  const activeId = useActiveChainId();
   const rpcVersion = useRpcVersion();
-  const chainIds = selectableWith(activeId);
-  const [lists, setLists] = useState(() => readLists(chainIds));
+  const [lists, setLists] = useState(() => readLists());
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries(chainIds.map((id) => [id, ''])),
   );
@@ -57,10 +51,10 @@ export default function SettingsPage({ navigate }) {
 
   // Stored lists changed underneath (a save, a reset): show what is stored.
   useEffect(() => {
-    setLists(readLists(selectableWith(activeId)));
+    setLists(readLists());
     setRescanDelay(String(getRescanDelayMs() / 60_000));
     setDirty(false);
-  }, [rpcVersion, activeId]);
+  }, [rpcVersion]);
 
   const edit = (id, next) => {
     setLists((cur) => ({ ...cur, [id]: next }));
@@ -103,35 +97,16 @@ export default function SettingsPage({ navigate }) {
 
       <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">
         合约通过 CREATE2 部署，在每条链上都是同一个地址（{shortAddr(GLYPH_ADDRESS)}），
-        所以切换网络只是换一个节点去读。每条链可以配置多个 RPC 节点：按顺序使用第一个，
-        失败时自动回退到下一个。保存后立即生效，不刷新页面；正在进行的扫描会从下一次请求起使用新的节点。
+        所以两条链读的是同一本刊物：首页把两条链上的文章按时间合在一起。每条链可以配置多个 RPC 节点：
+        按顺序使用第一个，失败时自动回退到下一个。保存后立即生效，不刷新页面；正在进行的扫描会从下一次请求起使用新的节点。
       </p>
 
       {chainIds.map((id) => {
         const chain = CHAINS[id];
         const list = lists[id] ?? [];
-        const active = id === activeId;
         return (
           <section key={id} className="mb-10">
-            <SectionHeader
-              label={`${chain?.name ?? `链 ${id}`} · ${id}`}
-              right={
-                active ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-accent">
-                    <Check size={13} />
-                    当前网络
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => navigate({ chain: id, settings: '1' })}
-                    className="text-xs text-ink-faint hover:text-accent transition-colors"
-                  >
-                    切换到此网络
-                  </button>
-                )
-              }
-            />
+            <SectionHeader label={`${chain?.name ?? `链 ${id}`} · ${id}`} />
 
             {list.length === 0 ? (
               <p className="mb-3 text-sm text-ink-ghost">
@@ -257,12 +232,7 @@ export default function SettingsPage({ navigate }) {
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
         <button
           type="button"
-          onClick={() => {
-            resetEndpointConfig();
-            // The reset can drop a stored chain choice; the URL carries the
-            // chain, so it has to be told where the reset left us.
-            navigate({ chain: getActiveChainId(), settings: '1' }, { replace: true });
-          }}
+          onClick={() => resetEndpointConfig()}
           className={BTN_QUIET}
         >
           恢复默认
@@ -278,7 +248,7 @@ export default function SettingsPage({ navigate }) {
       </div>
 
       <p className="mt-8 text-xs leading-relaxed text-ink-ghost">
-        节点列表保存在本机浏览器（localStorage）。已扫描的区块范围、正文与图片缓存都按链分别保存，切换网络不会互相污染。
+        节点列表保存在本机浏览器（localStorage）。已扫描的区块范围、正文与图片缓存都按链分别保存，互不污染。
       </p>
     </div>
   );

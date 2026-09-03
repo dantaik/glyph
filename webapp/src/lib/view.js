@@ -9,10 +9,12 @@
 
 import { addrKey } from './scanStore';
 import { DEFAULT_CHAIN_ID } from './chains';
+import { READ_CHAIN_IDS } from './config';
 import { getReader } from './data';
 import { MergedAuthorList } from './mergedAuthorList';
 import { MergedFeed } from './mergedFeed';
 import { PAGE_SIZE } from './reader';
+import { useUrlState } from './router';
 
 /**
  * Compose readers into a view. Pure: tests build views over readers with
@@ -102,6 +104,12 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
   return { key, chainIds, readers: list, reader, feed, authorList, counts, ensName, loadPostBody, findMetaByTx, findPostAnywhere };
 }
 
+/** The chains a URL filter selects: that chain alone, or every chain read. */
+export const viewChainsFor = (filter) => (filter != null ? [Number(filter)] : READ_CHAIN_IDS);
+
+/** Every chain the app reads, as one view — the footer's, whatever the page shows. */
+export const getAllChainsView = () => getView(READ_CHAIN_IDS);
+
 const views = new Map(); // key -> view
 
 /** The view over `chainIds`, created on first use and kept for the page. */
@@ -117,4 +125,10 @@ export function getView(chainIds) {
     views.set(key, view);
   }
   return view;
+}
+
+/** React hook: the view the URL asks for — one chain when it names one, else all. */
+export function useView() {
+  const [params] = useUrlState();
+  return getView(viewChainsFor(params.chain));
 }

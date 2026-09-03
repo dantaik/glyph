@@ -7,7 +7,8 @@ import {
   MAX_CALLDATA_BYTES,
 } from '../lib/publish';
 import { getClient } from '../lib/clients';
-import { useReader } from '../lib/data';
+import { getReader } from '../lib/data';
+import { resolvePublishChain, usePublishChainId } from '../lib/config';
 import { useWallet } from '../lib/wallet';
 import { etherscanTxUrl } from '../lib/format';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
@@ -53,9 +54,12 @@ export default function Publisher() {
   const [isFirstPost, setIsFirstPost] = useState(true);
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
   const { account, chainId: walletChainId, connect } = useWallet();
-  // Publish on the chain being read — the one the header shows.
-  const reader = useReader();
-  const chainId = reader.chainId;
+  // The chain to publish on: the one picked here, else the wallet's own
+  // when Glyph is read on it, else Ethereum (config.js). Reading and
+  // writing are separate things: the feed shows every chain, a post goes
+  // to one.
+  const chainId = resolvePublishChain(usePublishChainId(), walletChainId);
+  const reader = getReader(chainId);
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
 
   // Stable preview URLs for uploaded files — shared by the dropzone

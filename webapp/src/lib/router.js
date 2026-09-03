@@ -1,29 +1,29 @@
 // router.js — tiny URL-state hook. No deps.
 //
-// Reads and writes `window.location.search` as a key/value map. The state
-// lives at module level and every hook instance subscribes to the same
-// updates, so a navigate() from ANY component (Header, Reader, …) re-renders
-// all of them — history.replaceState fires no popstate, so a per-instance
-// state would silently drift apart.
+// Reads and writes the URL as a key/value map. The state lives at module
+// level and every hook instance subscribes to the same updates, so a
+// navigate() from ANY component (Header, Reader, …) re-renders all of them
+// — history.replaceState fires no popstate, so a per-instance state would
+// silently drift apart.
 //
-// Every route names the chain it is read on, as its first segment:
-// /ethereum, /taiko/tx/0x…/0, /taiko/author/0x…. The same post hash means
-// different things on different chains, so an address that omits the chain
-// is ambiguous — and the address bar, not a stored preference, is what a
-// shared link carries. The chain segment is therefore the source of truth:
-// App follows it into the chain switcher, and everything that changes the
-// chain navigates rather than setting it directly.
+// The first path segment may name a chain: `/` reads every chain at once,
+// `/taiko` reads Taiko alone — a FILTER, carried by the URL and nothing
+// else. Post routes always name their chain (`/taiko/tx/0x…/0`): the same
+// hash means different things on different chains, and a shared link has
+// to say which. That segment is an address, not a choice: opening a post
+// from the merged feed doesn't switch the reader to that chain, so the
+// choice — which chain the reader asked to look at — is remembered here
+// and inherited by every route that doesn't say otherwise.
 //
 // Two URL shapes, one route vocabulary. Served over http(s) the routes are
-// real paths (`/tx/0x…/0?tab=write`) that the host rewrites to index.html.
-// In the downloadable single-file build there is no host to rewrite anything
-// — and off a file:// page pushState is refused on the opaque origin anyway —
-// so the very same routes live in the fragment (`#/tx/0x…/0?tab=write`) and
-// navigation goes through location.hash instead.
+// real paths (`/taiko/tx/0x…/0?tab=write`) that the host rewrites to
+// index.html. In the downloadable single-file build there is no host to
+// rewrite anything — and off a file:// page pushState is refused on the
+// opaque origin anyway — so the very same routes live in the fragment
+// (`#/taiko/tx/0x…/0?tab=write`) and navigation goes through location.hash.
 
 import { useEffect, useState, useCallback } from 'react';
 import { chainFromSlug, chainSlug } from './chains';
-import { getActiveChainId, setActiveChain } from './config';
 import { IS_OFFLINE_BUILD } from './offline';
 
 const EVT = 'cairn:urlstate';
@@ -52,9 +52,8 @@ export function readParams() {
   const out = {};
   for (const [k, v] of sp.entries()) out[k] = v;
 
-  // The chain segment comes off the front; what is left is the route. A URL
-  // that names no chain — a bare `/`, or a link from before the prefix —
-  // parses as the route alone, with `chain` null for App to canonicalise.
+  // A chain segment comes off the front; what is left is the route. `chain`
+  // is null when the URL names none — every chain, or a chainless post link.
   const [, head = '', tail = ''] = path.match(/^\/([^/]*)(.*)$/) ?? [];
   const chain = chainFromSlug(head);
   out.chain = chain;
@@ -77,6 +76,24 @@ export function readParams() {
   if (route.match(/^\/settings\/?$/)) out.settings = '1';
   return out;
 }
+
+/**
+ * The chain the reader chose to look at (null: every chain). A post URL's
+ * chain is where the post is, not a choice, so it leaves this alone — a
+ * post opened by its link, with no choice made yet, leads back to every
+ * chain.
+ */
+let choice = null;
+let state = readParams();
+choice = choiceFrom(state);
+
+function choiceFrom(s) {
+  return s.tx ? choice : (s.chain ?? null);
+}
+
+/** The filter a route inherits: given `chain` (null clears it), else the choice. */
+export const inheritedChain = (next) =>
+  Object.prototype.hasOwnProperty.call(next, 'chain') ? next.chain ?? null : choice;
 
 /**
  * The route `next` describes, as a path + query string — the single place
@@ -103,8 +120,6 @@ function buildUrl(next) {
   // Dev demo mode (fixtures) follows in-app navigation.
   if (next.fixtures == null && state.fixtures) sp.set('fixtures', state.fixtures);
   const search = sp.toString();
-  // Deep links use their paths; everything else is the root path
-  // with query params.
   const route = next.tx
     ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
     : next.author
@@ -114,9 +129,15 @@ function buildUrl(next) {
         : next.settings
           ? '/settings'
           : '/';
-  // Always prefixed: a URL the app writes always says which chain it is on.
-  const prefix = `/${chainSlug(next.chain ?? getActiveChainId())}`;
-  return `${prefix}${route === '/' ? '' : route}${search ? `?${search}` : ''}`;
+  // A post is on one chain: its URL must say which. Everything else carries
+  // the chain only as a filter.
+  const chain = next.tx ? (next.chain ?? null) : inheritedChain(next);
+  if (next.tx && chain == null && import.meta.env.DEV) {
+    throw new Error('a post route must name its chain: navigate({ chain, tx, txEvent })');
+  }
+  const prefix = chain != null ? `/${chainSlug(chain)}` : '';
+  const path = `${prefix}${route === '/' ? (prefix ? '' : '/') : route}`;
+  return `${path}${search ? `?${search}` : ''}`;
 }
 
 /** The href an <a> should carry for `next` — `#`-prefixed off a file:// page. */
@@ -125,20 +146,30 @@ export function hrefFor(next) {
   return HASH_MODE ? `#${url}` : url;
 }
 
-/**
- * Read the URL and adopt the chain it names — before anything renders.
- *
- * It has to happen here rather than in an effect: a post is looked up on the
- * chain the address names, and an effect runs after the first render, so the
- * lookup would go to last session's chain, miss, and bounce to the feed.
- */
 function readState() {
   const next = readParams();
-  if (next.chain != null) setActiveChain(next.chain);
+  choice = choiceFrom(next);
   return next;
 }
 
-let state = readState();
+/** Go to the route `next` describes (the hook's navigate, usable outside React). */
+export function navigateTo(next, { replace = false } = {}) {
+  const url = buildUrl(next);
+  if (!next.tx) choice = inheritedChain(next);
+  if (HASH_MODE) {
+    // pushState is refused on file://'s opaque origin, so the fragment is
+    // written directly. A same-value assignment fires no hashchange — the
+    // explicit re-read below covers that.
+    if (replace) window.location.replace(`#${url}`);
+    else window.location.hash = url;
+  } else if (replace) {
+    window.history.replaceState({}, '', url);
+  } else {
+    window.history.pushState({}, '', url);
+  }
+  state = readState();
+  window.dispatchEvent(new CustomEvent(EVT));
+}
 
 export function useUrlState() {
   const [, force] = useState(0);
@@ -158,22 +189,7 @@ export function useUrlState() {
     };
   }, []);
 
-  const navigate = useCallback((next, { replace = false } = {}) => {
-    const url = buildUrl(next);
-    if (HASH_MODE) {
-      // pushState is refused on file://'s opaque origin, so the fragment is
-      // written directly. A same-value assignment fires no hashchange — the
-      // explicit re-read below covers that.
-      if (replace) window.location.replace(`#${url}`);
-      else window.location.hash = url;
-    } else if (replace) {
-      window.history.replaceState({}, '', url);
-    } else {
-      window.history.pushState({}, '', url);
-    }
-    state = readState();
-    window.dispatchEvent(new CustomEvent(EVT));
-  }, []);
+  const navigate = useCallback((next, opts) => navigateTo(next, opts), []);
 
   return [state, navigate];
 }

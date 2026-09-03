@@ -38,7 +38,7 @@ export default function PostRoute({ reader, txHash, eventIndex, navigate }) {
       navigate={navigate}
       onBack={() => navigate({ author: post.author })}
       neighbors={neighbors}
-      onNavigate={(m) => navigate({ tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
+      onNavigate={(m) => navigate({ chain: reader.chainId, tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
       onOpenAuthor={() => navigate({ author: post.author })}
     />
   );
