@@ -53,6 +53,9 @@ function normalizeRow(row) {
     eventIndex: Number(row.eventIndex ?? 0),
     // Absent on rows persisted before ordering-within-a-block was tracked.
     logIndex: row.logIndex == null ? null : Number(row.logIndex),
+    // The block's timestamp in seconds. Absent on rows persisted before it
+    // was read; filled in later by rememberBlockTs().
+    ts: row.ts == null ? null : Number(row.ts),
   };
 }
 
@@ -66,6 +69,7 @@ const plainRow = (r) => ({
   txHash: r.txHash,
   eventIndex: r.eventIndex ?? 0,
   logIndex: r.logIndex ?? null,
+  ts: r.ts ?? null,
 });
 
 /** Feed order: newest first — higher block, then higher log index. */
@@ -155,26 +159,74 @@ export function createScanStore(chainId) {
     return () => listeners.delete(fn);
   }
 
+  /**
+   * File one row. A post already held stays the canonical row, but a
+   * newcomer fills in what the held one lacks — the log index (rows
+   * persisted before in-block ordering was tracked) or the timestamp — as a
+   * fresh object, so anything holding the old one sees a change.
+   */
   function indexRow(row) {
     const key = postId(row.author, row.index);
     const prev = posts.get(key);
-    // A row that carries a log index supersedes a legacy one that doesn't.
-    if (prev && (row.logIndex == null || prev.logIndex != null)) return prev;
+    if (prev) {
+      const fills = {};
+      if (prev.logIndex == null && row.logIndex != null) fills.logIndex = row.logIndex;
+      if (prev.ts == null && row.ts != null) fills.ts = row.ts;
+      if (Object.keys(fills).length === 0) return { row: prev, changed: false };
+      const merged = { ...prev, ...fills };
+      posts.set(key, merged);
+      return { row: merged, changed: true };
+    }
     posts.set(key, row);
     idByTx.set(txId(row.txHash, row.eventIndex), key);
     const b = String(row.block);
     const set = idsByBlock.get(b) ?? new Set();
     set.add(key);
     idsByBlock.set(b, set);
-    return row;
+    return { row, changed: true };
   }
 
   /** Record posts the session has read. Returns the canonical row objects. */
   function rememberPosts(rows) {
-    const before = posts.size;
-    const out = (rows ?? []).map((r) => indexRow(normalizeRow(r)));
-    if (posts.size !== before) notify();
+    let changed = false;
+    const out = (rows ?? []).map((r) => {
+      const res = indexRow(normalizeRow(r));
+      changed = changed || res.changed;
+      return res.row;
+    });
+    if (changed) notify();
     return out;
+  }
+
+  /**
+   * A block's timestamp arrived: give it to every row in that block still
+   * without one. Returns whether anything changed.
+   */
+  function rememberBlockTs(block, ts) {
+    if (ts == null) return false;
+    const ids = idsByBlock.get(String(block));
+    if (!ids) return false;
+    let changed = false;
+    for (const pid of ids) {
+      const row = posts.get(pid);
+      if (row && row.ts == null) {
+        posts.set(pid, { ...row, ts: Number(ts) });
+        changed = true;
+      }
+    }
+    if (changed) notify();
+    return changed;
+  }
+
+  /** The timestamp of `block` if any row in it carries one, else null. */
+  function knownBlockTs(block) {
+    const ids = idsByBlock.get(String(block));
+    if (!ids) return null;
+    for (const pid of ids) {
+      const ts = posts.get(pid)?.ts;
+      if (ts != null) return ts;
+    }
+    return null;
   }
 
   /** Record that `[from, to]` was read in full, for every author. */
@@ -446,6 +498,8 @@ export function createScanStore(chainId) {
     subscribe,
     getVersion: () => version,
     rememberPosts,
+    rememberBlockTs,
+    knownBlockTs,
     rememberFeedRange,
     rememberAuthorBlock,
     knownPost,

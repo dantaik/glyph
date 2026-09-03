@@ -262,7 +262,10 @@ export function createFixtureIO(chainId, mode) {
   for (const posts of byAuthor.values()) {
     for (const p of posts) metaByTx.set(p.txHash.toLowerCase(), p);
   }
-  const meta = (p) => ({ ...p });
+  // The demo clock: HEAD is "now", every block SECONDS_PER_BLOCK earlier.
+  const now = Math.floor(Date.now() / 1000);
+  const tsOf = (block) => now - Number(HEAD - BigInt(block)) * SECONDS_PER_BLOCK;
+  const meta = (p) => ({ ...p, ts: tsOf(p.block) });
 
   return {
     chainId: Number(chainId),
@@ -280,8 +283,7 @@ export function createFixtureIO(chainId, mode) {
     async block(which) {
       await delay();
       const number = which === 'latest' ? HEAD : BigInt(which);
-      const now = Math.floor(Date.now() / 1000);
-      return { number, timestamp: now - Number(HEAD - number) * SECONDS_PER_BLOCK };
+      return { number, timestamp: tsOf(number) };
     },
 
     async postsInRange(from, to) {

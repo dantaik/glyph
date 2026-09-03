@@ -174,3 +174,54 @@ describe('scanStore', () => {
     expect(n).toBe(3);
   });
 });
+
+describe('scanStore timestamps', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('keeps ts on rows, persists it and reads it back', () => {
+    const store = freshStore(1);
+    store.rememberPosts([row(A, 0, 10, { ts: 1_700_000_000 }), row(B, 0, 12)]);
+    expect(store.knownPost(A, 0).ts).toBe(1_700_000_000);
+    expect(store.knownPost(B, 0).ts).toBeNull();
+    store.rememberFeedRange(5n, 15n);
+    store.persistFeedScan();
+    const again = createScanStore(1);
+    expect(again.knownPost(A, 0).ts).toBe(1_700_000_000);
+    expect(again.knownPost(B, 0).ts).toBeNull();
+    expect(again.knownBlockTs(10n)).toBe(1_700_000_000);
+    expect(again.knownBlockTs(12n)).toBeNull();
+  });
+
+  it('a newcomer fills a missing ts (and logIndex) on the held row', () => {
+    const store = freshStore(1);
+    const [held] = store.rememberPosts([row(A, 0, 10)]);
+    let bumps = 0;
+    store.subscribe(() => bumps++);
+    const [filled] = store.rememberPosts([row(A, 0, 10, { ts: 5, logIndex: 2 })]);
+    expect(filled).not.toBe(held);
+    expect(filled).toMatchObject({ ts: 5, logIndex: 2 });
+    expect(store.knownPost(A, 0)).toBe(filled);
+    expect(bumps).toBe(1);
+    // Nothing to fill: no new object, no notification.
+    const [same] = store.rememberPosts([row(A, 0, 10, { ts: 99 })]);
+    expect(same).toBe(filled);
+    expect(same.ts).toBe(5);
+    expect(bumps).toBe(1);
+  });
+
+  it('rememberBlockTs stamps every row in the block still lacking one', () => {
+    const store = freshStore(1);
+    store.rememberPosts([row(A, 0, 10), row(B, 0, 10, { ts: 1 }), row(A, 1, 11)]);
+    let bumps = 0;
+    store.subscribe(() => bumps++);
+    expect(store.rememberBlockTs(10n, 7)).toBe(true);
+    expect(store.knownPost(A, 0).ts).toBe(7);
+    expect(store.knownPost(B, 0).ts).toBe(1); // already had one
+    expect(store.knownPost(A, 1).ts).toBeNull(); // other block
+    expect(bumps).toBe(1);
+    expect(store.rememberBlockTs(10n, 8)).toBe(false); // nothing left to fill
+    expect(store.rememberBlockTs(99n, 8)).toBe(false); // unknown block
+    expect(store.rememberBlockTs(11n, null)).toBe(false);
+    expect(bumps).toBe(1);
+  });
+});

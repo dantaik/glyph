@@ -31,7 +31,7 @@ export default function FeaturedPost({ reader, post, clock, navigate, excerptCha
           {teaser}
         </p>
       )}
-      <PostMeta block={post.block} clock={clock} className="mt-3" />
+      <PostMeta block={post.block} ts={post.ts} clock={clock} className="mt-3" />
     </article>
   );
 }

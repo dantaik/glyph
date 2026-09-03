@@ -64,6 +64,18 @@ export function createReader(chainId, makeIO = null) {
     getTtlMs: getRescanDelayMs,
   });
 
+  /**
+   * When `block` was mined, in seconds — exact. A row already carrying it
+   * answers at once; otherwise one header read, kept for the page (blocks
+   * are immutable, so it can never go stale).
+   */
+  const blockTime = (block) =>
+    forever(`ts:${block}`, async () => {
+      const known = store.knownBlockTs(block);
+      if (known != null) return known;
+      return (await io.block(block)).timestamp;
+    });
+
   const lists = new Map(); // addrKey -> AuthorListController
   function authorList(author) {
     const key = addrKey(author);
@@ -274,6 +286,7 @@ export function createReader(chainId, makeIO = null) {
     findMetaByTx,
     count,
     clock,
+    blockTime,
     ensName,
     loadPostBody,
     resolveGlyphRefs,

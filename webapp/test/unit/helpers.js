@@ -64,7 +64,9 @@ export const AUTHORS = [
  *
  * Options: `rangeLimit` makes eth_getLogs refuse windows wider than that
  * (the reader halves its window); `secondsPerBlock`/`now` shape block
- * timestamps; `fail` is a predicate over a call that makes it throw.
+ * timestamps; `fail` is a predicate over a call that makes it throw;
+ * `legacyRows` hands out rows without `ts`, the way rows persisted before
+ * timestamps existed look.
  */
 export function fakeChain({
   chainId = 1,
@@ -74,6 +76,7 @@ export function fakeChain({
   now = 1_700_000_000,
   rangeLimit = null,
   fail = null,
+  legacyRows = false,
 } = {}) {
   const sorted = [...posts]
     .map((p) => ({ ...p, index: BigInt(p.index), block: BigInt(p.block) }))
@@ -101,6 +104,8 @@ export function fakeChain({
   });
   const byAuthor = (author) => rows.filter((r) => r.author.toLowerCase() === String(author).toLowerCase());
   const tsOf = (block) => now - Number(headBlock - BigInt(block)) * secondsPerBlock;
+  // What chainIO hands out: a copy, with the block's timestamp attached.
+  const meta = (r) => ({ ...r, ts: legacyRows ? null : tsOf(r.block) });
   const calls = [];
   const record = (method, ...args) => {
     calls.push({ method, args });
@@ -126,14 +131,14 @@ export function fakeChain({
         throw err;
       }
       const hit = rows.filter((r) => r.block >= from && r.block <= to);
-      return { rows: hit.map((r) => ({ ...r })), to };
+      return { rows: hit.map(meta), to };
     },
     async authorPostsInBlock(author, block) {
       record('eth_getLogs:author', author, block);
       return byAuthor(author)
         .filter((r) => r.block === BigInt(block))
         .sort((a, b) => Number(b.index - a.index))
-        .map((r) => ({ ...r }));
+        .map(meta);
     },
     async latestBlock(author) {
       record('latestBlock', author);
@@ -146,7 +151,7 @@ export function fakeChain({
     },
     async postsInTx(txHash) {
       record('eth_getTransactionReceipt', txHash);
-      return rows.filter((r) => r.txHash === txHash).map((r) => ({ ...r }));
+      return rows.filter((r) => r.txHash === txHash).map(meta);
     },
     async postBody() {
       throw new Error('fake chain has no bodies');

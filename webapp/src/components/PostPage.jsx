@@ -7,7 +7,7 @@ import {
   fmtBlock,
   fmtIndex,
   fmtTitle,
-  estimateBlockTime,
+  fmtAbsTime,
   fmtRelTime,
   etherscanTxUrl,
   friendlyError,
@@ -96,9 +96,14 @@ export default function PostPage({
     };
   }, [meta.title]);
 
-  // Estimated wall-clock time from the chain clock (null → suppressed).
-  const clock = useAsync(() => reader.clock(), [reader]);
-  const relTime = clock.value ? fmtRelTime(estimateBlockTime(clock.value, meta.block)) : null;
+  // The exact time the post was mined: on the row when the feed read it,
+  // otherwise one header read (null while resolving → suppressed).
+  const time = useAsync(
+    () => (meta.ts != null ? Promise.resolve(meta.ts) : reader.blockTime(meta.block)),
+    [reader, meta.txHash, meta.ts],
+  );
+  const relTime = time.value != null ? fmtRelTime(new Date(time.value * 1000), { exact: true }) : null;
+  const absTime = fmtAbsTime(time.value);
 
   // Author display: ENS name when the address has one, else the address.
   const ens = useAsync(() => reader.ensName(meta.author), [reader, meta.author]);
@@ -139,7 +144,7 @@ export default function PostPage({
             {relTime && (
               <>
                 <span className="select-none" aria-hidden="true">·</span>
-                <span>{relTime}</span>
+                <span title={absTime ?? undefined}>{relTime}</span>
               </>
             )}
           </span>

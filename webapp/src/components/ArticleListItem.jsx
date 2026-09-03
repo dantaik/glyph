@@ -27,6 +27,7 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
       <div className="mt-1.5">
         <PostMeta
           block={post.block}
+          ts={post.ts}
           clock={clock}
           prefix={showIndex ? fmtIndex(post.index) : undefined}
           lead={
