@@ -100,9 +100,10 @@ export const CHAINS = {
 };
 
 /**
- * Chains offered in the header switcher and the settings page — the ones
- * Glyph is actually deployed and read on. The testnets above stay resolvable
- * (VITE_CHAIN_ID, an older stored preference) without cluttering the menu.
+ * The chains Glyph is actually deployed and read on — read together by the
+ * feed, offered as publish targets, listed on the settings page. The
+ * testnets above stay resolvable (VITE_CHAIN_ID, an older stored
+ * preference) without cluttering any of that.
  */
 export const SELECTABLE_CHAIN_IDS = [1, 167000];
 

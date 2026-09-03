@@ -1,16 +1,18 @@
-// config.js — runtime configuration: which chain is being read, and how to
-// reach it.
+// config.js — runtime configuration: which chains are read, which one is
+// written to, and how to reach them.
 //
-// Resolution order for the active chain and its RPC endpoints:
-//   1. localStorage (set from the chain menu / settings page)
+// The chains READ are all of them (READ_CHAIN_IDS) — the reader shows every
+// deployed chain at once, and a URL naming one chain is a filter over that,
+// not a setting (router.js). The chain WRITTEN to is a preference: the
+// publish chain, chosen in the write tab, persisted here.
+//
+// Resolution order for RPC endpoints:
+//   1. localStorage (set from the settings page)
 //   2. Vite env vars (VITE_CHAIN_ID, VITE_RPC_URL)
 //   3. the chain registry's defaults (chains.js)
 //
-// The active chain is live state, not a constant. Switching it re-renders
-// the app in place: nothing reloads and nothing running is interrupted — a
-// scan started on the previous chain keeps its own client and store and
-// finishes in the background (see reader.js), and what it finds is cached
-// under that chain, ready for the next visit.
+// Endpoint lists are live state: saving one re-renders in place and even a
+// scan already running moves to the new endpoints at its next request.
 //
 // Each chain keeps its OWN ordered list of endpoints: the reader tries the
 // first and falls back to the next when one fails, so a flaky public node
@@ -23,16 +25,17 @@
 // for a private redeploy (a changed Blog.sol yields a different address).
 
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_CHAIN_ID, defaultRpcs, isKnownChain } from './chains';
+import { DEFAULT_CHAIN_ID, SELECTABLE_CHAIN_IDS, defaultRpcs, isKnownChain } from './chains';
 
-const KEY_CHAIN = 'glyph.chainId.v1';
+const KEY_CHAIN = 'glyph.chainId.v1'; // the active chain, before every chain was read at once
+const KEY_PUBLISH_CHAIN = 'glyph.publishChain.v1';
 const KEY_RPCS = 'glyph.rpcs.v1'; // { [chainId]: string[] }
 const KEY_RPC_LEGACY = 'glyph.rpc.v1'; // one URL, before per-chain lists
 const KEY_RESCAN_DELAY = 'glyph.rescanDelay.v1';
 const KEY_CACHE_TTL_LEGACY = 'glyph.cacheTtl.v1'; // the same number, when it still meant a cache TTL
 
-/** Window event: the active chain changed. */
-export const CHAIN_EVT = 'glyph:chain';
+/** Window event: the publish chain changed. */
+export const PUBLISH_CHAIN_EVT = 'glyph:publishChain';
 /** Window event: some chain's endpoint list changed. */
 export const RPCS_EVT = 'glyph:rpcs';
 
@@ -77,35 +80,50 @@ const ENV_CHAIN_ID = (() => {
   return isKnownChain(fromEnv) ? fromEnv : DEFAULT_CHAIN_ID;
 })();
 
-function resolveStoredChain() {
-  const stored = Number(lsGet(KEY_CHAIN));
-  return isKnownChain(stored) ? stored : ENV_CHAIN_ID;
-}
-
-// --- Active chain -------------------------------------------------------
-
-let activeChainId = resolveStoredChain();
-
-/** The chain currently being read. */
-export const getActiveChainId = () => activeChainId;
+// --- The chains read -------------------------------------------------------
 
 /**
- * Switch the chain being read. Persists the choice and lets every
- * subscriber re-render; no reload — see the file comment.
+ * Every chain the reader shows at once. The deployed mainnets — unless the
+ * build points VITE_CHAIN_ID at some other known chain (a private redeploy
+ * on a testnet), which is then the only one.
  */
-export function setActiveChain(chainId) {
-  const id = Number(chainId);
-  if (!isKnownChain(id) || id === activeChainId) return;
-  activeChainId = id;
-  lsSet(KEY_CHAIN, String(id));
-  emit(CHAIN_EVT);
+export const READ_CHAIN_IDS =
+  SELECTABLE_CHAIN_IDS.includes(ENV_CHAIN_ID) ? [...SELECTABLE_CHAIN_IDS] : [ENV_CHAIN_ID];
+
+export const isReadChain = (id) => READ_CHAIN_IDS.includes(Number(id));
+
+// --- The chain written to ----------------------------------------------------
+
+/** The stored publish chain, or null when none was ever picked. */
+export function getPublishChainId() {
+  const stored = Number(lsGet(KEY_PUBLISH_CHAIN));
+  return isKnownChain(stored) ? stored : null;
 }
 
-const subscribeChain = subscribeTo(CHAIN_EVT);
+/** Remember the chain to publish on (null forgets it). */
+export function savePublishChainId(chainId) {
+  const id = chainId == null ? null : Number(chainId);
+  if (id != null && !isKnownChain(id)) return;
+  lsSet(KEY_PUBLISH_CHAIN, id == null ? null : String(id));
+  emit(PUBLISH_CHAIN_EVT);
+}
 
-/** React hook: the chain currently being read; re-renders on switch. */
-export function useActiveChainId() {
-  return useSyncExternalStore(subscribeChain, getActiveChainId, getActiveChainId);
+const subscribePublishChain = subscribeTo(PUBLISH_CHAIN_EVT);
+
+/** React hook: the stored publish chain (null when none); re-renders on change. */
+export function usePublishChainId() {
+  return useSyncExternalStore(subscribePublishChain, getPublishChainId, getPublishChainId);
+}
+
+/**
+ * The chain to publish on: the one picked, else the wallet's own chain when
+ * it is one Glyph is read on, else the default. Pure, so the write tab and
+ * its tests agree.
+ */
+export function resolvePublishChain(stored, walletChainId) {
+  if (stored != null && isKnownChain(stored)) return Number(stored);
+  if (walletChainId != null && isReadChain(walletChainId)) return Number(walletChainId);
+  return DEFAULT_CHAIN_ID;
 }
 
 // --- RPC endpoints -------------------------------------------------------
@@ -208,27 +226,24 @@ export const VOLATILE_TTL_MS = 60_000;
 /** Forget every stored preference and go back to the built-in defaults. */
 export function resetEndpointConfig() {
   lsSet(KEY_CHAIN, null);
+  lsSet(KEY_PUBLISH_CHAIN, null);
   lsSet(KEY_RPCS, null);
   lsSet(KEY_RPC_LEGACY, null);
   lsSet(KEY_RESCAN_DELAY, null);
   lsSet(KEY_CACHE_TTL_LEGACY, null);
   rpcVersion += 1;
   emit(RPCS_EVT);
-  const next = resolveStoredChain();
-  if (next !== activeChainId) {
-    activeChainId = next;
-    emit(CHAIN_EVT);
-  }
+  emit(PUBLISH_CHAIN_EVT);
 }
 
 export function hasOverrides() {
   return Boolean(
-    lsGet(KEY_CHAIN) || lsGet(KEY_RPCS) || lsGet(KEY_RESCAN_DELAY) || lsGet(KEY_CACHE_TTL_LEGACY),
+    lsGet(KEY_PUBLISH_CHAIN) || lsGet(KEY_RPCS) || lsGet(KEY_RESCAN_DELAY) || lsGet(KEY_CACHE_TTL_LEGACY),
   );
 }
 
 // One-time migration: a single stored RPC URL becomes the first entry of the
-// active chain's list, ahead of the registry defaults that now back it up.
+// env chain's list, ahead of the registry defaults that now back it up.
 (function migrateLegacyRpc() {
   const legacy = lsGet(KEY_RPC_LEGACY);
   if (!legacy || lsGet(KEY_RPCS)) return;
@@ -237,9 +252,9 @@ export function hasOverrides() {
     return;
   }
   const map = {};
-  map[String(activeChainId)] = [
+  map[String(ENV_CHAIN_ID)] = [
     legacy,
-    ...defaultRpcs(activeChainId).filter((u) => u !== legacy),
+    ...defaultRpcs(ENV_CHAIN_ID).filter((u) => u !== legacy),
   ];
   lsSet(KEY_RPCS, JSON.stringify(map));
   lsSet(KEY_RPC_LEGACY, null);

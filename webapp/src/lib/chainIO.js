@@ -100,11 +100,37 @@ function logToMeta(log, block) {
     eventIndex: log.__eventIndex ?? 0,
     // Orders posts published in the same block — the feed's page cursor.
     logIndex: log.logIndex,
+    // The block's timestamp (seconds) when the node put it on the log
+    // (geth ≥ 1.14 and Erigon do); otherwise looked up, see withTimes().
+    ts: log.blockTimestamp != null ? Number(log.blockTimestamp) : null,
   };
+}
+
+/** Run `fn` over `items` with at most `limit` in flight; results in order. */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }
 
 const short = (s) => `${String(s).slice(0, 10)}…`;
 const shortAddr = (a) => `${String(a).slice(0, 8)}…`;
+
+/**
+ * An address as an argument to the node. viem checks the EIP-55 checksum
+ * of a mixed-case address and refuses one that fails it — which is what an
+ * address typed or pasted into a URL in the wrong case looks like. All
+ * lowercase is the same address and passes, so that is what goes out.
+ */
+const addrArg = (a) => String(a).toLowerCase();
 
 /**
  * The real chain I/O for `chainId`. `log` is the chain's rpcLog.scoped().
@@ -114,7 +140,44 @@ export function createChainIO(chainId, log) {
   const chain = getChain(id);
   const client = () => getClient(id);
 
-  return {
+  // A block's timestamp, once per block for the life of the page. Blocks
+  // are immutable once mined, so the promise is kept for good — except on
+  // failure, which is dropped so the next asker retries.
+  const blockTimes = new Map(); // block (string) -> Promise<number|null>
+  function blockTs(block) {
+    const key = String(block);
+    let hit = blockTimes.get(key);
+    if (!hit) {
+      hit = io
+        .block(block)
+        .then((b) => Number(b.timestamp))
+        .catch(() => {
+          blockTimes.delete(key);
+          return null;
+        });
+      blockTimes.set(key, hit);
+    }
+    return hit;
+  }
+
+  /**
+   * Attach `ts` to rows that lack it — one header read per distinct block,
+   * a few in flight at a time, best-effort. Posts are sparse, so a window of
+   * thousands of blocks costs at most a handful of these; the merged feed
+   * orders by exact time, and a row without one is only ever an estimate.
+   */
+  async function withTimes(rows) {
+    const missing = [...new Set(rows.filter((r) => r.ts == null).map((r) => String(r.block)))];
+    if (missing.length === 0) return rows;
+    const times = await mapLimit(missing, 4, (b) => blockTs(b));
+    const byBlock = new Map(missing.map((b, i) => [b, times[i]]));
+    for (const r of rows) {
+      if (r.ts == null) r.ts = byBlock.get(String(r.block)) ?? null;
+    }
+    return rows;
+  }
+
+  const io = {
     chainId: id,
     /** False: what this reads is worth keeping in IndexedDB. */
     ephemeral: false,
@@ -167,7 +230,8 @@ export function createChainIO(chainId, log) {
             (out) => `${out.length} post${out.length === 1 ? '' : 's'}`,
           );
           assignEventIndexes(logs);
-          return { rows: logs.map((l) => logToMeta(l, l.blockNumber)), to: top };
+          const rows = await withTimes(logs.map((l) => logToMeta(l, l.blockNumber)));
+          return { rows, to: top };
         } catch (err) {
           if (isBeyondHead(err) && top > bottom && attempt < HEAD_RETRIES) {
             top -= 1n;
@@ -205,9 +269,9 @@ export function createChainIO(chainId, log) {
       // narrow to the author (one tx can carry posts from several senders).
       assignEventIndexes(logs);
       const key = String(author).toLowerCase();
-      return logs
-        .filter((l) => String(l.args.author).toLowerCase() === key)
-        .map((l) => logToMeta(l, at));
+      return withTimes(
+        logs.filter((l) => String(l.args.author).toLowerCase() === key).map((l) => logToMeta(l, at)),
+      );
     },
 
     /** The block holding `author`'s newest post (0 when they have none). */
@@ -220,7 +284,7 @@ export function createChainIO(chainId, log) {
             address: GLYPH_ADDRESS,
             abi,
             functionName: 'latestBlock',
-            args: [author],
+            args: [addrArg(author)],
           }),
         (head) => `block ${log.b(head)}`,
       );
@@ -236,7 +300,7 @@ export function createChainIO(chainId, log) {
             address: GLYPH_ADDRESS,
             abi,
             functionName: 'count',
-            args: [author],
+            args: [addrArg(author)],
           }),
         (c) => `${c} posts`,
       );
@@ -269,6 +333,7 @@ export function createChainIO(chainId, log) {
         }
       }
       posts.sort((a, b) => a.log.logIndex - b.log.logIndex);
+      const ts = posts.length ? await blockTs(receipt.blockNumber) : null;
       return posts.map(({ log: entry, args }, i) => ({
         author: args.author,
         index: args.index,
@@ -278,6 +343,7 @@ export function createChainIO(chainId, log) {
         txHash,
         eventIndex: i,
         logIndex: entry.logIndex,
+        ts,
       }));
     },
 
@@ -310,10 +376,11 @@ export function createChainIO(chainId, log) {
       const name = await log.fromNode(
         'ens_getName',
         shortAddr(address),
-        () => client().getEnsName({ address }),
+        () => client().getEnsName({ address: addrArg(address) }),
         (v) => v ?? 'no name',
       );
       return name ?? null;
     },
   };
+  return io;
 }

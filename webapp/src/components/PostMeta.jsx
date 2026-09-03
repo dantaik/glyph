@@ -1,21 +1,51 @@
-import { estimateBlockTime, fmtRelTime } from '../lib/format';
+import { Fragment } from 'react';
+import { estimateBlockTime, fmtAbsTime, fmtRelTime } from '../lib/format';
+import ChainChip from './ChainChip';
 
 /**
- * Relative time — the shared meta line for article rows and the featured
- * entry. `lead` (e.g. the author link) renders first, `prefix` (e.g.
- * 第 N 篇) before the time. The chain name lives in the app footer only.
+ * The shared meta line for article rows and the featured entry:
+ *
+ *   [lead] · [chain] · [prefix] · [time]
+ *
+ * `lead` is e.g. the author link, `prefix` e.g. 第 N 篇. The chain chip
+ * names the network the post was read on and links to that network's
+ * view — unless the list is already filtered to it (`currentChain`), when
+ * it is just a label. The time is exact when the row carries its block's
+ * timestamp (`ts`), an estimate from the chain clock — 约-prefixed — until
+ * it does.
  */
-export default function PostMeta({ block, clock, prefix, className = '', lead }) {
-  const rel = fmtRelTime(estimateBlockTime(clock, block));
+export default function PostMeta({
+  block,
+  clock,
+  ts,
+  chainId,
+  currentChain = null,
+  navigate,
+  prefix,
+  className = '',
+  lead,
+}) {
+  const exact = ts != null;
+  const date = exact ? new Date(Number(ts) * 1000) : estimateBlockTime(clock, block);
+  const rel = fmtRelTime(date, { exact });
+  const parts = [
+    lead,
+    chainId != null && (
+      <ChainChip chainId={chainId} navigate={navigate} current={currentChain != null && Number(currentChain) === Number(chainId)} />
+    ),
+    prefix && <span className="text-ink-ghost">{prefix}</span>,
+    rel && <span title={exact ? fmtAbsTime(ts) : undefined}>{rel}</span>,
+  ].filter(Boolean);
   return (
     <span
       className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint tabular-nums ${className}`}
     >
-      {lead}
-      {lead && (prefix || rel) && <span className="select-none" aria-hidden="true">·</span>}
-      {prefix && <span className="text-ink-ghost">{prefix}</span>}
-      {prefix && rel && <span className="select-none" aria-hidden="true">·</span>}
-      {rel && <span>{rel}</span>}
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          {i > 0 && <span className="select-none" aria-hidden="true">·</span>}
+          {part}
+        </Fragment>
+      ))}
     </span>
   );
 }

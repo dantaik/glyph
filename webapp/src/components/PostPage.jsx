@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAsync } from '../lib/hooks';
 import { chainFromSlug } from '../lib/chains';
+import ChainChip from './ChainChip';
 import { hrefFor } from '../lib/router';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
   fmtIndex,
   fmtTitle,
-  estimateBlockTime,
+  fmtAbsTime,
   fmtRelTime,
   etherscanTxUrl,
   friendlyError,
@@ -26,7 +27,7 @@ import { ArticleSkeleton } from './Skeleton';
  *          null=absent), onNavigate(neighborMeta), onOpenAuthor() }
  *
  * Fetches the body (tags + markdown) from the publish() tx calldata through
- * the reader of the chain being shown, rewrites `0x<txhash>/<n>` article
+ * the reader of the chain the post is on, rewrites `0x<txhash>/<n>` article
  * refs to in-app links, then resolves any eth:<txhash> image refs to blob
  * URLs before rendering.
  */
@@ -96,9 +97,14 @@ export default function PostPage({
     };
   }, [meta.title]);
 
-  // Estimated wall-clock time from the chain clock (null → suppressed).
-  const clock = useAsync(() => reader.clock(), [reader]);
-  const relTime = clock.value ? fmtRelTime(estimateBlockTime(clock.value, meta.block)) : null;
+  // The exact time the post was mined: on the row when the feed read it,
+  // otherwise one header read (null while resolving → suppressed).
+  const time = useAsync(
+    () => (meta.ts != null ? Promise.resolve(meta.ts) : reader.blockTime(meta.block)),
+    [reader, meta.txHash, meta.ts],
+  );
+  const relTime = time.value != null ? fmtRelTime(new Date(time.value * 1000), { exact: true }) : null;
+  const absTime = fmtAbsTime(time.value);
 
   // Author display: ENS name when the address has one, else the address.
   const ens = useAsync(() => reader.ensName(meta.author), [reader, meta.author]);
@@ -135,11 +141,13 @@ export default function PostPage({
             </a>
           </span>
           <span className="flex items-center gap-2">
+            <ChainChip chainId={reader.chainId} navigate={navigate} />
+            <span className="select-none" aria-hidden="true">·</span>
             <span>{fmtIndex(meta.index)}</span>
             {relTime && (
               <>
                 <span className="select-none" aria-hidden="true">·</span>
-                <span>{relTime}</span>
+                <span title={absTime ?? undefined}>{relTime}</span>
               </>
             )}
           </span>
@@ -181,7 +189,7 @@ export default function PostPage({
             // 0x… cross-article refs render as in-app post links (glyphRefs)
             // — route them instead of reloading the page. The chain segment
             // is optional here so a ref written before the prefix, or by
-            // hand, still lands somewhere sensible: the chain being read.
+            // hand, still lands somewhere sensible: this post's own chain.
             const href = e.target.closest?.('a[href]')?.getAttribute('href');
             const m = href?.match(
               /^#?\/(?:([^/]+)\/)?tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/,
@@ -189,7 +197,7 @@ export default function PostPage({
             if (!m) return; // an ordinary link — let the browser have it
             e.preventDefault();
             navigate?.({
-              chain: chainFromSlug(m[1]) ?? undefined,
+              chain: chainFromSlug(m[1]) ?? reader.chainId,
               tx: m[2],
               txEvent: m[3] != null ? Number(m[3]) : 0,
             });

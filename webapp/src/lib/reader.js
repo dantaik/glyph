@@ -32,13 +32,15 @@ const short = (s) => `${String(s).slice(0, 10)}…`;
 
 /**
  * Build the reader for `chainId`. `makeIO(chainId, log)` swaps the chain
- * I/O — fixtures.js uses it to run the reader on an in-memory chain.
+ * I/O — fixtures.js uses it to run the reader on an in-memory chain — and
+ * `store` swaps the chain's scan store (tests hand in a fresh one; the app
+ * uses the page-wide store for the chain).
  */
-export function createReader(chainId, makeIO = null) {
+export function createReader(chainId, { makeIO = null, store: ownStore = null } = {}) {
   const id = Number(chainId);
   const chain = getChain(id);
   const log = rpcLog.scoped(chain.name);
-  const store = getScanStore(id);
+  const store = ownStore ?? getScanStore(id);
   const io = makeIO ? makeIO(id, log) : createChainIO(id, log);
   // Two caches, because there are two kinds of read.
   //
@@ -63,6 +65,18 @@ export function createReader(chainId, makeIO = null) {
     pageSize: PAGE_SIZE,
     getTtlMs: getRescanDelayMs,
   });
+
+  /**
+   * When `block` was mined, in seconds — exact. A row already carrying it
+   * answers at once; otherwise one header read, kept for the page (blocks
+   * are immutable, so it can never go stale).
+   */
+  const blockTime = (block) =>
+    forever(`ts:${block}`, async () => {
+      const known = store.knownBlockTs(block);
+      if (known != null) return known;
+      return (await io.block(block)).timestamp;
+    });
 
   const lists = new Map(); // addrKey -> AuthorListController
   function authorList(author) {
@@ -129,11 +143,16 @@ export function createReader(chainId, makeIO = null) {
     });
   }
 
+  /** Every post a transaction published — one receipt read per transaction, kept. */
+  const txPosts = (txHash) =>
+    forever(`tx:${String(txHash).toLowerCase()}`, async () => store.rememberPosts(await io.postsInTx(txHash)));
+
   /**
    * Resolve post metadata from a publish transaction hash + the 0-based
    * ordinal of the Post event within that transaction (one tx can publish
    * several posts). One receipt read, no scanning. Null when there is no
-   * such event.
+   * such event — an answer that is kept too, since a mined transaction
+   * cannot grow one; a receipt that cannot be read yet is not.
    */
   function findMetaByTx(txHash, eventIndex = 0) {
     return forever(txMetaKey(txHash, eventIndex), async () => {
@@ -144,7 +163,7 @@ export function createReader(chainId, makeIO = null) {
       }
       // Remember every post in the transaction, not just the one asked for:
       // a sibling opened later in the session is then already resolved.
-      const rows = store.rememberPosts(await io.postsInTx(txHash));
+      const rows = await txPosts(txHash);
       return cacheMetaBoth(rows[eventIndex] ?? null);
     });
   }
@@ -274,6 +293,7 @@ export function createReader(chainId, makeIO = null) {
     findMetaByTx,
     count,
     clock,
+    blockTime,
     ensName,
     loadPostBody,
     resolveGlyphRefs,

@@ -18,8 +18,11 @@ import { custom, http } from 'viem';
 import * as rpcLog from './rpcLog';
 
 /** How long a failed endpoint is skipped before it is tried first again. */
-const COOLDOWN_MS = 30_000;
+export const COOLDOWN_MS = 30_000;
 const TIMEOUT_MS = 8_000;
+
+/** The request function of one endpoint: viem's HTTP transport, no retries of its own. */
+const httpRequest = (url, chain) => http(url, { timeout: TIMEOUT_MS, retryCount: 0 })({ chain }).request;
 
 /**
  * Walk a viem error chain for a transport-level failure — the node could not
@@ -37,24 +40,23 @@ function isNodeFailure(err) {
 }
 
 /**
- * A transport that walks `urls` in order, skipping endpoints still cooling
- * off from a recent failure. `label` names the chain in the console.
+ * The provider behind the transport: walks `urls` in order, skipping
+ * endpoints still cooling off from a recent failure. `label` names the
+ * chain in the console. `makeRequest(url, chain)` builds an endpoint's
+ * request function and `now` is the clock — both injectable so the
+ * failover can be tested without a network.
  */
-export function orderedFallback(urls, chain, label = chain?.name ?? '') {
+export function orderedRequest(urls, chain, label = chain?.name ?? '', { makeRequest = httpRequest, now = Date.now } = {}) {
   const log = rpcLog.scoped(label);
-  const nodes = urls.map((url) => ({
-    url,
-    request: http(url, { timeout: TIMEOUT_MS, retryCount: 0 })({ chain }).request,
-    downUntil: 0,
-  }));
+  const nodes = urls.map((url) => ({ url, request: makeRequest(url, chain), downUntil: 0 }));
 
-  return custom({
+  return {
     async request(args) {
-      const now = Date.now();
+      const at = now();
       // Preferred order first, then anything still cooling off — a cooling
       // endpoint is a last resort, never simply dropped.
-      const ready = nodes.filter((n) => n.downUntil <= now);
-      const cooling = nodes.filter((n) => n.downUntil > now);
+      const ready = nodes.filter((n) => n.downUntil <= at);
+      const cooling = nodes.filter((n) => n.downUntil > at);
       const order = [...ready, ...cooling];
       let lastError;
       for (let i = 0; i < order.length; i++) {
@@ -66,7 +68,7 @@ export function orderedFallback(urls, chain, label = chain?.name ?? '') {
         } catch (err) {
           lastError = err;
           const failed = isNodeFailure(err);
-          if (failed) node.downUntil = Date.now() + COOLDOWN_MS;
+          if (failed) node.downUntil = now() + COOLDOWN_MS;
           if (i < order.length - 1) {
             log.endpointFailed(node.url, args.method, err, {
               cooled: failed,
@@ -77,5 +79,10 @@ export function orderedFallback(urls, chain, label = chain?.name ?? '') {
       }
       throw lastError;
     },
-  });
+  };
+}
+
+/** The viem transport over `orderedRequest`. */
+export function orderedFallback(urls, chain, label = chain?.name ?? '', opts) {
+  return custom(orderedRequest(urls, chain, label, opts));
 }

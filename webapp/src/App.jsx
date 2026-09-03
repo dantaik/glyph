@@ -1,40 +1,21 @@
-import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { Fragment, useCallback, useState, useSyncExternalStore } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import SettingsPage from './components/SettingsPage';
-import { FIXTURES_MODE, useReader } from './lib/data';
-import { DEFAULT_CHAIN_ID } from './lib/chains';
+import ChainIcon from './components/ChainIcon';
+import { ExternalLink } from './components/Icons';
+import { FIXTURES_MODE } from './lib/data';
 import { GLYPH_ADDRESS } from './lib/config';
-import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
 import { IS_OFFLINE_BUILD, OFFLINE_FILE } from './lib/offline';
 import { hrefFor, useUrlState } from './lib/router';
+import { getAllChainsView } from './lib/view';
 
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
-  const { chainId: walletChainId } = useWallet();
   const [params, navigate] = useUrlState();
-
-  // The chain lives in the URL, and router.js adopts the one the address
-  // names as it reads it — before any of this renders. Left for here is the
-  // other direction: an address that names no chain gets one, in place.
-  //
-  // A bare `/` is the front door and opens on Ethereum, whatever was read
-  // last — an address with nothing after the host states no preference, so
-  // it gets the canonical one. (Reaching the feed from inside the app is
-  // navigation, not the front door: it keeps the chain you are reading.)
-  // A chainless deep link — a link from before the prefix existed — keeps
-  // the chain being read instead, which is the only guess available.
-  useLayoutEffect(() => {
-    if (params.chain != null) return;
-    const frontDoor = !params.tx && !params.author && !params.scan && !params.settings;
-    navigate(
-      { ...params, chain: frontDoor ? DEFAULT_CHAIN_ID : undefined },
-      { replace: true },
-    );
-  }, [params, navigate]);
 
   // The URL names a surface — /scan, /tx/…, /author/…, /settings — and a
   // link to one of them IS the instruction to show it, whichever tab was
@@ -51,40 +32,6 @@ export default function App() {
     },
     [urlSurface, navigate],
   );
-  const reader = useReader();
-  const chainId = reader.chainId;
-  const chainMismatch = walletChainId != null && walletChainId !== chainId;
-  const [switching, setSwitching] = useState(false);
-  const [switchError, setSwitchError] = useState(null);
-
-  // Covered home-feed block ranges of the chain being shown, summarized in
-  // the footer — live, window by window, while a scan runs. (Subscribed
-  // directly: the footer must never start a scan of its own.)
-  const feed = useSyncExternalStore(
-    reader.feed.subscribe,
-    reader.feed.getSnapshot,
-    reader.feed.getSnapshot,
-  );
-
-  // Coverage is a set of ranges; the footer shows the outer span plus how
-  // many separate ranges make it up.
-  const segments = feed.coverage;
-  const scanSpan = segments.length
-    ? ` ${fmtBlock(lowest(segments))} 至 ${fmtBlock(highest(segments))}` +
-      (segments.length > 1 ? ` · ${segments.length} 段` : '')
-    : '';
-
-  const handleSwitchChain = async () => {
-    setSwitchError(null);
-    setSwitching(true);
-    try {
-      await switchToConfiguredChain(chainId);
-    } catch (err) {
-      setSwitchError(err?.code === 4001 ? '已取消' : '切换失败，请在钱包中手动切换');
-    } finally {
-      setSwitching(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -95,22 +42,6 @@ export default function App() {
         onTabChange={handleTabChange}
         onOpenSettings={() => navigate({ settings: '1' })}
       />
-      {chainMismatch && (
-        <div
-          role="alert"
-          className="border-b border-danger-wash bg-danger-wash/60 px-4 py-2 text-center text-sm text-danger sm:px-6"
-        >
-          钱包连接的链（ID {walletChainId}）与正在阅读的链（ID {chainId}）不一致。
-          <button
-            type="button"
-            onClick={handleSwitchChain}
-            disabled={switching}
-            className="ml-2 font-medium underline underline-offset-2 hover:text-accent disabled:opacity-50"
-          >
-            {switching ? '切换中…' : '切换钱包网络'}{switchError ? `（${switchError}）` : ''}
-          </button>
-        </div>
-      )}
       <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-8 pb-16">
         {params.settings ? (
           <SettingsPage navigate={navigate} />
@@ -120,54 +51,107 @@ export default function App() {
           <Reader onStartWriting={() => handleTabChange('write')} />
         )}
       </main>
-      <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
-        <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-          <span>{chainName(chainId)}</span>
-          <span className="select-none" aria-hidden="true">·</span>
-          <a
-            href={etherscanAddrUrl(GLYPH_ADDRESS, chainId)}
-            target="_blank"
-            rel="noreferrer"
-            title="在区块浏览器查看合约"
-            className="inline-block font-mono text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
-          >
-            合约：{shortAddr(GLYPH_ADDRESS)}
-          </a>
-          <span className="select-none" aria-hidden="true">·</span>
-          <a
-            href={hrefFor({ scan: '1' })}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate({ scan: '1' });
-            }}
-            title="查看扫描范围"
-            className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
-          >
-            扫描范围
-            {scanSpan}
-            {feed.job && <span className="animate-pulse"> · 扫描中</span>}
-          </a>
-          {/* The whole app as one file, for when this domain is gone. */}
-          {!IS_OFFLINE_BUILD && (
-            <>
-              <span className="select-none" aria-hidden="true">·</span>
-              <a
-                href={`/${OFFLINE_FILE}`}
-                download={OFFLINE_FILE}
-                title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
-                className="inline-block text-2xs text-ink-faint hover:text-accent transition-colors"
-              >
-                离线版
-              </a>
-            </>
-          )}
-        </p>
-      </footer>
+      <Footer navigate={navigate} />
       {FIXTURES_MODE && (
         <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
           演示数据
         </div>
       )}
     </div>
+  );
+}
+
+const FOOT_LINK = 'inline-flex items-center gap-1 hover:text-accent transition-colors';
+
+/**
+ * The footer: the contract, then one line per chain the app reads — the
+ * same lines whatever the page shows, because the chains are one journal
+ * and the reader is told about all of them or none. Each line is the way
+ * into that chain's view and to the scan page, and says how far the local
+ * scan has got, live, window by window, while a scan runs.
+ *
+ * Subscribed to the all-chains feed directly: the footer must never start
+ * a scan of its own.
+ */
+function Footer({ navigate }) {
+  const all = getAllChainsView();
+  const feed = useSyncExternalStore(all.feed.subscribe, all.feed.getSnapshot, all.feed.getSnapshot);
+  const go = (next) => (e) => {
+    e.preventDefault();
+    navigate(next);
+  };
+
+  return (
+    <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
+      <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
+        <span className="font-mono text-2xs">合约：{shortAddr(GLYPH_ADDRESS)}</span>
+        {feed.chains.map((c) => (
+          <Fragment key={c.chainId}>
+            <span className="select-none" aria-hidden="true">·</span>
+            <a
+              href={etherscanAddrUrl(GLYPH_ADDRESS, c.chainId)}
+              target="_blank"
+              rel="noreferrer"
+              title={`在${chainName(c.chainId)}的区块浏览器查看合约`}
+              className={`${FOOT_LINK} text-2xs`}
+            >
+              {chainName(c.chainId)}
+              <ExternalLink size={10} aria-hidden="true" />
+            </a>
+          </Fragment>
+        ))}
+        {/* The whole app as one file, for when this domain is gone. */}
+        {!IS_OFFLINE_BUILD && (
+          <>
+            <span className="select-none" aria-hidden="true">·</span>
+            <a
+              href={`/${OFFLINE_FILE}`}
+              download={OFFLINE_FILE}
+              title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
+              className={`${FOOT_LINK} text-2xs`}
+            >
+              离线版
+            </a>
+          </>
+        )}
+      </p>
+      <ul className="mt-2 space-y-1 text-2xs text-ink-faint tabular-nums">
+        {feed.chains.map((c) => (
+          <ChainLine key={c.chainId} chainId={c.chainId} span={scanSpan(c.coverage)} scanning={c.job != null} go={go} />
+        ))}
+      </ul>
+    </footer>
+  );
+}
+
+/**
+ * Coverage is a set of ranges; the footer shows the outer span plus how
+ * many separate ranges make it up. (Rendered to a string here rather than
+ * passed down: React's DEV render log serialises arrays of primitives in
+ * changed props with JSON.stringify, which throws on BigInt — a block
+ * range would freeze the page in development.)
+ */
+const scanSpan = (segments) =>
+  segments.length
+    ? ` ${fmtBlock(lowest(segments))} 至 ${fmtBlock(highest(segments))}` +
+      (segments.length > 1 ? ` · ${segments.length} 段` : '')
+    : '';
+
+/** One chain's line: its name (→ its view) and its scan range (→ /scan). */
+function ChainLine({ chainId, span, scanning, go }) {
+  const name = chainName(chainId);
+  return (
+    <li className="flex flex-wrap items-center justify-center gap-2" data-chain-line={chainId}>
+      <a href={hrefFor({ chain: chainId })} onClick={go({ chain: chainId })} title={`只看${name}`} className={FOOT_LINK}>
+        <ChainIcon chainId={chainId} size={12} className="shrink-0" />
+        {name}
+      </a>
+      <span className="select-none" aria-hidden="true">·</span>
+      <a href={hrefFor({ scan: '1' })} onClick={go({ scan: '1' })} title="查看扫描范围" className={FOOT_LINK}>
+        扫描范围
+        {span}
+        {scanning && <span className="animate-pulse"> · 扫描中</span>}
+      </a>
+    </li>
   );
 }

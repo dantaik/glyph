@@ -1,9 +1,9 @@
 // format.js — pure presentation helpers (no React, no network).
 //
 // Deterministic string/date math shared by the feed, reader list, post
-// page and footer. Block numbers stay the on-chain source of truth;
-// relative times are estimates from the chain clock's measured block
-// time, always 约-prefixed.
+// page and footer. Block numbers stay the on-chain source of truth. A time
+// is exact when the row carries its block's timestamp; until then it is an
+// estimate from the chain clock's measured block time, and 约-prefixed.
 
 import { getChain } from './chains';
 
@@ -82,8 +82,11 @@ export function estimateBlockTime(clock, block) {
   return new Date((Number(clock.ts) + drift) * 1000);
 }
 
-/** Date → `约 3天前` (Intl zh-CN, numeric auto); `刚刚` under a minute; null-safe. */
-export function fmtRelTime(date) {
+/**
+ * Date → `约 3天前` (Intl zh-CN, numeric auto); `刚刚` under a minute;
+ * null-safe. `exact` drops the 约: the time came from the block itself.
+ */
+export function fmtRelTime(date, { exact = false } = {}) {
   if (!date) return null;
   const ms = new Date(date).getTime();
   if (Number.isNaN(ms)) return null;
@@ -91,7 +94,24 @@ export function fmtRelTime(date) {
   const abs = Math.abs(seconds);
   if (abs < 60) return '刚刚';
   const [size, unit] = REL_UNITS.find(([s]) => abs >= s);
-  return `约 ${REL_FMT.format(Math.round(abs / size) * (seconds < 0 ? -1 : 1), unit)}`;
+  const text = REL_FMT.format(Math.round(abs / size) * (seconds < 0 ? -1 : 1), unit);
+  return exact ? text : `约 ${text}`;
+}
+
+const ABS_FMT = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+/** Seconds since the epoch → `2026年9月3日 15:04`; null-safe. */
+export function fmtAbsTime(ts) {
+  if (ts == null) return null;
+  const date = new Date(Number(ts) * 1000);
+  return Number.isNaN(date.getTime()) ? null : ABS_FMT.format(date);
 }
 
 /**
@@ -122,6 +142,7 @@ export function excerpt(md, max = 80) {
 /** Turn a raw provider error into a short, human-friendly hint. */
 export function friendlyError(message) {
   const m = String(message || '');
+  if (/尚未同步/.test(m)) return m; // scanner.js: a node behind the chain, said plainly
   if (/rate limit|429|too many requests/i.test(m)) {
     return '节点请求过于频繁，请稍后重试，或到右上角设置更换 RPC 节点。';
   }

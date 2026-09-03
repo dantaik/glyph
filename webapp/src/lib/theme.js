@@ -1,10 +1,12 @@
-// theme.js — theme + article font-size preference hooks.
+// theme.js — theme + article font-size preferences: the setters, and the
+// hooks over them.
 //
 // Source of truth is the DOM (<html> `.dark` class / `data-fontsize`
 // attribute), seeded before first paint by the inline FOUC script in
 // index.html. Setters persist to localStorage, mutate the DOM, then
 // announce the change on a `glyph:prefs` window event so every hook
-// instance (header toggle, editor, font-size control…) stays in sync.
+// instance (header toggle, editor, font-size control…) stays in sync —
+// and so a settings file restored on the settings page applies at once.
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -23,11 +25,15 @@ function lsGet(key) {
 
 function lsSet(key, value) {
   try {
-    localStorage.setItem(key, value);
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
   } catch {
     // quota / disabled — in-memory state still works for this session
   }
 }
+
+const osPrefersDark = () =>
+  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
 function readTheme() {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
@@ -55,6 +61,38 @@ function broadcast() {
   window.dispatchEvent(new CustomEvent(PREFS_EVENT));
 }
 
+// --- The preferences themselves ------------------------------------------
+
+/** The theme chosen: 'light' | 'dark', or null while following the OS. */
+export function getThemePref() {
+  const t = lsGet(THEME_KEY);
+  return t === 'light' || t === 'dark' ? t : null;
+}
+
+/** Choose a theme — or null to follow the OS again. Applies at once. */
+export function setThemePref(theme) {
+  const chosen = theme === 'light' || theme === 'dark' ? theme : null;
+  lsSet(THEME_KEY, chosen);
+  applyTheme(chosen ?? (osPrefersDark() ? 'dark' : 'light'));
+  broadcast();
+}
+
+/** The article font size chosen: 's' | 'm' | 'l' ('m' when none was). */
+export function getFontSizePref() {
+  const f = lsGet(FONTSIZE_KEY);
+  return f === 's' || f === 'l' ? f : 'm';
+}
+
+/** Choose the article font size. Applies at once. */
+export function setFontSizePref(size) {
+  const chosen = size === 's' || size === 'l' ? size : 'm';
+  lsSet(FONTSIZE_KEY, chosen);
+  applyFontSize(chosen);
+  broadcast();
+}
+
+// --- Hooks ----------------------------------------------------------------
+
 /**
  * Theme hook → `{ theme: 'light'|'dark', isDark, setTheme }`.
  * Follows the OS color-scheme only until the user picks one explicitly.
@@ -62,11 +100,7 @@ function broadcast() {
 export function useTheme() {
   const [theme, setThemeState] = useState(readTheme);
 
-  const setTheme = useCallback((t) => {
-    lsSet(THEME_KEY, t);
-    applyTheme(t);
-    broadcast();
-  }, []);
+  const setTheme = useCallback((t) => setThemePref(t), []);
 
   useEffect(() => {
     const sync = () => setThemeState(readTheme());
@@ -94,11 +128,7 @@ export function useTheme() {
 export function useFontSize() {
   const [size, setSizeState] = useState(readFontSize);
 
-  const setSize = useCallback((s) => {
-    lsSet(FONTSIZE_KEY, s);
-    applyFontSize(s);
-    broadcast();
-  }, []);
+  const setSize = useCallback((s) => setFontSizePref(s), []);
 
   useEffect(() => {
     const sync = () => setSizeState(readFontSize());

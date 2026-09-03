@@ -12,8 +12,6 @@
 // newest post down — never "every post the store happens to know", which
 // could have holes where a feed sweep saw one post and not its neighbours.
 
-import { useEffect, useSyncExternalStore } from 'react';
-import * as seg from './segments';
 import * as scanner from './scanner';
 import { indexCompare } from './scanStore';
 
@@ -187,7 +185,7 @@ export class AuthorListController {
         target: wanted > 0 ? wanted : null,
       };
       this.#bump();
-      const covered = Boolean(seg.segmentAt(store.authorCoverage(author), block));
+      const held = store.authorPostsInBlock(author, block).length > 0;
       const rows = await scanner.authorRowsAt({
         store,
         log: this.#log,
@@ -195,7 +193,7 @@ export class AuthorListController {
         block,
         fetchBlock,
       });
-      if (!covered) store.persistAuthorScan(author); // keep what was just read
+      if (!held) store.persistAuthorScan(author); // keep what was just read
       if (rows.length === 0) break;
       const fresh = skip == null ? rows : rows.filter((m) => m.index < skip);
       skip = null;
@@ -214,13 +212,4 @@ export class AuthorListController {
     this.#rows = [...byIndex.values()].sort(indexCompare);
     this.#bump();
   }
-}
-
-/** React hook: an author list's snapshot, refreshed on mount when stale. */
-export function useAuthorList(list) {
-  const snapshot = useSyncExternalStore(list.subscribe, list.getSnapshot, list.getSnapshot);
-  useEffect(() => {
-    list.ensureFresh();
-  }, [list]);
-  return snapshot;
 }

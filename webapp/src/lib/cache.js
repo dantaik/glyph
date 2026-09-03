@@ -84,7 +84,7 @@ async function del(storeName, key) {
 // Map holds the session's worth. It dies with the page; IndexedDB, wherever
 // it is allowed, remains the permanent cache.
 
-const MEMORY_MAX = 500;
+export const MEMORY_MAX = 500;
 const memory = new Map();
 let idbDenied = false;
 

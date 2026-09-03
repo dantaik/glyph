@@ -148,10 +148,23 @@ export async function sweepFeed({
 
 // --- Per-author reads: the contract's reverse block-linked list -------
 
+/** A node answering for a block it hasn't seen — the walk fails, and can be retried. */
+const nodeBehind = (block) =>
+  Object.assign(new Error(`节点尚未同步到区块 ${block}，稍后重试即可`), { nodeBehind: true });
+
 /**
  * Rows for one block of `author`'s chain, newest (highest index) first — so
  * the last entry is the block's oldest post, the one whose prevBlock
  * continues the chain. Covered blocks never reach `fetchBlock`.
+ *
+ * Every block asked for here is one the chain points at — the author's
+ * latestBlock() or a prevBlock — so it holds at least one of their posts.
+ * An empty answer is a node that hasn't caught up (public gateways answer
+ * eth_call and eth_getLogs from different nodes), never the truth: it is
+ * not recorded as coverage, and the walk fails so it can be retried.
+ * Coverage that claims the block yet holds none of the author's posts is
+ * the same thing, left behind by an earlier read, and the block is read
+ * again.
  *
  * @param fetchBlock async (block) => meta[]  (that author's posts only)
  */
@@ -159,13 +172,17 @@ export async function authorRowsAt({ store, log, author, block, fetchBlock }) {
   const at = BigInt(block);
   if (seg.segmentAt(store.authorCoverage(author), at)) {
     const held = store.authorPostsInBlock(author, at);
-    log.fromCache('author', `block ${log.b(at)}`, `${held.length} posts`, 'already scanned');
-    return held;
+    if (held.length > 0) {
+      log.fromCache('author', `block ${log.b(at)}`, `${held.length} posts`, 'already scanned');
+      return held;
+    }
   }
   await store.once(`author:${addrKey(author)}:${at}`, async () => {
-    // A parallel walk may have covered it while we waited our turn.
-    if (seg.segmentAt(store.authorCoverage(author), at)) return;
-    store.rememberPosts(await fetchBlock(at));
+    // A parallel walk may have read it while we waited our turn.
+    if (store.authorPostsInBlock(author, at).length > 0) return;
+    const rows = await fetchBlock(at);
+    if (rows.length === 0) throw nodeBehind(at);
+    store.rememberPosts(rows);
     store.rememberAuthorBlock(author, at);
   });
   return store.authorPostsInBlock(author, at);
