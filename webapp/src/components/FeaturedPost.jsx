@@ -1,27 +1,15 @@
-import { useEffect, useState } from 'react';
-import { loadPostBody } from '../lib/data';
+import { useAsync } from '../lib/hooks';
 import { fmtTitle, excerpt } from '../lib/format';
 import PostMeta from './PostMeta';
 
 /**
  * Large card for the most recent post — shared by the home feed and the
- * author page. Fetches tags + a short excerpt from the post body
- * (silently degrades to title-only).
+ * author page. Fetches tags + a short excerpt from the post body through
+ * the reader (silently degrades to title-only).
  */
-export default function FeaturedPost({ post, clock, navigate, excerptChars = 80 }) {
-  const [body, setBody] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    setBody(null);
-    loadPostBody(post.txHash)
-      .then((res) => !cancelled && setBody(res.body))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [post.txHash]);
-
-  const teaser = body ? excerpt(body.markdown, excerptChars) : '';
+export default function FeaturedPost({ reader, post, clock, navigate, excerptChars = 80 }) {
+  const body = useAsync(() => reader.loadPostBody(post.txHash), [reader, post.txHash]);
+  const teaser = body.value ? excerpt(body.value.body.markdown, excerptChars) : '';
 
   return (
     <article className="border-b border-edge pb-8">

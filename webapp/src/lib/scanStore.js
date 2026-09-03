@@ -1,4 +1,5 @@
-// scanStore.js — everything the reader has already read, at two lifetimes.
+// scanStore.js — everything the reader has already read from ONE chain, at
+// two lifetimes.
 //
 // SESSION layer (module state, never expires). Every post this tab has seen,
 // indexed by (author, index) and by (txHash, eventIndex), plus the block
@@ -8,8 +9,16 @@
 // a post, no other surface fetches it again for the life of the page.
 //
 // PERSISTED layer (localStorage). A bounded snapshot of the same thing, so a
-// fresh session starts warm. The session layer is seeded from it on first
-// use; writes flow back on every scan.
+// fresh session starts warm. The session layer is seeded from it when the
+// store is created; writes flow back after every fetched window or block,
+// so an interrupted scan (a closed tab, a lost connection) keeps what it
+// had read up to that point.
+//
+// ONE STORE PER CHAIN. Block heights, post indexes and transaction hashes
+// mean nothing across chains, so nothing here is shared between them:
+// getScanStore(chainId) hands out a chain's store and keeps it for the life
+// of the page. A scan on one chain keeps writing to its own store no matter
+// which chain the reader is showing.
 //
 // Coverage is a SET of ranges, not one `[frontier, head]` window: blocks
 // 1–100 read once and 200–300 read later are two segments, and a read that
@@ -17,22 +26,11 @@
 // already held for that segment. See segments.js.
 
 import * as seg from './segments';
-import { CHAIN_ID } from './config';
-
-// Block heights and post indexes mean nothing across chains, so every scan
-// key is scoped to the chain it was read from. The v1 keys were mainnet-only.
-const FEED_KEY = `glyph.feedScan.v2.${CHAIN_ID}`;
-const FEED_KEY_LEGACY = CHAIN_ID === 1 ? 'glyph.feedScan.v1' : null;
-const AUTHOR_KEY = `glyph.authorScan.v2.${CHAIN_ID}`;
-const AUTHOR_KEY_LEGACY = CHAIN_ID === 1 ? 'glyph.authorScan.v1' : null;
-
-export const FEED_SCAN_EVT = 'glyph:feedscan';
-export const AUTHOR_SCAN_EVT = 'glyph:authorscan';
 
 /** Persisted global rows (storage bound). The session keeps every row it saw. */
-const FEED_ROW_CAP = 300;
+export const FEED_ROW_CAP = 300;
 /** Persisted rows per author (storage bound). */
-const AUTHOR_ROW_CAP = 200;
+export const AUTHOR_ROW_CAP = 200;
 
 export const addrKey = (a) => String(a || '').toLowerCase();
 export const postId = (author, index) => `${addrKey(author)}:${index}`;
@@ -76,6 +74,9 @@ export function feedCompare(a, b) {
   return (b.logIndex ?? 0) - (a.logIndex ?? 0);
 }
 
+/** Author order: newest (highest index) first. */
+export const indexCompare = (a, b) => (a.index < b.index ? 1 : a.index > b.index ? -1 : 0);
+
 /**
  * True when `row` sits strictly older than `cursor` in feed order. Rows
  * cached without a log index fall back to block granularity.
@@ -84,132 +85,6 @@ export function isOlder(row, cursor) {
   if (row.block !== cursor.block) return row.block < cursor.block;
   if (row.logIndex == null || cursor.logIndex == null) return false;
   return row.logIndex < cursor.logIndex;
-}
-
-// --- Session state ----------------------------------------------------
-
-const posts = new Map(); // postId -> row
-const idByTx = new Map(); // txId -> postId
-const idsByBlock = new Map(); // block (string) -> Set<postId>
-/** Ranges read in full for EVERY author (home-feed window fetches). */
-let feedSegments = [];
-/** addrKey -> ranges read in full for that one author (single-block fetches). */
-const authorSegments = new Map();
-/** Chain head at the last completed feed scan, as a decimal string. */
-let feedHead = null;
-/** addrKey -> the author's `latestBlock` at their last completed walk. */
-const authorHeads = new Map();
-
-function indexRow(row) {
-  const id = postId(row.author, row.index);
-  const prev = posts.get(id);
-  // A row that carries a log index supersedes a legacy one that doesn't.
-  if (prev && (row.logIndex == null || prev.logIndex != null)) return prev;
-  posts.set(id, row);
-  idByTx.set(txId(row.txHash, row.eventIndex), id);
-  const key = String(row.block);
-  const set = idsByBlock.get(key) ?? new Set();
-  set.add(id);
-  idsByBlock.set(key, set);
-  return row;
-}
-
-/** Record posts the session has read. Returns the canonical row objects. */
-export function rememberPosts(rows) {
-  return (rows ?? []).map((r) => indexRow(normalizeRow(r)));
-}
-
-/** Record that `[from, to]` was read in full, for every author. */
-export function rememberFeedRange(from, to) {
-  feedSegments = seg.add(feedSegments, from, to);
-}
-
-/** Record that `block` was read in full for one author. */
-export function rememberAuthorBlock(author, block) {
-  const key = addrKey(author);
-  authorSegments.set(key, seg.add(authorSegments.get(key) ?? [], block, block));
-}
-
-/** A post already read this session, or null — no RPC needed either way. */
-export const knownPost = (author, index) => posts.get(postId(author, index)) ?? null;
-
-/** Same, addressed by publish transaction + event ordinal. */
-export function knownPostByTx(txHash, eventIndex = 0) {
-  const id = idByTx.get(txId(txHash, eventIndex));
-  return id ? (posts.get(id) ?? null) : null;
-}
-
-/** Every post the session holds, newest first. */
-export const allPosts = () => [...posts.values()].sort(feedCompare);
-
-/** Posts the session holds inside `[from, to]`, newest first. */
-export function postsInRange(from, to) {
-  const out = [];
-  for (const row of posts.values()) {
-    if (row.block >= from && row.block <= to) out.push(row);
-  }
-  return out.sort(feedCompare);
-}
-
-/** One author's posts inside a block, newest (highest index) first. */
-export function authorPostsInBlock(author, block) {
-  const ids = idsByBlock.get(String(block));
-  if (!ids) return [];
-  const key = addrKey(author);
-  const out = [];
-  for (const id of ids) {
-    const row = posts.get(id);
-    if (row && addrKey(row.author) === key) out.push(row);
-  }
-  return out.sort((a, b) => (a.index < b.index ? 1 : -1));
-}
-
-/** One author's posts, newest (highest index) first. */
-export function authorPosts(author) {
-  const key = addrKey(author);
-  const out = [];
-  for (const row of posts.values()) {
-    if (addrKey(row.author) === key) out.push(row);
-  }
-  return out.sort((a, b) => (a.index < b.index ? 1 : -1));
-}
-
-/** Ranges proven complete for every author. */
-export const feedCoverage = () => feedSegments;
-
-/**
- * Ranges proven complete for `author` — their own single-block reads plus
- * the global feed sweeps, which record every Post event in the range.
- */
-export const authorCoverage = (author) =>
-  seg.normalize([...(authorSegments.get(addrKey(author)) ?? []), ...feedSegments]);
-
-export const feedScanHead = () => feedHead;
-export const authorScanHead = (author) => authorHeads.get(addrKey(author)) ?? null;
-export function setFeedScanHead(head) {
-  feedHead = String(head);
-}
-export function setAuthorScanHead(author, head) {
-  authorHeads.set(addrKey(author), String(head));
-}
-
-// --- localStorage snapshot -------------------------------------------
-
-function lsRead(key) {
-  if (!key) return null;
-  try {
-    return JSON.parse(localStorage.getItem(key) || 'null');
-  } catch {
-    return null; // corrupted entry — treat as a first scan
-  }
-}
-
-function emit(name) {
-  try {
-    window.dispatchEvent(new CustomEvent(name));
-  } catch {
-    /* non-browser context */
-  }
 }
 
 /**
@@ -231,158 +106,380 @@ function trimRows(rows, cap) {
   return { kept: i > 0 ? kept.slice(0, i) : kept, floor: edge + 1n };
 }
 
-/** Snapshot the session's global view to localStorage (bounded). */
-export function persistFeedScan() {
-  const { kept, floor } = trimRows(allPosts(), FEED_ROW_CAP);
-  const segments = floor == null ? feedSegments : seg.clipBelow(feedSegments, floor);
+function lsRead(key) {
+  if (!key) return null;
   try {
-    localStorage.setItem(
-      FEED_KEY,
-      JSON.stringify({
-        head: feedHead,
+    return JSON.parse(localStorage.getItem(key) || 'null');
+  } catch {
+    return null; // corrupted entry — treat as a first scan
+  }
+}
+
+/** Build the store for one chain. Prefer getScanStore(), which memoizes. */
+export function createScanStore(chainId) {
+  const id = Number(chainId);
+  // Block heights and post indexes mean nothing across chains, so every
+  // persisted key is scoped to the chain. The v1 keys were mainnet-only.
+  const FEED_KEY = `glyph.feedScan.v2.${id}`;
+  const FEED_KEY_LEGACY = id === 1 ? 'glyph.feedScan.v1' : null;
+  const AUTHOR_KEY = `glyph.authorScan.v2.${id}`;
+  const AUTHOR_KEY_LEGACY = id === 1 ? 'glyph.authorScan.v1' : null;
+
+  // --- Session state --------------------------------------------------
+
+  const posts = new Map(); // postId -> row
+  const idByTx = new Map(); // txId -> postId
+  const idsByBlock = new Map(); // block (string) -> Set<postId>
+  /** Ranges read in full for EVERY author (home-feed window fetches). */
+  let feedSegments = [];
+  /** addrKey -> ranges read in full for that one author (single-block fetches). */
+  const authorSegments = new Map();
+  /** Chain head at the last completed feed scan, as a decimal string. */
+  let feedHead = null;
+  /** addrKey -> the author's `latestBlock` at their last completed walk. */
+  const authorHeads = new Map();
+
+  // --- Change notification ------------------------------------------
+  //
+  // Anything that shows rows subscribes here and re-derives its view after
+  // every mutation, so a sweep's findings reach the page window by window.
+
+  const listeners = new Set();
+  let version = 0;
+  function notify() {
+    version += 1;
+    for (const fn of listeners) fn();
+  }
+  function subscribe(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+
+  function indexRow(row) {
+    const key = postId(row.author, row.index);
+    const prev = posts.get(key);
+    // A row that carries a log index supersedes a legacy one that doesn't.
+    if (prev && (row.logIndex == null || prev.logIndex != null)) return prev;
+    posts.set(key, row);
+    idByTx.set(txId(row.txHash, row.eventIndex), key);
+    const b = String(row.block);
+    const set = idsByBlock.get(b) ?? new Set();
+    set.add(key);
+    idsByBlock.set(b, set);
+    return row;
+  }
+
+  /** Record posts the session has read. Returns the canonical row objects. */
+  function rememberPosts(rows) {
+    const before = posts.size;
+    const out = (rows ?? []).map((r) => indexRow(normalizeRow(r)));
+    if (posts.size !== before) notify();
+    return out;
+  }
+
+  /** Record that `[from, to]` was read in full, for every author. */
+  function rememberFeedRange(from, to) {
+    feedSegments = seg.add(feedSegments, from, to);
+    notify();
+  }
+
+  /** Record that `block` was read in full for one author. */
+  function rememberAuthorBlock(author, block) {
+    const key = addrKey(author);
+    authorSegments.set(key, seg.add(authorSegments.get(key) ?? [], block, block));
+    notify();
+  }
+
+  /** A post already read this session, or null — no RPC needed either way. */
+  const knownPost = (author, index) => posts.get(postId(author, index)) ?? null;
+
+  /** Same, addressed by publish transaction + event ordinal. */
+  function knownPostByTx(txHash, eventIndex = 0) {
+    const key = idByTx.get(txId(txHash, eventIndex));
+    return key ? (posts.get(key) ?? null) : null;
+  }
+
+  /** Every post the session holds, newest first. */
+  const allPosts = () => [...posts.values()].sort(feedCompare);
+
+  /** Posts the session holds inside `[from, to]`, newest first. */
+  function postsInRange(from, to) {
+    const out = [];
+    for (const row of posts.values()) {
+      if (row.block >= from && row.block <= to) out.push(row);
+    }
+    return out.sort(feedCompare);
+  }
+
+  /**
+   * Posts inside ranges swept for every author, newest first.
+   *
+   * Deliberately NOT "every post the store knows": a post found by an author
+   * walk sits in an unswept range, and listing it would put a hole in the
+   * feed — and hand load-more a cursor below blocks nobody has read. A range
+   * shows up once it has actually been swept.
+   */
+  function coveredPosts() {
+    const out = [];
+    for (const [from, to] of feedSegments) out.push(...postsInRange(from, to));
+    return out.sort(feedCompare);
+  }
+
+  /** One author's posts inside a block, newest (highest index) first. */
+  function authorPostsInBlock(author, block) {
+    const ids = idsByBlock.get(String(block));
+    if (!ids) return [];
+    const key = addrKey(author);
+    const out = [];
+    for (const pid of ids) {
+      const row = posts.get(pid);
+      if (row && addrKey(row.author) === key) out.push(row);
+    }
+    return out.sort(indexCompare);
+  }
+
+  /** One author's posts, newest (highest index) first. */
+  function authorPosts(author) {
+    const key = addrKey(author);
+    const out = [];
+    for (const row of posts.values()) {
+      if (addrKey(row.author) === key) out.push(row);
+    }
+    return out.sort(indexCompare);
+  }
+
+  /** Ranges proven complete for every author. */
+  const feedCoverage = () => feedSegments;
+
+  /**
+   * Ranges proven complete for `author` — their own single-block reads plus
+   * the global feed sweeps, which record every Post event in the range.
+   */
+  const authorCoverage = (author) =>
+    seg.normalize([...(authorSegments.get(addrKey(author)) ?? []), ...feedSegments]);
+
+  /**
+   * The author's chain from `fromBlock` down, as far as covered blocks
+   * reach — the rows a completed walk left behind, without any I/O. Stops
+   * at the first block that would have to be fetched.
+   */
+  function knownChain(author, fromBlock) {
+    const out = [];
+    const coverage = authorCoverage(author);
+    let block = BigInt(fromBlock);
+    while (block > 0n && seg.segmentAt(coverage, block)) {
+      const rows = authorPostsInBlock(author, block);
+      if (rows.length === 0) break;
+      out.push(...rows);
+      const next = rows[rows.length - 1].prevBlock;
+      if (next >= block) break;
+      block = next;
+    }
+    return out;
+  }
+
+  const feedScanHead = () => feedHead;
+  const authorScanHead = (author) => authorHeads.get(addrKey(author)) ?? null;
+  function setFeedScanHead(head) {
+    feedHead = String(head);
+    notify();
+  }
+  function setAuthorScanHead(author, head) {
+    authorHeads.set(addrKey(author), String(head));
+    notify();
+  }
+
+  // --- localStorage snapshot -----------------------------------------
+
+  /** Snapshot the session's global view to localStorage (bounded). */
+  function persistFeedScan() {
+    const { kept, floor } = trimRows(allPosts(), FEED_ROW_CAP);
+    const segments = floor == null ? feedSegments : seg.clipBelow(feedSegments, floor);
+    try {
+      localStorage.setItem(
+        FEED_KEY,
+        JSON.stringify({
+          head: feedHead,
+          segments: seg.toPlain(segments),
+          rows: kept.map(plainRow),
+        }),
+      );
+      if (FEED_KEY_LEGACY) localStorage.removeItem(FEED_KEY_LEGACY);
+    } catch {
+      /* quota / privacy mode — the session layer still holds everything */
+    }
+  }
+
+  /** Snapshot one author's view to localStorage (bounded). */
+  function persistAuthorScan(author) {
+    const key = addrKey(author);
+    const { kept, floor } = trimRows(authorPosts(author), AUTHOR_ROW_CAP);
+    const own = authorSegments.get(key) ?? [];
+    const segments = floor == null ? own : seg.clipBelow(own, floor);
+    try {
+      const all = lsRead(AUTHOR_KEY) ?? {};
+      all[key] = {
+        head: authorHeads.get(key) ?? null,
         segments: seg.toPlain(segments),
         rows: kept.map(plainRow),
-      }),
-    );
-    if (FEED_KEY_LEGACY) localStorage.removeItem(FEED_KEY_LEGACY);
-  } catch {
-    /* quota / privacy mode — the session layer still holds everything */
-  }
-  emit(FEED_SCAN_EVT); // the footer and /scan re-read the persisted ranges
-}
-
-/** Snapshot one author's view to localStorage (bounded). */
-export function persistAuthorScan(author) {
-  const key = addrKey(author);
-  const { kept, floor } = trimRows(authorPosts(author), AUTHOR_ROW_CAP);
-  const own = authorSegments.get(key) ?? [];
-  const segments = floor == null ? own : seg.clipBelow(own, floor);
-  try {
-    const all = lsRead(AUTHOR_KEY) ?? {};
-    all[key] = {
-      head: authorHeads.get(key) ?? null,
-      segments: seg.toPlain(segments),
-      rows: kept.map(plainRow),
-    };
-    localStorage.setItem(AUTHOR_KEY, JSON.stringify(all));
-  } catch {
-    /* quota / privacy mode — the session layer still holds everything */
-  }
-  emit(AUTHOR_SCAN_EVT);
-}
-
-// --- Seeding ----------------------------------------------------------
-
-let seeded = false;
-
-/**
- * Fold the persisted snapshot into the session layer, once. v1 stored a
- * single `[frontier, head]` window; that is simply the first segment.
- */
-export function seedFromStorage() {
-  if (seeded) return;
-  seeded = true;
-
-  const feed = lsRead(FEED_KEY);
-  if (feed && Array.isArray(feed.rows)) {
-    rememberPosts(feed.rows);
-    feedSegments = seg.normalize([...feedSegments, ...seg.fromPlain(feed.segments)]);
-    if (typeof feed.head === 'string') feedHead = feed.head;
-  } else {
-    const legacy = lsRead(FEED_KEY_LEGACY);
-    if (legacy && Array.isArray(legacy.rows)) {
-      rememberPosts(legacy.rows);
-      if (legacy.frontier != null && legacy.head != null) {
-        feedSegments = seg.add(feedSegments, legacy.frontier, legacy.head);
-      }
-      if (typeof legacy.head === 'string') feedHead = legacy.head;
+      };
+      localStorage.setItem(AUTHOR_KEY, JSON.stringify(all));
+    } catch {
+      /* quota / privacy mode — the session layer still holds everything */
     }
   }
 
-  const authors = lsRead(AUTHOR_KEY) ?? {};
-  for (const [address, scan] of Object.entries(authors)) {
-    if (!scan || typeof scan !== 'object') continue;
-    rememberPosts(Array.isArray(scan.rows) ? scan.rows : []);
-    authorSegments.set(addrKey(address), seg.fromPlain(scan.segments));
-    if (typeof scan.head === 'string') authorHeads.set(addrKey(address), scan.head);
-  }
+  // --- Seeding --------------------------------------------------------
 
-  // v1 per-author state has rows but no ranges: the rows are still worth
-  // keeping (they answer post lookups), the coverage claim simply starts empty.
-  const legacyAuthors = lsRead(AUTHOR_KEY_LEGACY);
-  if (legacyAuthors && typeof legacyAuthors === 'object' && !lsRead(AUTHOR_KEY)) {
-    for (const [address, scan] of Object.entries(legacyAuthors)) {
+  /**
+   * Fold the persisted snapshot into the session layer. v1 stored a single
+   * `[frontier, head]` window; that is simply the first segment.
+   */
+  function seedFromStorage() {
+    const feed = lsRead(FEED_KEY);
+    if (feed && Array.isArray(feed.rows)) {
+      rememberPosts(feed.rows);
+      feedSegments = seg.normalize([...feedSegments, ...seg.fromPlain(feed.segments)]);
+      if (typeof feed.head === 'string') feedHead = feed.head;
+    } else {
+      const legacy = lsRead(FEED_KEY_LEGACY);
+      if (legacy && Array.isArray(legacy.rows)) {
+        rememberPosts(legacy.rows);
+        if (legacy.frontier != null && legacy.head != null) {
+          feedSegments = seg.add(feedSegments, legacy.frontier, legacy.head);
+        }
+        if (typeof legacy.head === 'string') feedHead = legacy.head;
+      }
+    }
+
+    const authors = lsRead(AUTHOR_KEY) ?? {};
+    for (const [address, scan] of Object.entries(authors)) {
       if (!scan || typeof scan !== 'object') continue;
       rememberPosts(Array.isArray(scan.rows) ? scan.rows : []);
+      authorSegments.set(addrKey(address), seg.fromPlain(scan.segments));
       if (typeof scan.head === 'string') authorHeads.set(addrKey(address), scan.head);
     }
+
+    // v1 per-author state has rows but no ranges: the rows are still worth
+    // keeping (they answer post lookups), the coverage claim simply starts empty.
+    const legacyAuthors = lsRead(AUTHOR_KEY_LEGACY);
+    if (legacyAuthors && typeof legacyAuthors === 'object' && !lsRead(AUTHOR_KEY)) {
+      for (const [address, scan] of Object.entries(legacyAuthors)) {
+        if (!scan || typeof scan !== 'object') continue;
+        rememberPosts(Array.isArray(scan.rows) ? scan.rows : []);
+        if (typeof scan.head === 'string') authorHeads.set(addrKey(address), scan.head);
+      }
+    }
+    notify();
   }
-}
 
-// --- Read-only views for the UI (/scan, footer) -----------------------
+  // --- Read-only views for the UI (/scan, footer) ---------------------
 
-/** Global coverage as `{ head, segments, rows }`, or null before any scan. */
-export function readFeedScan() {
-  seedFromStorage();
-  if (feedHead == null && feedSegments.length === 0) return null;
-  return { head: feedHead, segments: feedSegments, rows: allPosts() };
-}
+  /** Global coverage as `{ head, segments, rows }`, or null before any scan. */
+  function readFeedScan() {
+    if (feedHead == null && feedSegments.length === 0) return null;
+    return { head: feedHead, segments: feedSegments, rows: allPosts() };
+  }
 
-/** Per-author coverage: `{ address, head, segments, count }`, newest head first. */
-export function readAuthorScanEntries() {
-  seedFromStorage();
-  const out = [];
-  for (const [address, segments] of authorSegments.entries()) {
-    out.push({
-      address,
-      head: authorHeads.get(address) ?? null,
-      segments,
-      count: authorPosts(address).length,
+  /** Per-author coverage: `{ address, head, segments, count }`, newest head first. */
+  function readAuthorScanEntries() {
+    const out = [];
+    for (const [address, segments] of authorSegments.entries()) {
+      out.push({
+        address,
+        head: authorHeads.get(address) ?? null,
+        segments,
+        count: authorPosts(address).length,
+      });
+    }
+    for (const [address, head] of authorHeads.entries()) {
+      if (authorSegments.has(address)) continue;
+      out.push({ address, head, segments: [], count: authorPosts(address).length });
+    }
+    out.sort((a, b) => {
+      if (a.head == null || b.head == null) return a.head == null ? 1 : -1;
+      const ha = BigInt(a.head);
+      const hb = BigInt(b.head);
+      return hb > ha ? 1 : hb < ha ? -1 : 0;
     });
+    return out;
   }
-  for (const [address, head] of authorHeads.entries()) {
-    if (authorSegments.has(address)) continue;
-    out.push({ address, head, segments: [], count: authorPosts(address).length });
+
+  // --- In-flight fetches ---------------------------------------------
+  //
+  // Two surfaces can want the same block at the same moment — resolving a
+  // post's prev and next neighbors runs both walks in parallel. Sharing the
+  // promise keeps "fetched at most once per session" true under concurrency,
+  // not just in sequence.
+
+  const inflight = new Map(); // key -> Promise
+
+  function once(key, fn) {
+    const hit = inflight.get(key);
+    if (hit) return hit;
+    const promise = Promise.resolve()
+      .then(fn)
+      .finally(() => {
+        if (inflight.get(key) === promise) inflight.delete(key);
+      });
+    inflight.set(key, promise);
+    return promise;
   }
-  out.sort((a, b) => {
-    if (a.head == null || b.head == null) return a.head == null ? 1 : -1;
-    const ha = BigInt(a.head);
-    const hb = BigInt(b.head);
-    return hb > ha ? 1 : hb < ha ? -1 : 0;
-  });
-  return out;
+
+  /** Test / QA hook: forget everything the session has cached. */
+  function reset() {
+    inflight.clear();
+    posts.clear();
+    idByTx.clear();
+    idsByBlock.clear();
+    authorSegments.clear();
+    authorHeads.clear();
+    feedSegments = [];
+    feedHead = null;
+    notify();
+  }
+
+  seedFromStorage();
+
+  return {
+    chainId: id,
+    subscribe,
+    getVersion: () => version,
+    rememberPosts,
+    rememberFeedRange,
+    rememberAuthorBlock,
+    knownPost,
+    knownPostByTx,
+    allPosts,
+    postsInRange,
+    coveredPosts,
+    authorPostsInBlock,
+    authorPosts,
+    knownChain,
+    feedCoverage,
+    authorCoverage,
+    feedScanHead,
+    authorScanHead,
+    setFeedScanHead,
+    setAuthorScanHead,
+    persistFeedScan,
+    persistAuthorScan,
+    readFeedScan,
+    readAuthorScanEntries,
+    once,
+    reset,
+  };
 }
 
-// --- In-flight fetches -----------------------------------------------
-//
-// Two surfaces can want the same block at the same moment — resolving a
-// post's prev and next neighbors runs both walks in parallel. Sharing the
-// promise keeps "fetched at most once per session" true under concurrency,
-// not just in sequence.
+const stores = new Map(); // chainId -> store
 
-const inflight = new Map(); // key -> Promise
-
-export function once(key, fn) {
-  const hit = inflight.get(key);
-  if (hit) return hit;
-  const promise = Promise.resolve()
-    .then(fn)
-    .finally(() => {
-      if (inflight.get(key) === promise) inflight.delete(key);
-    });
-  inflight.set(key, promise);
-  return promise;
-}
-
-/** Test / QA hook: forget everything the session has cached. */
-export function resetSessionStore() {
-  inflight.clear();
-  posts.clear();
-  idByTx.clear();
-  idsByBlock.clear();
-  authorSegments.clear();
-  authorHeads.clear();
-  feedSegments = [];
-  feedHead = null;
-  seeded = false;
+/** The store for `chainId`, created (and seeded from localStorage) on first use. */
+export function getScanStore(chainId) {
+  const id = Number(chainId);
+  let store = stores.get(id);
+  if (!store) {
+    store = createScanStore(id);
+    stores.set(id, store);
+  }
+  return store;
 }

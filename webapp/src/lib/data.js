@@ -1,16 +1,17 @@
-// data.js — single data facade for all chain reads.
+// data.js — the readers, one per chain, and the DEV fixtures switch.
 //
-// Components import from here instead of blogReader.js so that, in DEV,
-// `?fixtures=1` / `?fixtures=empty` (or VITE_FIXTURES=1) swaps every chain
-// call for deterministic in-memory fixtures. The dynamic import below sits
-// behind a literal `import.meta.env.DEV` check, so production builds
-// tree-shake fixtures.js away entirely (top-level await is enabled in
-// vite.config.js).
+// Components get their reader from here — `useReader()` for the chain being
+// shown, `getReader(chainId)` for any chain — so that, in DEV, `?fixtures=1`
+// / `?fixtures=empty` (or VITE_FIXTURES=1) can swap the chain I/O for an
+// in-memory chain. The dynamic import sits behind a literal
+// `import.meta.env.DEV` check, so production builds tree-shake fixtures.js
+// away entirely (top-level await is enabled in vite.config.js).
+//
+// Readers live for the page: a scan one of them is running keeps going, and
+// keeps caching, no matter which chain the page switches to.
 
-import * as reader from './blogReader';
-import { GLYPH_ADDRESS, getCacheTtlMs } from './config';
-import { makeTtlCache } from './ttlCache';
-import * as rpcLog from './rpcLog';
+import { createReader } from './reader';
+import { useActiveChainId } from './config';
 
 function detectFixturesMode() {
   try {
@@ -25,102 +26,26 @@ function detectFixturesMode() {
 /** `'1'` (demo dataset) | `'empty'` (empty-state QA) | `null` (real chain). DEV only. */
 export const FIXTURES_MODE = import.meta.env.DEV ? detectFixturesMode() : null;
 
-// --- Chain helpers layered on top of the blogReader surface ---
-
-function getAuthorCountReal(author) {
-  return rpcLog.fromNode(
-    'count()',
-    `author ${String(author).slice(0, 8)}…`,
-    () =>
-      reader.client.readContract({
-        address: GLYPH_ADDRESS,
-        abi: reader.abi,
-        functionName: 'count',
-        args: [author],
-      }),
-    (c) => `${c} posts`,
-  );
-}
-
-function getChainClockReal() {
-  return rpcLog.fromNode(
-    'eth_getBlockByNumber',
-    'latest · chain clock',
-    () => reader.client.getBlock({ blockTag: 'latest' }),
-    (b) => `block ${rpcLog.b(b.number)}`,
-  ).then((b) => ({ block: b.number, ts: Number(b.timestamp) }));
-}
-
-// --- Implementation object — fixtures replace it wholesale in DEV ---
-
-let impl = {
-  loadTitleList: reader.loadTitleList,
-  loadMoreTitles: reader.loadMoreTitles,
-  findTitleMeta: reader.findTitleMeta,
-  loadRecentAcrossAuthors: reader.loadRecentAcrossAuthors,
-  loadMoreAcrossAuthors: reader.loadMoreAcrossAuthors,
-  findMetaByTx: reader.findMetaByTx,
-  loadPostBody: reader.loadPostBody,
-  resolveImages: reader.resolveImages,
-  resolveEnsName: reader.resolveEnsName,
-  getAuthorCount: getAuthorCountReal,
-  getChainClock: getChainClockReal,
-};
-
+let makeIO = null;
 if (import.meta.env.DEV && FIXTURES_MODE) {
-  impl = (await import('./fixtures.js')).makeFixtures(FIXTURES_MODE);
+  const { createFixtureIO } = await import('./fixtures.js');
+  makeIO = (chainId) => createFixtureIO(chainId, FIXTURES_MODE);
 }
 
-// Every re-export routes through `impl` so fixtures swap transparently.
-// Repeat chain reads (lists, counts, feed, clock) are deduped by a TTL
-// cache — default 5 minutes, configurable in Settings. Bodies and images
-// are permanently cached in IndexedDB, so they bypass this layer.
-const ttlCache = makeTtlCache(getCacheTtlMs);
-const authorKey = (a) => String(a || '').toLowerCase();
+const readers = new Map(); // chainId -> reader
 
-/**
- * Warm BOTH meta cache keys for a resolved post: resolving a neighbor
- * via findTitleMeta pre-warms its /tx/<hash> entry (and vice versa), so
- * prev/next navigation hits the cache instantly.
- */
-const txMetaKey = (txHash, eventIndex = 0) =>
-  `txmeta:${String(txHash).toLowerCase()}:${eventIndex}`;
-
-function cacheMetaBoth(meta) {
-  if (!meta) return meta;
-  // Touch both cache keys with the same resolved meta.
-  ttlCache(`meta:${authorKey(meta.author)}:${meta.index}`, () => Promise.resolve(meta));
-  ttlCache(txMetaKey(meta.txHash, meta.eventIndex ?? 0), () => Promise.resolve(meta));
-  return meta;
+/** The reader for `chainId`, created on first use and kept for the page. */
+export function getReader(chainId) {
+  const id = Number(chainId);
+  let reader = readers.get(id);
+  if (!reader) {
+    reader = createReader(id, makeIO);
+    readers.set(id, reader);
+  }
+  return reader;
 }
 
-export const loadTitleList = (author, n) =>
-  ttlCache(`titles:${authorKey(author)}:${n}`, () => impl.loadTitleList(author, n));
-export const loadMoreTitles = (author, oldestShown, n) =>
-  ttlCache(
-    `more:${authorKey(author)}:${oldestShown?.index ?? ''}:${oldestShown?.block ?? ''}:${n}`,
-    () => impl.loadMoreTitles(author, oldestShown, n),
-  );
-export const findTitleMeta = (author, targetIndex) =>
-  ttlCache(`meta:${authorKey(author)}:${targetIndex}`, async () =>
-    cacheMetaBoth(await impl.findTitleMeta(author, targetIndex)),
-  );
-export const loadRecentAcrossAuthors = (n, opts) =>
-  ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
-    impl.loadRecentAcrossAuthors(n, opts),
-  );
-// Deliberately NOT TTL-cached: a click that comes up empty is meant to be
-// clicked again, and each repeat sweeps further back. Ranges already read
-// are skipped by the scan store, so repeating costs nothing anyway.
-export const loadMoreAcrossAuthors = (oldestShown, n, opts) =>
-  impl.loadMoreAcrossAuthors(oldestShown, n, opts);
-export const findMetaByTx = (txHash, eventIndex = 0) =>
-  ttlCache(txMetaKey(txHash, eventIndex), async () =>
-    cacheMetaBoth(await impl.findMetaByTx(txHash, eventIndex)),
-  );
-export const loadPostBody = (txHash) => impl.loadPostBody(txHash);
-export const resolveImages = (markdown) => impl.resolveImages(markdown);
-export const resolveEnsName = (author) => impl.resolveEnsName(author);
-export const getAuthorCount = (author) =>
-  ttlCache(`count:${authorKey(author)}`, () => impl.getAuthorCount(author));
-export const getChainClock = () => ttlCache('clock', () => impl.getChainClock());
+/** React hook: the reader for the chain currently being shown. */
+export function useReader() {
+  return getReader(useActiveChainId());
+}

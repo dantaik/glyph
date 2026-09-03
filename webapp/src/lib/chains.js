@@ -1,10 +1,10 @@
 // chains.js — the chains Glyph is deployed on, and how to reach them.
 //
 // The contract is CREATE2-deployed to the SAME address on every EVM chain,
-// so a chain is fully described by its id, its explorer and a list of RPC
-// endpoints. The list is ordered: the reader tries the first and falls back
-// to the next when one fails, so a flaky public node degrades instead of
-// breaking the page.
+// so a chain is fully described by its id, its explorer, an ordered list of
+// RPC endpoints and the block it was deployed in. The list is ordered: the
+// reader tries the first and falls back to the next when one fails, so a
+// flaky public node degrades instead of breaking the page.
 
 import { mainnet, sepolia, taiko } from 'viem/chains';
 
@@ -31,6 +31,13 @@ export const CHAINS = {
     // Blocks per getLogs window. Under drpc's 10,000 free-tier ceiling; a
     // stricter node just makes the sweep shrink its window and carry on.
     logWindow: 9000,
+    // THE MOST BLOCKS ONE SCAN READS FROM THE NODE — one page load, or one
+    // 加载更早的文章 click. Blocks already read are free and don't count.
+    // 270,000 blocks ≈ 37 days of Ethereum at 12s a block.
+    scanBlocks: 270_000,
+    // The block the contract was deployed in (tx 0x5f16…ce9a). No block
+    // below it can hold a Post event, so no sweep ever reads that far.
+    deployBlock: 25_888_250,
     wallet: {
       chainName: 'Ethereum Mainnet',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -42,9 +49,15 @@ export const CHAINS = {
     viem: taiko,
     explorer: 'https://taikoscan.io',
     rpcs: ['https://rpc.mainnet.taiko.xyz', 'https://taiko.drpc.org'],
-    // Both cap getLogs at 10,000 blocks. Taiko's blocks are far quicker than
-    // Ethereum's, so a window covers much less wall-clock time.
+    // The official node allows 30,000 blocks per getLogs, drpc 10,000 —
+    // 9,000 suits both. Taiko blocks come every ~2s, so a window covers far
+    // less wall-clock time than on Ethereum.
     logWindow: 9000,
+    // Per scan (see Ethereum above). 270,000 blocks ≈ 6 days of Taiko at
+    // ~2s a block.
+    scanBlocks: 270_000,
+    // Deployment tx 0x6c66…dae7.
+    deployBlock: 10_863_505,
     wallet: {
       chainName: 'Taiko Alethia',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -57,6 +70,8 @@ export const CHAINS = {
     explorer: 'https://sepolia.etherscan.io',
     rpcs: ['https://sepolia.drpc.org'],
     logWindow: 9000,
+    scanBlocks: 270_000,
+    deployBlock: 0,
     testnet: true,
     wallet: {
       chainName: 'Sepolia',
@@ -70,6 +85,8 @@ export const CHAINS = {
     explorer: 'https://hoodi.taikoscan.io',
     rpcs: ['https://rpc.hoodi.taiko.xyz'],
     logWindow: 9000,
+    scanBlocks: 270_000,
+    deployBlock: 0,
     testnet: true,
     wallet: {
       chainName: 'Taiko Hoodi',
@@ -79,7 +96,7 @@ export const CHAINS = {
 };
 
 /**
- * Chains offered in the header switcher and the settings dialog — the ones
+ * Chains offered in the header switcher and the settings page — the ones
  * Glyph is actually deployed and read on. The testnets above stay resolvable
  * (VITE_CHAIN_ID, an older stored preference) without cluttering the menu.
  */
@@ -97,6 +114,15 @@ export const defaultRpcs = (id) => [...getChain(id).rpcs];
 
 /** Blocks per getLogs window on `id`. */
 export const logWindow = (id) => getChain(id).logWindow ?? 800;
+
+/** The most blocks one scan on `id` reads from the node (see CHAINS). */
+export const scanBlocks = (id) => BigInt(getChain(id).scanBlocks ?? 270_000);
+
+/** The lowest block a sweep on `id` needs to read (the deployment block). */
+export const deployBlock = (id) => BigInt(getChain(id).deployBlock ?? 0);
+
+/** Human-readable name for `id`, or a generic label for an unknown chain. */
+export const chainName = (id) => CHAINS[Number(id)]?.name ?? `链 ${id}`;
 
 /** Params for wallet_addEthereumChain, built from the same single source. */
 export function walletChainParams(id) {

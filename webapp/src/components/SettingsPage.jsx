@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CHAINS, SELECTABLE_CHAIN_IDS, defaultRpcs } from '../lib/chains';
 import {
-  CHAIN_ID,
   GLYPH_ADDRESS,
   getCacheTtlMs,
   getRpcUrls,
@@ -11,9 +10,12 @@ import {
   saveCacheTtl,
   saveRpcUrls,
   setActiveChain,
+  useActiveChainId,
+  useRpcVersion,
 } from '../lib/config';
 import { shortAddr } from '../lib/format';
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Plus, Trash } from './Icons';
+import { Check, ChevronDown, ChevronUp, Plus, Trash } from './Icons';
+import BackButton from './BackButton';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
 
@@ -26,70 +28,71 @@ const BTN_PRIMARY =
 const ICON_BTN =
   'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-ghost hover:text-accent hover:bg-paper-sunken disabled:opacity-25 disabled:hover:text-ink-ghost disabled:hover:bg-transparent transition-colors';
 
-const chainIds = SELECTABLE_CHAIN_IDS.includes(CHAIN_ID)
-  ? SELECTABLE_CHAIN_IDS
-  : [...SELECTABLE_CHAIN_IDS, CHAIN_ID];
+const selectableWith = (activeId) =>
+  SELECTABLE_CHAIN_IDS.includes(activeId)
+    ? SELECTABLE_CHAIN_IDS
+    : [...SELECTABLE_CHAIN_IDS, activeId];
+
+const readLists = (ids) => Object.fromEntries(ids.map((id) => [id, getRpcUrls(id)]));
 
 /**
  * Settings page (/settings): the active chain, each chain's ordered RPC
  * endpoints, and the read-cache TTL. Endpoints are tried top-down and the
  * reader falls back to the next when one fails, so order is the setting —
- * hence move-up / move-down rather than a single URL field.
+ * hence move-up / move-down rather than a single URL field. Saving takes
+ * effect at once, without a reload: even a scan already running moves to
+ * the new endpoints at its next request.
  */
 export default function SettingsPage({ navigate }) {
-  const [lists, setLists] = useState(() =>
-    Object.fromEntries(chainIds.map((id) => [id, getRpcUrls(id)])),
-  );
+  const activeId = useActiveChainId();
+  const rpcVersion = useRpcVersion();
+  const chainIds = selectableWith(activeId);
+  const [lists, setLists] = useState(() => readLists(chainIds));
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries(chainIds.map((id) => [id, ''])),
   );
   const [cacheTtl, setCacheTtl] = useState(String(getCacheTtlMs() / 60_000));
-  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  // Stored lists changed underneath (a save, a reset): show what is stored.
+  useEffect(() => {
+    setLists(readLists(selectableWith(activeId)));
+    setCacheTtl(String(getCacheTtlMs() / 60_000));
+    setDirty(false);
+  }, [rpcVersion, activeId]);
 
   const edit = (id, next) => {
     setLists((cur) => ({ ...cur, [id]: next }));
-    setSaved(false);
+    setDirty(true);
   };
 
   const move = (id, i, delta) => {
-    const list = [...lists[id]];
+    const list = [...(lists[id] ?? [])];
     const j = i + delta;
     if (j < 0 || j >= list.length) return;
     [list[i], list[j]] = [list[j], list[i]];
     edit(id, list);
   };
 
-  const remove = (id, i) => edit(id, lists[id].filter((_, k) => k !== i));
+  const remove = (id, i) => edit(id, (lists[id] ?? []).filter((_, k) => k !== i));
 
   const add = (id) => {
     const url = (drafts[id] || '').trim();
-    if (!/^https?:\/\/\S+$/i.test(url) || lists[id].includes(url)) return;
-    edit(id, [...lists[id], url]);
+    if (!/^https?:\/\/\S+$/i.test(url) || (lists[id] ?? []).includes(url)) return;
+    edit(id, [...(lists[id] ?? []), url]);
     setDrafts((cur) => ({ ...cur, [id]: '' }));
   };
 
   const handleSave = () => {
     saveCacheTtl(cacheTtl.trim() === '' ? null : Number(cacheTtl));
-    // The active chain goes last: it reloads the page, and the others must
-    // already be written by then.
-    for (const id of chainIds.filter((x) => x !== CHAIN_ID)) {
-      saveRpcUrls(id, lists[id], { reloadPage: false });
-    }
-    setSaved(true);
-    saveRpcUrls(CHAIN_ID, lists[CHAIN_ID]);
+    for (const id of chainIds) saveRpcUrls(id, lists[id] ?? []);
+    navigate({});
   };
 
   return (
     <div>
       <div className="mb-8">
-        <button
-          type="button"
-          onClick={() => navigate({})}
-          className="-ml-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors"
-        >
-          <ArrowLeft size={16} />
-          返回
-        </button>
+        <BackButton onClick={() => navigate({})} />
       </div>
 
       <ListHeader
@@ -100,13 +103,13 @@ export default function SettingsPage({ navigate }) {
       <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">
         合约通过 CREATE2 部署，在每条链上都是同一个地址（{shortAddr(GLYPH_ADDRESS)}），
         所以切换网络只是换一个节点去读。每条链可以配置多个 RPC 节点：按顺序使用第一个，
-        失败时自动回退到下一个。保存后会刷新页面。
+        失败时自动回退到下一个。保存后立即生效，不刷新页面；正在进行的扫描会从下一次请求起使用新的节点。
       </p>
 
       {chainIds.map((id) => {
         const chain = CHAINS[id];
         const list = lists[id] ?? [];
-        const active = id === CHAIN_ID;
+        const active = id === activeId;
         return (
           <section key={id} className="mb-10">
             <SectionHeader
@@ -233,7 +236,7 @@ export default function SettingsPage({ navigate }) {
             value={cacheTtl}
             onChange={(e) => {
               setCacheTtl(e.target.value);
-              setSaved(false);
+              setDirty(true);
             }}
             className={INPUT}
           />
@@ -251,14 +254,14 @@ export default function SettingsPage({ navigate }) {
           <button type="button" onClick={() => navigate({})} className={BTN_QUIET}>
             取消
           </button>
-          <button type="button" onClick={handleSave} disabled={saved} className={BTN_PRIMARY}>
-            {saved ? '正在刷新…' : '保存并刷新'}
+          <button type="button" onClick={handleSave} disabled={!dirty} className={BTN_PRIMARY}>
+            保存
           </button>
         </div>
       </div>
 
       <p className="mt-8 text-xs leading-relaxed text-ink-ghost">
-        节点列表保存在本机浏览器（localStorage）。已扫描的区块范围按链分别缓存，切换网络不会互相污染。
+        节点列表保存在本机浏览器（localStorage）。已扫描的区块范围、正文与图片缓存都按链分别保存，切换网络不会互相污染。
       </p>
     </div>
   );
