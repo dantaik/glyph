@@ -15,41 +15,34 @@ import {
 import { shortAddr } from '../lib/format';
 import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
+import BackupSection from './BackupSection';
 import ListHeader from './ListHeader';
+import Note from './Note';
 import OfflineSection from './OfflineSection';
 import SectionHeader from './SectionHeader';
-
-const INPUT =
-  'w-full rounded-lg border border-edge-strong bg-paper px-3 py-2 font-mono text-sm placeholder:text-ink-ghost focus:border-accent focus:outline-none';
-const BTN_QUIET =
-  'rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors';
-const BTN_PRIMARY =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2 text-sm font-medium text-paper hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors';
-const ICON_BTN =
-  'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-ghost hover:text-accent hover:bg-paper-sunken disabled:opacity-25 disabled:hover:text-ink-ghost disabled:hover:bg-transparent transition-colors';
+import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT, INPUT_MONO } from './formStyles';
 
 const chainIds = READ_CHAIN_IDS;
 
 const readLists = () => Object.fromEntries(chainIds.map((id) => [id, getRpcUrls(id)]));
 
 /**
- * Settings page (/settings): each chain's ordered RPC endpoints and the
- * rescan delay. Endpoints are tried top-down and the reader falls back to
- * the next when one fails, so order is the setting — hence move-up /
- * move-down rather than a single URL field. Saving takes effect at once,
- * without a reload: even a scan already running moves to the new
- * endpoints at its next request.
+ * Settings page (/settings): each chain's ordered RPC endpoints, the
+ * rescan delay, backup and restore, and the offline copy. Endpoints are
+ * tried top-down and the reader falls back to the next when one fails,
+ * so order is the setting — hence move-up / move-down rather than a
+ * single URL field. Saving takes effect at once, without a reload: even a
+ * scan already running moves to the new endpoints at its next request.
  */
 export default function SettingsPage({ navigate }) {
   const rpcVersion = useRpcVersion();
   const [lists, setLists] = useState(() => readLists());
-  const [drafts, setDrafts] = useState(() =>
-    Object.fromEntries(chainIds.map((id) => [id, ''])),
-  );
+  const [drafts, setDrafts] = useState(() => Object.fromEntries(chainIds.map((id) => [id, ''])));
   const [rescanDelay, setRescanDelay] = useState(String(getRescanDelayMs() / 60_000));
   const [dirty, setDirty] = useState(false);
 
-  // Stored lists changed underneath (a save, a reset): show what is stored.
+  // Stored lists changed underneath (a save, a reset, a restored file):
+  // show what is stored.
   useEffect(() => {
     setLists(readLists());
     setRescanDelay(String(getRescanDelayMs() / 60_000));
@@ -90,16 +83,13 @@ export default function SettingsPage({ navigate }) {
         <BackButton onClick={() => navigate({})} />
       </div>
 
-      <ListHeader
-        title="设置"
-        subtitle={hasOverrides() ? '已自定义' : '使用默认配置'}
-      />
+      <ListHeader title="设置" subtitle={hasOverrides() ? '已自定义' : '使用默认配置'} />
 
-      <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">
+      <Note className="mb-8 max-w-2xl">
         合约通过 CREATE2 部署，在每条链上都是同一个地址（{shortAddr(GLYPH_ADDRESS)}），
         所以两条链读的是同一本刊物：首页把两条链上的文章按时间合在一起。每条链可以配置多个 RPC 节点：
         按顺序使用第一个，失败时自动回退到下一个。保存后立即生效，不刷新页面；正在进行的扫描会从下一次请求起使用新的节点。
-      </p>
+      </Note>
 
       {chainIds.map((id) => {
         const chain = CHAINS[id];
@@ -109,27 +99,19 @@ export default function SettingsPage({ navigate }) {
             <SectionHeader label={`${chain?.name ?? `链 ${id}`} · ${id}`} />
 
             {list.length === 0 ? (
-              <p className="mb-3 text-sm text-ink-ghost">
-                没有节点，保存后将使用内置默认节点。
-              </p>
+              <Note className="mb-3">没有节点，保存后将使用内置默认节点。</Note>
             ) : (
               <ol className="mb-3 divide-y divide-edge border-y border-edge">
                 {list.map((url, i) => (
                   <li key={`${url}-${i}`} className="flex items-center gap-2 py-2">
-                    <span className="w-6 shrink-0 text-center font-mono text-2xs text-ink-ghost">
-                      {i + 1}
-                    </span>
+                    <span className="w-6 shrink-0 text-center text-2xs tabular-nums text-ink-ghost">{i + 1}</span>
                     <span
                       title={url}
-                      className={`min-w-0 flex-1 truncate font-mono text-xs ${
-                        i === 0 ? 'text-ink-soft' : 'text-ink-faint'
-                      }`}
+                      className={`min-w-0 flex-1 truncate font-mono text-xs ${i === 0 ? 'text-ink-soft' : 'text-ink-faint'}`}
                     >
                       {url}
                     </span>
-                    {i === 0 && (
-                      <span className="shrink-0 text-2xs text-ink-ghost">优先</span>
-                    )}
+                    {i === 0 && <span className="shrink-0 text-2xs text-ink-faint">优先</span>}
                     <button
                       type="button"
                       onClick={() => move(id, i, -1)}
@@ -175,13 +157,9 @@ export default function SettingsPage({ navigate }) {
                 }}
                 placeholder="https://你的节点地址"
                 aria-label={`为 ${chain?.name ?? id} 添加 RPC 节点`}
-                className={INPUT}
+                className={INPUT_MONO}
               />
-              <button
-                type="button"
-                onClick={() => add(id)}
-                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-edge-strong px-3 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors"
-              >
+              <button type="button" onClick={() => add(id)} className={`${BTN_OUTLINE} shrink-0 px-3`}>
                 <Plus size={15} />
                 添加
               </button>
@@ -190,7 +168,7 @@ export default function SettingsPage({ navigate }) {
               <button
                 type="button"
                 onClick={() => edit(id, defaultRpcs(id))}
-                className="mt-2 text-xs text-ink-ghost hover:text-accent transition-colors"
+                className="mt-2 text-xs text-ink-faint hover:text-accent transition-colors"
               >
                 恢复此链的默认节点
               </button>
@@ -202,9 +180,7 @@ export default function SettingsPage({ navigate }) {
       <section className="mb-10">
         <SectionHeader label="扫描频率" />
         <label className="block max-w-xs">
-          <span className="mb-1.5 block text-xs tracking-label text-ink-faint">
-            区块链扫描延迟（分钟）
-          </span>
+          <span className={FIELD_LABEL}>区块链扫描延迟（分钟）</span>
           <input
             type="number"
             min="0"
@@ -214,27 +190,22 @@ export default function SettingsPage({ navigate }) {
               setRescanDelay(e.target.value);
               setDirty(true);
             }}
-            className={INPUT}
+            className={`${INPUT} tabular-nums`}
           />
-          <span className="mt-1 block text-xs leading-relaxed text-ink-faint">
-            上一次扫描结束后的 N 分钟内，重新打开首页或作者页只显示上次扫到的文章，不再向节点请求新区块；
-            超过之后，下次打开会补扫这段时间新产生的区块。0 = 每次都扫。默认 1 分钟。
-          </span>
-          <span className="mt-1.5 block text-xs leading-relaxed text-ink-ghost">
-            这只决定「什么时候去读新区块」，不会漏掉任何文章。已经读到的内容是永久缓存的——
-            链上数据不会改变，同一篇文章不会被重复请求。
-          </span>
         </label>
+        <Note className="mt-2 max-w-2xl">
+          上一次扫描结束后的 N 分钟内，重新打开首页或作者页只显示上次扫到的文章，不再向节点请求新区块；
+          超过之后，下次打开会补扫这段时间新产生的区块。0 = 每次都扫。默认 1 分钟。
+          这只决定「什么时候去读新区块」，不会漏掉任何文章：已经读到的内容是永久缓存的——链上数据不会改变，同一篇文章不会被重复请求。
+        </Note>
       </section>
+
+      <BackupSection />
 
       <OfflineSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
-        <button
-          type="button"
-          onClick={() => resetEndpointConfig()}
-          className={BTN_QUIET}
-        >
+        <button type="button" onClick={() => resetEndpointConfig()} className={BTN_QUIET}>
           恢复默认
         </button>
         <div className="flex items-center gap-2">
@@ -247,9 +218,9 @@ export default function SettingsPage({ navigate }) {
         </div>
       </div>
 
-      <p className="mt-8 text-xs leading-relaxed text-ink-ghost">
+      <Note className="mt-8">
         节点列表保存在本机浏览器（localStorage）。已扫描的区块范围、正文与图片缓存都按链分别保存，互不污染。
-      </p>
+      </Note>
     </div>
   );
 }

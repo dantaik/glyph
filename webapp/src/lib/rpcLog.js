@@ -30,6 +30,18 @@ function enabled() {
   }
 }
 
+/** Whether chain reads are being logged to the console. */
+export const isEnabled = () => enabled();
+
+/** Turn the console log on or off, for this browser. */
+export function setEnabled(on) {
+  try {
+    localStorage.setItem(KEY, on ? '1' : '0');
+  } catch {
+    // not persisted — the query flag still works
+  }
+}
+
 const TAG = 'background:#4f46e5;color:#fff;border-radius:3px;padding:0 5px';
 const CHAIN = 'color:#4f46e5;font-weight:600';
 const NODE = 'color:#b45309;font-weight:600';
