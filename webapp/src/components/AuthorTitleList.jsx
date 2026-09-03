@@ -6,6 +6,7 @@ import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import ScanProgress from './ScanProgress';
 
 /**
  * Author page: address header, post count, title list with relative times,
@@ -25,6 +26,17 @@ export default function AuthorTitleList({
   onRetry,
   navigate,
 }) {
+  // Live load-more progress for the author-chain walk.
+  const [scanProgress, setScanProgress] = useState(null);
+  useEffect(() => {
+    const onProgress = (e) => setScanProgress(e.detail);
+    window.addEventListener('glyph:scanprogress', onProgress);
+    return () => window.removeEventListener('glyph:scanprogress', onProgress);
+  }, []);
+  useEffect(() => {
+    if (!loadingMore) setScanProgress(null);
+  }, [loadingMore]);
+
   // Show the author's ENS name when the address has one, else the address.
   const [ensName, setEnsName] = useState(null);
   useEffect(() => {
@@ -85,7 +97,16 @@ export default function AuthorTitleList({
       )}
 
       {titles.length > 0 && (
-        <LoadMoreButton onClick={onLoadMore} loading={loadingMore} hasMore={hasMore} />
+        <>
+          {loadingMore && (
+            <ScanProgress
+              label="正在扫描更早的文章…"
+              progress={scanProgress}
+              className="mt-8"
+            />
+          )}
+          <LoadMoreButton onClick={onLoadMore} loading={loadingMore} hasMore={hasMore} />
+        </>
       )}
     </div>
   );

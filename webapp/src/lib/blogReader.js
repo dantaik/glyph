@@ -188,12 +188,30 @@ export async function loadTitleList(author, n) {
 export async function loadMoreTitles(author, oldestShown, n) {
   if (!oldestShown) return [];
   store.seedFromStorage();
+  const emitStep = ({ block, collected, target }) => {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('glyph:scanprogress', {
+          detail: {
+            fromBlock: block,
+            toBlock: block,
+            fraction: Math.min(1, Math.max(0, collected / Math.max(1, target))),
+            posts: collected,
+            target,
+          },
+        }),
+      );
+    } catch {
+      /* non-browser context */
+    }
+  };
   const out = await scanner.walkAuthorTitles(
     author,
     oldestShown.block,
     oldestShown.index,
     n,
     authorBlockFetcher(author),
+    emitStep,
   );
   store.persistAuthorScan(author);
   return out;
@@ -268,6 +286,34 @@ async function fetchFeedRange(from, to, endsAtHead) {
   return logs.map((log) => logToMeta(log, log.blockNumber));
 }
 
+/**
+ * Wrap a feed-range fetcher to pulse `glyph:scanprogress` before each fresh
+ * window: the range about to be fetched plus the overall fraction, anchored
+ * on the span from `cursor` down to `targetBottom`.
+ */
+function withFeedProgress(cursor, targetBottom, fetchRange) {
+  return async (from, to, endsAtHead) => {
+    try {
+      const scanSpan = cursor - targetBottom + 1n;
+      const fraction =
+        scanSpan <= 0n
+          ? 1
+          : Math.min(
+              1,
+              Math.max(0, Number(((cursor - from + 1n) * 1000n) / scanSpan) / 1000),
+            );
+      window.dispatchEvent(
+        new CustomEvent('glyph:scanprogress', {
+          detail: { fromBlock: from, toBlock: to, targetBottom, fraction },
+        }),
+      );
+    } catch {
+      /* non-browser context */
+    }
+    return fetchRange(from, to, endsAtHead);
+  };
+}
+
 /** Home feed: most recent `n` posts across ALL authors. */
 export async function loadRecentAcrossAuthors(
   n,
@@ -289,13 +335,26 @@ export async function loadRecentAcrossAuthors(
     return rows;
   }
 
+  // Walk backwards from the head, skipping every range already read. The
+  // UI gets a glyph:scanprogress pulse per fresh window (current range +
+  // overall fraction), anchored on the ground this sweep can actually
+  // cover: down to the top of the nearest already-covered range, or a
+  // bounded maxWindows floor on the first visit.
+  const span = BigInt(windowSize);
+  const below = seg.topBelow(store.feedCoverage(), head);
+  const targetBottom =
+    below != null
+      ? below + 1n
+      : head > span * BigInt(maxWindows)
+        ? head - span * BigInt(maxWindows) + 1n
+        : 0n;
   await scanner.sweepFeed({
     cursor: head,
     head,
     n,
     windowSize,
     maxWindows,
-    fetchRange: fetchFeedRange,
+    fetchRange: withFeedProgress(head, targetBottom, fetchFeedRange),
   });
   store.setFeedScanHead(head);
   store.persistFeedScan();
@@ -327,6 +386,10 @@ export async function loadMoreAcrossAuthors(
   if (cursor < 0n) return { rows: [], done: true };
 
   const head = store.feedScanHead();
+  // Progress anchor: this call can walk at most maxWindows below the cursor.
+  const span = BigInt(windowSize);
+  const targetBottom =
+    cursor > span * BigInt(maxWindows) ? cursor - span * BigInt(maxWindows) + 1n : 0n;
   const swept = await scanner.sweepFeed({
     cursor,
     head: head != null ? BigInt(head) : null,
@@ -334,7 +397,7 @@ export async function loadMoreAcrossAuthors(
     olderThan: oldestShown ? store.rememberPosts([oldestShown])[0] : null,
     windowSize,
     maxWindows,
-    fetchRange: fetchFeedRange,
+    fetchRange: withFeedProgress(cursor, targetBottom, fetchFeedRange),
   });
   store.persistFeedScan();
   return { rows: swept.rows, done: swept.reachedGenesis };

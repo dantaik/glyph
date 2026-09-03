@@ -129,7 +129,9 @@ const BODY_A1_3 = `山里落了今年第一场雪，不大，半夜下的，清�
 
 屋后的竹子被雪压弯了腰，我拿竹竿轻轻一敲，雪扑簌簌落下来，它们又齐齐站直，跟没事人一样。
 
-雪停了我就下山寄腊肉，顺路把这封信发出去。山高路远，字比人先到。`;
+雪停了我就下山寄腊肉，顺路把这封信发出去。山高路远，字比人先到。
+
+昨天又翻出家里那篇《关于外婆的香樟木箱》重读了一遍，雪天读旧信，格外暖。想顺着读的，点这里：[关于外婆的香樟木箱](0x000000008a1f3b52c9e44e1a9b1f0d2c7a44e0b1d2e3f4a50000000000fab1e2)。`;
 
 const BODY_A1_2 = `梦里又走了一遍那条小路：从村口的老槐树拐进去，过石板桥，第三户人家的烟囱永远先冒烟，那是我家。
 
@@ -240,13 +242,36 @@ export function makeFixtures(mode) {
     },
 
     async loadMoreTitles(author, oldestShown, n) {
-      await delay();
       if (!oldestShown) return [];
-      return postsOf(author)
+      const rows = postsOf(author)
         .filter((p) => p.index < oldestShown.index)
         .reverse()
         .slice(0, n)
         .map((p) => ({ ...p }));
+      // Mimic the real author-walk progress pulses while the fake delay runs.
+      const block = Number(oldestShown.block);
+      const emit = (posts, blockNum) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('glyph:scanprogress', {
+              detail: {
+                fromBlock: blockNum,
+                toBlock: blockNum,
+                fraction: Math.min(1, posts / Math.max(1, n)),
+                posts,
+                target: n,
+              },
+            }),
+          );
+        } catch {
+          /* non-browser context */
+        }
+      };
+      emit(0, Math.max(0, block - 1));
+      await delay();
+      emit(rows.length, Math.max(0, block - 2));
+      await delay();
+      return rows;
     },
 
     async findTitleMeta(author, targetIndex) {
@@ -257,15 +282,50 @@ export function makeFixtures(mode) {
     },
 
     async loadRecentAcrossAuthors(n) {
+      const rows = feed.slice(0, n).map((p) => ({ ...p }));
+      // Mimic the real scan's progress pulses while the fake delay runs.
+      const head = feed.length ? Number(feed[0].block) : 0;
+      const bottom = feed.length ? Number(feed[feed.length - 1].block) : 0;
+      const emit = (fromBlock, fraction) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('glyph:scanprogress', {
+              detail: { head, fromBlock, toBlock: fromBlock + 799, targetBottom: bottom, fraction },
+            }),
+          );
+        } catch {
+          /* non-browser context */
+        }
+      };
+      emit(Math.max(0, head - 800), 0.05);
       await delay();
-      return feed.slice(0, n).map((p) => ({ ...p }));
+      emit(Math.max(0, head - 12000), 0.5);
+      await delay();
+      return rows;
     },
 
     async loadMoreAcrossAuthors(oldestShown, n) {
-      await delay();
       if (!oldestShown) return { rows: [], done: feed.length === 0 };
       const older = feed.filter((p) => p.block < BigInt(oldestShown.block));
-      return { rows: older.slice(0, n).map((p) => ({ ...p })), done: older.length <= n };
+      const rows = older.slice(0, n).map((p) => ({ ...p }));
+      // Mimic the real feed-sweep progress pulses while the fake delay runs.
+      const cursor = Number(oldestShown.block);
+      const emit = (fromBlock, fraction) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('glyph:scanprogress', {
+              detail: { fromBlock, toBlock: fromBlock + 799, fraction },
+            }),
+          );
+        } catch {
+          /* non-browser context */
+        }
+      };
+      emit(Math.max(0, cursor - 800), 0.1);
+      await delay();
+      emit(Math.max(0, cursor - 12000), 0.6);
+      await delay();
+      return { rows, done: older.length <= n };
     },
 
     async loadPostBody(txHash) {

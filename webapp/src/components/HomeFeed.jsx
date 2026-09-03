@@ -10,6 +10,7 @@ import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import ScanProgress from './ScanProgress';
 
 const FEED_SIZE = 20;
 const EXCERPT_CHARS = 80;
@@ -35,17 +36,30 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   const [error, setError] = useState(null);
   const [clock, setClock] = useState(null);
   const [tick, setTick] = useState(0);
+  // Live scan progress: { head, fromBlock, toBlock, fraction } or null.
+  const [scanProgress, setScanProgress] = useState(null);
+
+  useEffect(() => {
+    const onProgress = (e) => setScanProgress(e.detail);
+    window.addEventListener('glyph:scanprogress', onProgress);
+    return () => window.removeEventListener('glyph:scanprogress', onProgress);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setScanProgress(null);
     setDone(false);
     setNote(null);
     loadRecentAcrossAuthors(FEED_SIZE)
       .then((r) => !cancelled && setRows(r))
       .catch((e) => !cancelled && setError(e.message || '加载失败'))
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+        setScanProgress(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -66,6 +80,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     if (loadingMore || done) return;
     setLoadingMore(true);
     setNote(null);
+    setScanProgress(null);
     try {
       const oldest = rows[rows.length - 1] ?? null;
       const { rows: more = [], done: finished } =
@@ -80,6 +95,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
       setNote(friendlyError(e?.message));
     } finally {
       setLoadingMore(false);
+      setScanProgress(null);
     }
   }, [rows, loadingMore, done]);
 
@@ -90,16 +106,14 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     <div>
       <section className="mb-9 text-center">
         <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-display">
-          人过留名，雁过留声。
-          <br />
-          人海亿万，唯留字者不朽。
+          人海亿万，唯文字不朽。
         </h1>
       </section>
 
       <ListHeader title="最新文章" subtitle="来自所有作者" />
 
       {loading ? (
-        <FeedSkeleton />
+        <FeedSkeleton progress={scanProgress} />
       ) : error ? (
         <EmptyState
           tone="danger"
@@ -130,6 +144,13 @@ export default function HomeFeed({ navigate, onStartWriting }) {
             ))}
           </ul>
 
+          {loadingMore && (
+            <ScanProgress
+              label="正在扫描更早的文章…"
+              progress={scanProgress}
+              className="mt-8"
+            />
+          )}
           <LoadMoreButton
             onClick={loadMore}
             loading={loadingMore}
@@ -144,26 +165,27 @@ export default function HomeFeed({ navigate, onStartWriting }) {
 }
 
 
-function FeedSkeleton() {
+function FeedSkeleton({ progress }) {
+  const pct = progress ? Math.round(progress.fraction * 100) : 0;
   return (
-    <div aria-hidden="true">
-      <div className="border-b border-edge pb-8">
-        <div className="h-7 w-3/5 animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-4 h-4 w-full animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-2 h-4 w-4/5 animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-4 h-3 w-2/5 animate-pulse rounded bg-paper-sunken" />
+    <div>
+      <div aria-hidden="true">
+        <div className="border-b border-edge pb-8">
+          <div className="h-7 w-3/5 animate-pulse rounded bg-paper-sunken" />
+          <div className="mt-4 h-4 w-full animate-pulse rounded bg-paper-sunken" />
+          <div className="mt-2 h-4 w-4/5 animate-pulse rounded bg-paper-sunken" />
+          <div className="mt-4 h-3 w-2/5 animate-pulse rounded bg-paper-sunken" />
+        </div>
+        <ul className="divide-y divide-edge">
+          {[0, 1, 2, 3].map((k) => (
+            <li key={k} className="py-5">
+              <div className="h-5 w-2/3 animate-pulse rounded bg-paper-sunken" />
+              <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-paper-sunken" />
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="divide-y divide-edge">
-        {[0, 1, 2, 3].map((k) => (
-          <li key={k} className="py-5">
-            <div className="h-5 w-2/3 animate-pulse rounded bg-paper-sunken" />
-            <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-paper-sunken" />
-          </li>
-        ))}
-      </ul>
-      <p className="mt-10 animate-pulse text-center text-xs text-ink-ghost">
-        正在扫描最近区块…
-      </p>
+      <ScanProgress label="正在扫描最近区块…" progress={progress} className="mt-10" />
     </div>
   );
 }
