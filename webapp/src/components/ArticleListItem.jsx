@@ -4,7 +4,7 @@ import { hrefFor } from '../lib/router';
 import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
 
-const EXCERPT_CHARS = 80;
+const EXCERPT_CHARS = 256;
 
 /**
  * One article row in a reading list — shared by the home feed and the
@@ -48,7 +48,7 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
         </a>
       </div>
       {teaser && (
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft line-clamp-2">{teaser}</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{teaser}</p>
       )}
       <div className="mt-1.5">
         <PostMeta
