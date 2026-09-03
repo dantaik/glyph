@@ -6,21 +6,28 @@
 
 ## 快速开始
 
+合约已部署，地址（CREATE2，所有链相同）与各链的默认 RPC 节点都内置在前端里——
+克隆即可运行，**无需任何配置**：
+
 ```bash
-# 1. 部署合约（任何人都可以部署；部署者无任何特权）
+cd webapp && npm install && npm run dev
+```
+
+部署到 Vercel / Netlify 等静态托管同样零配置：`vercel.json` 已就绪，直接导入仓库即可。
+
+**可选——自己部署一份合约**（任何人都可以部署；部署者无任何特权）：
+
+```bash
 cd contracts && forge install foundry-rs/forge-std
 forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
   --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY 经环境变量传入（脚本用 vm.envUint 读取）
 
-# 2. 配置前端
+# 让前端指向自己那份。Vite 在构建时内联这些变量，改动后必须重新构建
 cat > webapp/.env.local <<EOF
-VITE_GLYPH_ADDRESS=0x000000AE2f2249c497cfc5F262dd1491634C361C
+VITE_GLYPH_ADDRESS=0x你自己部署的地址
 VITE_RPC_URL=https://eth.drpc.org
 VITE_CHAIN_ID=1
 EOF
-
-# 3. 运行
-cd webapp && npm install && npm run dev
 ```
 
 **阅读**：访问 `/`（全网最新文章）、`/author/0x作者地址`（某作者的列表）、`/tx/0x交易哈希/0`（单篇文章，末尾是交易内的事件序号）、`/scan`（本机增量扫描已覆盖的多段区块范围，页脚可直达）。

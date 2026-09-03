@@ -467,9 +467,14 @@ forge create src/Blog.sol:Glyph \
 ```
 
 **前端配置**
+
+合约地址由 CREATE2 决定、所有链相同，因此作为常量内置于 `webapp/src/lib/config.js`
+（`DEFAULT_GLYPH_ADDRESS`），默认无需配置。下列变量由 Vite 在**构建时**内联，仅在
+需要指向自己部署的那份合约时才用得上：
+
 ```bash
-# webapp/.env.local
-VITE_GLYPH_ADDRESS=0x...          # 合约地址
+# webapp/.env.local（可选）
+VITE_GLYPH_ADDRESS=0x...          # 覆盖内置合约地址
 VITE_RPC_URL=https://...          # RPC 默认（可在 UI 设置里覆盖）
 VITE_CHAIN_ID=1                   # 1=mainnet, 11155111=sepolia
 ```

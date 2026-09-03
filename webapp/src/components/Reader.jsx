@@ -6,10 +6,8 @@ import {
   findMetaByTx,
   getAuthorCount,
   getChainClock,
-  FIXTURES_MODE,
 } from '../lib/data';
 import { friendlyError } from '../lib/format';
-import { GLYPH_ADDRESS } from '../lib/config';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
 import EmptyState from './EmptyState';
 import PostPage from './PostPage';
@@ -64,15 +62,12 @@ export default function Reader({ onStartWriting }) {
   const [listTick, setListTick] = useState(0);
   const neighborCache = useRef(new Map());
 
-  const isConfigured =
-    Boolean(FIXTURES_MODE) || GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
-
   // Load title list when author changes.
   useEffect(() => {
     setTitles([]);
     setError(null);
     setHasMore(true);
-    if (!isConfigured || !author) return undefined;
+    if (!author) return undefined;
     let cancelled = false;
     setLoading(true);
     loadTitleList(author, PAGE_SIZE)
@@ -86,11 +81,11 @@ export default function Reader({ onStartWriting }) {
     return () => {
       cancelled = true;
     };
-  }, [author, isConfigured, listTick]);
+  }, [author, listTick]);
 
   // Chain clock for 约-relative times; silently degrade to block numbers.
   useEffect(() => {
-    if (!isConfigured || !author) return undefined;
+    if (!author) return undefined;
     let cancelled = false;
     getChainClock()
       .then((c) => !cancelled && setClock(c))
@@ -98,12 +93,12 @@ export default function Reader({ onStartWriting }) {
     return () => {
       cancelled = true;
     };
-  }, [author, isConfigured]);
+  }, [author]);
 
   // 共 N 篇 — total post count for the author header.
   useEffect(() => {
     setAuthorCount(undefined);
-    if (!isConfigured || !author) return undefined;
+    if (!author) return undefined;
     let cancelled = false;
     getAuthorCount(author)
       .then((c) => !cancelled && setAuthorCount(c))
@@ -111,7 +106,7 @@ export default function Reader({ onStartWriting }) {
     return () => {
       cancelled = true;
     };
-  }, [author, isConfigured]);
+  }, [author]);
 
   // Legacy ?author= query links converge onto the /author/<addr> path
   // (replace, so history stays clean).
@@ -187,25 +182,6 @@ export default function Reader({ onStartWriting }) {
       setLoadingMore(false);
     }
   }, [author, titles, loadingMore, hasMore]);
-
-  // --- Empty / error states ---
-
-  if (!isConfigured) {
-    return (
-      <EmptyState
-        title="尚未配置"
-        body={
-          <>
-            请先部署 Glyph 合约，然后通过{' '}
-            <code className="rounded bg-paper-sunken px-1.5 py-0.5 font-mono text-xs text-ink-soft">
-              VITE_GLYPH_ADDRESS
-            </code>{' '}
-            配置合约地址。
-          </>
-        }
-      />
-    );
-  }
 
   // --- /scan — local scan-range status page ---
 

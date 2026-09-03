@@ -11,8 +11,6 @@ import { readFeedScan } from './lib/scanStore';
 import { lowest, highest } from './lib/segments';
 import { useUrlState } from './lib/router';
 
-const CONTRACT_CONFIGURED = GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
-
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
   const { chainId: walletChainId } = useWallet();
@@ -81,34 +79,32 @@ export default function App() {
         )}
       </main>
       <footer className="border-t border-edge py-10 text-center">
-        {CONTRACT_CONFIGURED && (
-          <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-            <span>{chainName()}</span>
-            <span className="select-none" aria-hidden="true">·</span>
-            <a
-              href={etherscanAddrUrl(GLYPH_ADDRESS)}
-              target="_blank"
-              rel="noreferrer"
-              title="在 Etherscan 查看合约"
-              className="inline-block font-mono text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
-            >
-              合约：{shortAddr(GLYPH_ADDRESS)}
-            </a>
-            <span className="select-none" aria-hidden="true">·</span>
-            <a
-              href="/scan"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate({ scan: '1' });
-              }}
-              title="查看扫描范围"
-              className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
-            >
-              扫描范围
-              {scanSpan}
-            </a>
-          </p>
-        )}
+        <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
+          <span>{chainName()}</span>
+          <span className="select-none" aria-hidden="true">·</span>
+          <a
+            href={etherscanAddrUrl(GLYPH_ADDRESS)}
+            target="_blank"
+            rel="noreferrer"
+            title="在 Etherscan 查看合约"
+            className="inline-block font-mono text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
+          >
+            合约：{shortAddr(GLYPH_ADDRESS)}
+          </a>
+          <span className="select-none" aria-hidden="true">·</span>
+          <a
+            href="/scan"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate({ scan: '1' });
+            }}
+            title="查看扫描范围"
+            className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
+          >
+            扫描范围
+            {scanSpan}
+          </a>
+        </p>
       </footer>
       {FIXTURES_MODE && (
         <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
