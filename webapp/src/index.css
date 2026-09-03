@@ -33,8 +33,8 @@
   /* --- Fonts --- */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  --font-serif: "Source Han Serif SC", "思源宋体", "Noto Serif SC Variable",
-    "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-serif: "Source Han Serif SC", "思源宋体", "Noto Serif SC",
+    "Songti SC", "SimSun", serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Source Code Pro", monospace;
 
   /* --- Type scale — 9 named tiers, nothing else is used:

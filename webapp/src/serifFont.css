@@ -1,0 +1,12 @@
+/* The app's webfont: Adobe's official Source Han Serif (思源宋体),
+   Simplified-Chinese subset, variable weight — served as a WOFF2 file from
+   public/fonts/ (adobe-fonts/source-han-serif release branch, SIL OFL 1.1).
+   The subset covers the common ~9k characters; anything rarer falls through
+   the --font-serif stack to the locally installed face. font-display: swap
+   shows the fallback immediately while the file streams in. */
+@font-face {
+  font-family: 'Source Han Serif SC';
+  src: url('/fonts/SourceHanSerifCN-VF.otf.woff2') format('woff2-variations');
+  font-weight: 200 900;
+  font-display: swap;
+}
