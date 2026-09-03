@@ -113,7 +113,7 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
           {frontier?.after === -1 && marker()}
           {rows.map((t, i) => (
             <Fragment key={rowKey(t)}>
-              <ArticleListItem post={t} navigate={navigate} currentChain={currentChain} showIndex />
+              <ArticleListItem post={t} navigate={navigate} currentChain={currentChain} showIndex loadBody={view.loadPostBody} />
               {frontier?.after === i && marker()}
             </Fragment>
           ))}

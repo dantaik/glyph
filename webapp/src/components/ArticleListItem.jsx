@@ -1,7 +1,10 @@
-import { fmtTitle, fmtIndex } from '../lib/format';
+import { useEffect, useState } from 'react';
+import { fmtTitle, fmtIndex, excerpt } from '../lib/format';
 import { hrefFor } from '../lib/router';
 import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
+
+const EXCERPT_CHARS = 80;
 
 /**
  * One article row in a reading list — shared by the home feed and the
@@ -11,8 +14,25 @@ import PostMeta from './PostMeta';
  * chain it was read on; `currentChain` is the chain the list is filtered
  * to, if any, so that chain's chip reads as a label rather than a link.
  */
-export default function ArticleListItem({ post, clock, navigate, currentChain = null, showIndex = false }) {
+export default function ArticleListItem({ post, clock, navigate, currentChain = null, showIndex = false, loadBody }) {
   const target = { chain: post.chainId, tx: post.txHash, txEvent: post.eventIndex ?? 0 };
+  // Content preview: the body is fetched cache-first (IndexedDB) and shown
+  // as a short plain-text excerpt; silently degrades to title-only.
+  const [teaser, setTeaser] = useState(null);
+  useEffect(() => {
+    if (!loadBody) return undefined;
+    let cancelled = false;
+    setTeaser(null);
+    loadBody(post)
+      .then((res) => {
+        if (cancelled) return;
+        setTeaser(excerpt(res?.body?.markdown, EXCERPT_CHARS) || null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [post.txHash, post.chainId, loadBody]);
   return (
     <li className="py-4">
       <div className="flex items-baseline gap-3">
@@ -27,6 +47,9 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
           {fmtTitle(post.title) ?? <span className="text-ink-ghost">无标题</span>}
         </a>
       </div>
+      {teaser && (
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft line-clamp-2">{teaser}</p>
+      )}
       <div className="mt-1.5">
         <PostMeta
           block={post.block}

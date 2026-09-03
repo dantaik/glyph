@@ -22,6 +22,30 @@ const REL_UNITS = [
   [60, 'minute'],
 ];
 
+/**
+ * The first ~`maxChars` characters of a post's markdown as one line of
+ * plain text, for list-row previews. Markdown syntax is stripped, not
+ * rendered — no HTML, no markup escapes to fight.
+ */
+export function excerpt(markdown, maxChars = 80) {
+  if (!markdown) return '';
+  const text = String(markdown)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= maxChars) return text;
+  const cut = text.slice(0, maxChars + 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut.slice(0, maxChars)) + '…';
+}
+
 /** 0-based on-chain index → 1-based display: `2n` → `"第 3 篇"`. */
 export function fmtIndex(index) {
   return `第 ${Number(index) + 1} 篇`;

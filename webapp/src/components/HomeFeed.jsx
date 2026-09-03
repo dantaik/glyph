@@ -126,7 +126,7 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
               const gap = gapAfter(i);
               return (
                 <Fragment key={rowKey(r)}>
-                  <ArticleListItem post={r} navigate={navigate} currentChain={currentChain} />
+                  <ArticleListItem post={r} navigate={navigate} currentChain={currentChain} loadBody={view.loadPostBody} />
                   {frontier?.after === i && marker()}
                   {gap && gapMarker(gap)}
                 </Fragment>
