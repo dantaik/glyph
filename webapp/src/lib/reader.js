@@ -10,11 +10,11 @@
 // Readers are created by data.js, one per chain, and live for the page.
 
 import { deployBlock, getChain, logWindow, scanBlocks } from './chains';
-import { getCacheTtlMs } from './config';
+import { getRescanDelayMs, VOLATILE_TTL_MS } from './config';
 import { addrKey, getScanStore } from './scanStore';
 import * as scanner from './scanner';
 import * as rpcLog from './rpcLog';
-import { makeTtlCache } from './ttlCache';
+import { makeForeverCache, makeTtlCache } from './ttlCache';
 import { createChainIO } from './chainIO';
 import { FeedController } from './feed';
 import { AuthorListController } from './authorList';
@@ -40,10 +40,17 @@ export function createReader(chainId, makeIO = null) {
   const log = rpcLog.scoped(chain.name);
   const store = getScanStore(id);
   const io = makeIO ? makeIO(id, log) : createChainIO(id, log);
-  // Repeat one-shot reads (a post's meta, a count, the clock) are deduped
-  // by a TTL cache — default 1 minute, configurable in Settings. Bodies and
-  // images are immutable and cached for good, so they bypass this layer.
-  const ttl = makeTtlCache(getCacheTtlMs);
+  // Two caches, because there are two kinds of read.
+  //
+  // `forever` holds what the chain cannot change: a post's metadata is
+  // fixed by the transaction carrying it, so once read it is never read
+  // again. (Bodies and images are immutable too, and are cached harder
+  // still — in IndexedDB, across visits.)
+  //
+  // `volatile` holds the two answers that really do move — the head block
+  // and an author's post count — for a short fixed window.
+  const forever = makeForeverCache();
+  const volatile = makeTtlCache(() => VOLATILE_TTL_MS);
 
   const feed = new FeedController({
     chainId: id,
@@ -54,7 +61,7 @@ export function createReader(chainId, makeIO = null) {
     floor: io.floor ?? deployBlock(id),
     scanBlocks: io.scanBlocks ?? scanBlocks(id),
     pageSize: PAGE_SIZE,
-    getTtlMs: getCacheTtlMs,
+    getTtlMs: getRescanDelayMs,
   });
 
   const lists = new Map(); // addrKey -> AuthorListController
@@ -68,7 +75,7 @@ export function createReader(chainId, makeIO = null) {
         io,
         log,
         pageSize: PAGE_SIZE,
-        getTtlMs: getCacheTtlMs,
+        getTtlMs: getRescanDelayMs,
       });
       lists.set(key, list);
     }
@@ -87,8 +94,8 @@ export function createReader(chainId, makeIO = null) {
    */
   function cacheMetaBoth(meta) {
     if (!meta) return meta;
-    ttl(metaKey(meta.author, meta.index), () => Promise.resolve(meta));
-    ttl(txMetaKey(meta.txHash, meta.eventIndex ?? 0), () => Promise.resolve(meta));
+    forever(metaKey(meta.author, meta.index), () => Promise.resolve(meta));
+    forever(txMetaKey(meta.txHash, meta.eventIndex ?? 0), () => Promise.resolve(meta));
     return meta;
   }
 
@@ -102,7 +109,7 @@ export function createReader(chainId, makeIO = null) {
     // Guard against garbage from the URL (?i=abc): BigInt(NaN) throws, and
     // negative / fractional indexes can never match a real post.
     if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return Promise.resolve(null);
-    return ttl(metaKey(author, targetIndex), async () => {
+    return forever(metaKey(author, targetIndex), async () => {
       const known = store.knownPost(author, BigInt(targetIndex));
       if (known) {
         log.fromCache('post', `#${targetIndex} of ${short(author)}`, 'already loaded');
@@ -129,7 +136,7 @@ export function createReader(chainId, makeIO = null) {
    * such event.
    */
   function findMetaByTx(txHash, eventIndex = 0) {
-    return ttl(txMetaKey(txHash, eventIndex), async () => {
+    return forever(txMetaKey(txHash, eventIndex), async () => {
       const known = store.knownPostByTx(txHash, eventIndex);
       if (known) {
         log.fromCache('post', `${short(txHash)}/${eventIndex}`, 'already loaded');
@@ -142,7 +149,7 @@ export function createReader(chainId, makeIO = null) {
     });
   }
 
-  const count = (author) => ttl(`count:${addrKey(author)}`, () => io.count(author));
+  const count = (author) => volatile(`count:${addrKey(author)}`, () => io.count(author));
 
   /** Rewrite `0x<txhash>/<n>` article refs to in-app links (glyphRefs.js). */
   const resolveGlyphRefs = createRefResolver(findMetaByTx);
@@ -154,7 +161,7 @@ export function createReader(chainId, makeIO = null) {
    * the pace is read, not assumed.
    */
   const clock = () =>
-    ttl('clock', async () => {
+    volatile('clock', async () => {
       const latest = await io.block('latest');
       const sampleAt = latest.number > CLOCK_SAMPLE ? latest.number - CLOCK_SAMPLE : 0n;
       let secondsPerBlock = FALLBACK_SECONDS_PER_BLOCK;

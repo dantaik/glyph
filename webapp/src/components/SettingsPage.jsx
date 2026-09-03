@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { CHAINS, SELECTABLE_CHAIN_IDS, defaultRpcs } from '../lib/chains';
 import {
   GLYPH_ADDRESS,
-  getCacheTtlMs,
+  getRescanDelayMs,
   getRpcUrls,
   hasCustomRpcs,
   hasOverrides,
   resetEndpointConfig,
-  saveCacheTtl,
+  saveRescanDelay,
   saveRpcUrls,
   setActiveChain,
   useActiveChainId,
@@ -51,13 +51,13 @@ export default function SettingsPage({ navigate }) {
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries(chainIds.map((id) => [id, ''])),
   );
-  const [cacheTtl, setCacheTtl] = useState(String(getCacheTtlMs() / 60_000));
+  const [rescanDelay, setRescanDelay] = useState(String(getRescanDelayMs() / 60_000));
   const [dirty, setDirty] = useState(false);
 
   // Stored lists changed underneath (a save, a reset): show what is stored.
   useEffect(() => {
     setLists(readLists(selectableWith(activeId)));
-    setCacheTtl(String(getCacheTtlMs() / 60_000));
+    setRescanDelay(String(getRescanDelayMs() / 60_000));
     setDirty(false);
   }, [rpcVersion, activeId]);
 
@@ -84,7 +84,7 @@ export default function SettingsPage({ navigate }) {
   };
 
   const handleSave = () => {
-    saveCacheTtl(cacheTtl.trim() === '' ? null : Number(cacheTtl));
+    saveRescanDelay(rescanDelay.trim() === '' ? null : Number(rescanDelay));
     for (const id of chainIds) saveRpcUrls(id, lists[id] ?? []);
     navigate({});
   };
@@ -224,24 +224,29 @@ export default function SettingsPage({ navigate }) {
       })}
 
       <section className="mb-10">
-        <SectionHeader label="读取缓存" />
+        <SectionHeader label="扫描频率" />
         <label className="block max-w-xs">
           <span className="mb-1.5 block text-xs tracking-label text-ink-faint">
-            缓存时长（分钟）
+            区块链扫描延迟（分钟）
           </span>
           <input
             type="number"
             min="0"
             step="1"
-            value={cacheTtl}
+            value={rescanDelay}
             onChange={(e) => {
-              setCacheTtl(e.target.value);
+              setRescanDelay(e.target.value);
               setDirty(true);
             }}
             className={INPUT}
           />
-          <span className="mt-1 block text-xs text-ink-faint">
-            相同数据在 N 分钟内不重复请求；0 = 不缓存。默认 1 分钟。
+          <span className="mt-1 block text-xs leading-relaxed text-ink-faint">
+            上一次扫描结束后的 N 分钟内，重新打开首页或作者页只显示上次扫到的文章，不再向节点请求新区块；
+            超过之后，下次打开会补扫这段时间新产生的区块。0 = 每次都扫。默认 1 分钟。
+          </span>
+          <span className="mt-1.5 block text-xs leading-relaxed text-ink-ghost">
+            这只决定「什么时候去读新区块」，不会漏掉任何文章。已经读到的内容是永久缓存的——
+            链上数据不会改变，同一篇文章不会被重复请求。
           </span>
         </label>
       </section>

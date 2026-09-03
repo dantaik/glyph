@@ -1,4 +1,5 @@
-import { fmtTitle, fmtIndex, shortAddr } from '../lib/format';
+import { fmtTitle, fmtIndex } from '../lib/format';
+import AddressLabel from './Address';
 import PostMeta from './PostMeta';
 
 /**
@@ -35,9 +36,9 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
                 navigate({ author: post.author });
               }}
               title={post.author}
-              className="font-mono text-2xs text-ink-faint hover:text-accent transition-colors"
+              className="inline-flex items-center text-ink-faint hover:text-accent transition-colors"
             >
-              {shortAddr(post.author)}
+              <AddressLabel address={post.author} size={14} tailClassName="text-2xs" />
             </a>
           }
         />

@@ -197,3 +197,53 @@ export function Trash({ size, ...rest }) {
     </svg>
   );
 }
+
+/**
+ * Ethereum's diamond, as the mono mark: the upper and lower octahedron
+ * halves with the waist band between them. Geometry follows the canonical
+ * logo; drawn in currentColor so it sits in the palette like every other
+ * icon here rather than importing a second brand colour.
+ */
+export function EthereumMark({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest} stroke="none" fill="currentColor">
+      <path d="M12 3v6.652l5.625 2.516zm0 0-5.625 9.166L12 9.652zm0 13.478V21l5.625-7.785zM12 21v-4.522l-5.625-3.263z" />
+      <path d="m12 15.43 5.625-3.263L12 9.652zm-5.625-3.263L12 15.43V9.652z" />
+    </svg>
+  );
+}
+
+/**
+ * Taiko's mark — the three folded planes of the taiko (太鼓) glyph.
+ * Same treatment as EthereumMark: real geometry, currentColor fill.
+ */
+export function TaikoMark({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest} stroke="none" fill="currentColor">
+      <path d="m20.622 16.86-3.085-4.107a1.97 1.97 0 0 0-1.36-.773.38.38 0 0 1-.287-.185.37.37 0 0 1-.02-.338 1.88 1.88 0 0 0-.003-1.54l-2.086-4.67A1.94 1.94 0 0 0 12 4.104c-.772 0-1.471.449-1.78 1.141L8.132 9.917a1.9 1.9 0 0 0-.004 1.54.37.37 0 0 1-.019.338.38.38 0 0 1-.288.185 1.97 1.97 0 0 0-1.36.773L3.379 16.86a1.875 1.875 0 0 0-.118 2.082 1.96 1.96 0 0 0 1.899.94l5.171-.563a1.96 1.96 0 0 0 1.362-.768.386.386 0 0 1 .616 0c.316.42.8.707 1.362.768l5.171.564a1.96 1.96 0 0 0 1.899-.941 1.875 1.875 0 0 0-.118-2.082m-11.14-6.356 2.09-4.677a.47.47 0 0 1 .859 0l2.09 4.677a.47.47 0 0 1-.039.452.49.49 0 0 1-.408.216H9.927a.49.49 0 0 1-.408-.216.47.47 0 0 1-.039-.452zm1.072 7.12a.49.49 0 0 1-.38.258l-5.177.564a.47.47 0 0 1-.459-.226.45.45 0 0 1 .03-.502l3.087-4.111a.49.49 0 0 1 .419-.194.49.49 0 0 1 .395.238l.003.005 2.067 3.51.004.005c.082.14.087.31.013.453zm1.871-1.588a.494.494 0 0 1-.85 0l-1.589-2.695a.47.47 0 0 1 0-.48.5.5 0 0 1 .426-.242h3.175a.49.49 0 0 1 .425.24.47.47 0 0 1 0 .481zm7.038 2.184a.47.47 0 0 1-.459.227l-5.176-.564a.49.49 0 0 1-.381-.259.47.47 0 0 1 .013-.453l.003-.006 2.067-3.509.003-.005a.492.492 0 0 1 .814-.044l3.088 4.11c.11.148.121.345.029.503z" />
+    </svg>
+  );
+}
+
+/**
+ * Fallback chain mark for a chain with no logo of its own (a testnet from
+ * VITE_CHAIN_ID): a hollow hexagon — a block, not a brand.
+ */
+export function ChainMark({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <path d="M12 2.75 20 7.5v9L12 21.25 4 16.5v-9z" />
+    </svg>
+  );
+}
+
+/** Overflow "⋯" — opens the menu holding the controls a phone has no room for. */
+export function MoreHorizontal({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest} stroke="none" fill="currentColor">
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  );
+}

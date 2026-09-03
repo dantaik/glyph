@@ -28,7 +28,8 @@ import { DEFAULT_CHAIN_ID, defaultRpcs, isKnownChain } from './chains';
 const KEY_CHAIN = 'glyph.chainId.v1';
 const KEY_RPCS = 'glyph.rpcs.v1'; // { [chainId]: string[] }
 const KEY_RPC_LEGACY = 'glyph.rpc.v1'; // one URL, before per-chain lists
-const KEY_CACHE_TTL = 'glyph.cacheTtl.v1';
+const KEY_RESCAN_DELAY = 'glyph.rescanDelay.v1';
+const KEY_CACHE_TTL_LEGACY = 'glyph.cacheTtl.v1'; // the same number, when it still meant a cache TTL
 
 /** Window event: the active chain changed. */
 export const CHAIN_EVT = 'glyph:chain';
@@ -171,19 +172,36 @@ export function saveRpcUrls(chainId, urls) {
   emit(RPCS_EVT);
 }
 
-// --- Read cache TTL ------------------------------------------------------
+// --- Rescan delay --------------------------------------------------------
+//
+// How long a completed scan stays good for. Opening the home feed (or an
+// author page) within `last scan finished + delay` shows what that scan
+// found instead of going back to the node; after it, the next visit sweeps
+// the blocks mined in between. Nothing is ever skipped — a delay only
+// decides WHEN the newest blocks are read, never whether.
+//
+// This is not a cache lifetime: what a scan reads is immutable and is kept
+// for good (see reader.js). 0 = rescan on every visit.
 
-/** Cache TTL in ms for repeat chain reads (0 = no caching). Default 1 min. */
-export function getCacheTtlMs() {
-  const raw = lsGet(KEY_CACHE_TTL);
+/** Minimum time between chain scans, in ms. Default 1 minute. */
+export function getRescanDelayMs() {
+  const raw = lsGet(KEY_RESCAN_DELAY) ?? lsGet(KEY_CACHE_TTL_LEGACY);
   const minutes = raw == null ? 1 : Number(raw);
   return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 1) * 60_000;
 }
 
-export function saveCacheTtl(minutes) {
+export function saveRescanDelay(minutes) {
   const n = Number(minutes);
-  lsSet(KEY_CACHE_TTL, Number.isFinite(n) && n >= 0 ? String(n) : null);
+  lsSet(KEY_RESCAN_DELAY, Number.isFinite(n) && n >= 0 ? String(n) : null);
+  lsSet(KEY_CACHE_TTL_LEGACY, null);
 }
+
+/**
+ * How long the two reads that DO change on-chain are held: the head block
+ * (behind every 约 N 小时前) and an author's post count. Short, fixed, and
+ * not worth a setting — unlike a scan, these are one cheap call each.
+ */
+export const VOLATILE_TTL_MS = 60_000;
 
 // --- Reset ---------------------------------------------------------------
 
@@ -192,7 +210,8 @@ export function resetEndpointConfig() {
   lsSet(KEY_CHAIN, null);
   lsSet(KEY_RPCS, null);
   lsSet(KEY_RPC_LEGACY, null);
-  lsSet(KEY_CACHE_TTL, null);
+  lsSet(KEY_RESCAN_DELAY, null);
+  lsSet(KEY_CACHE_TTL_LEGACY, null);
   rpcVersion += 1;
   emit(RPCS_EVT);
   const next = resolveStoredChain();
@@ -203,7 +222,9 @@ export function resetEndpointConfig() {
 }
 
 export function hasOverrides() {
-  return Boolean(lsGet(KEY_CHAIN) || lsGet(KEY_RPCS) || lsGet(KEY_CACHE_TTL));
+  return Boolean(
+    lsGet(KEY_CHAIN) || lsGet(KEY_RPCS) || lsGet(KEY_RESCAN_DELAY) || lsGet(KEY_CACHE_TTL_LEGACY),
+  );
 }
 
 // One-time migration: a single stored RPC URL becomes the first entry of the

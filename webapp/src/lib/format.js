@@ -35,10 +35,28 @@ export function fmtBlock(block) {
 
 
 
-/** `0x12345678…cdef` → first 6 + `…` + last 4 chars. */
+/**
+ * `0x12345678…cdef` → first 6 + `…` + last 4 chars.
+ *
+ * The form for things that are addressed rather than owned — the contract,
+ * a transaction hash. A PERSON is shown as their identicon plus `addrTail`
+ * (see the Address components): the picture carries the identity, so the
+ * leading `0x…` only costs width.
+ */
 export function shortAddr(addr) {
   if (!addr) return '';
   return addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+}
+
+/**
+ * The last 6 characters of an address — what goes beside an identicon.
+ * Kept verbatim (checksum casing included) so it matches what a wallet or
+ * an explorer shows. Short input is returned as-is.
+ */
+export function addrTail(addr) {
+  if (!addr) return '';
+  const a = String(addr);
+  return a.length > 6 ? a.slice(-6) : a;
 }
 
 /**
