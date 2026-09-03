@@ -1,15 +1,27 @@
 import { useAsync } from '../lib/hooks';
-import { fmtTitle, excerpt } from '../lib/format';
+import { fmtTitle, fmtIndex, excerpt } from '../lib/format';
 import { hrefFor } from '../lib/router';
+import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
 
 /**
  * Large card for the most recent post — shared by the home feed and the
  * author page. Fetches a short excerpt from the post body through the
  * view (silently degrades to title-only). The post carries the chain it
- * was read on; the body comes from that chain's reader.
+ * was read on; the body comes from that chain's reader. The meta line is
+ * the rows' (ArticleListItem): author · chain · [第 N 篇] · time, so the
+ * first entry of a list reads like the rest; `showIndex` adds 第 N 篇 for
+ * author views.
  */
-export default function FeaturedPost({ view, post, clock, navigate, currentChain = null, excerptChars = 80 }) {
+export default function FeaturedPost({
+  view,
+  post,
+  clock,
+  navigate,
+  currentChain = null,
+  showIndex = false,
+  excerptChars = 80,
+}) {
   const body = useAsync(() => view.loadPostBody(post), [view, post.chainId, post.txHash]);
   const teaser = body.value?.body?.markdown ? excerpt(body.value.body.markdown, excerptChars) : null;
   const target = { chain: post.chainId, tx: post.txHash, txEvent: post.eventIndex ?? 0 };
@@ -38,6 +50,8 @@ export default function FeaturedPost({ view, post, clock, navigate, currentChain
         chainId={post.chainId}
         currentChain={currentChain}
         navigate={navigate}
+        prefix={showIndex ? fmtIndex(post.index) : undefined}
+        lead={<AuthorLink author={post.author} navigate={navigate} />}
         className="mt-3"
       />
     </article>

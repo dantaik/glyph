@@ -6,6 +6,7 @@ import { chainSlug } from '../../src/lib/chains';
 import { createFixtureIO } from '../../src/lib/fixtures';
 import { buildWorlds, expectedMergedOrder } from '../../src/lib/fixtureWorld';
 import { createReader } from '../../src/lib/reader';
+import { hrefFor } from '../../src/lib/router';
 import { createScanStore } from '../../src/lib/scanStore';
 import { createView } from '../../src/lib/view';
 import { NOW, settle, worldReader } from './mergedHelpers';
@@ -55,6 +56,14 @@ describe('HomeFeed over two chains', () => {
     expect(taiko[0].getAttribute('href')).toBe('/taiko');
     fireEvent.click(taiko[0]);
     expect(navigate).toHaveBeenCalledWith({ chain: 167000 });
+
+    // Every post names its author — the featured card no differently from
+    // the rows — and the name is the way into the author's page.
+    const authors = [...container.querySelectorAll('a[href^="/author/"]')];
+    expect(authors.map((a) => a.getAttribute('href'))).toEqual(snap.rows.map((r) => hrefFor({ author: r.author })));
+    expect(container.querySelector('article').contains(authors[0])).toBe(true);
+    fireEvent.click(authors[0]);
+    expect(navigate).toHaveBeenCalledWith({ author: snap.rows[0].author });
 
     expect(screen.getByText('来自所有作者 · 以太坊与Taiko')).toBeTruthy();
   });
