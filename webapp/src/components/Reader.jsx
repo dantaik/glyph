@@ -248,6 +248,7 @@ export default function Reader({ onStartWriting }) {
     return (
       <PostPage
         meta={txMeta}
+        navigate={navigate}
         onBack={() => navigate({ author: txMeta.author })}
         neighbors={neighbors}
         onNavigate={(m) => navigate({ tx: m.txHash, txEvent: m.eventIndex ?? 0 })}

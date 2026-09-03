@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { loadPostBody, resolveImages, getChainClock, resolveEnsName } from '../lib/data';
+import { resolveGlyphRefs } from '../lib/glyphRefs';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
@@ -29,7 +30,7 @@ const SKELETON_GROUPS = [
  * Fetches the body (tags + markdown) from the publish() tx calldata, then
  * resolves any eth:<txhash> image refs to blob URLs before rendering.
  */
-export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAuthor }) {
+export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAuthor, navigate }) {
   const [body, setBody] = useState(null); // { tags, markdown }
   const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
@@ -57,7 +58,8 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
       const b = res.body;
       setBody(b);
       setFromCache(res.fromCache);
-      const { markdown: resolved, urls } = await resolveImages(b.markdown);
+      const md = await resolveGlyphRefs(b.markdown);
+      const { markdown: resolved, urls } = await resolveImages(md);
       urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
     } catch (err) {
@@ -207,6 +209,15 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
         <div
           className="article-column prose-glyph"
           dangerouslySetInnerHTML={{ __html: html }}
+          onClick={(e) => {
+            // glyph: cross-article refs render as /tx/<hash>/<n> links —
+            // route them in-app instead of a full page load.
+            const a = e.target.closest?.('a[href^="/tx/"]');
+            if (!a) return;
+            e.preventDefault();
+            const m = a.getAttribute('href').match(/^\/tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/);
+            if (m) navigate?.({ tx: m[1], txEvent: m[2] != null ? Number(m[2]) : 0 });
+          }}
         />
       )}
 
