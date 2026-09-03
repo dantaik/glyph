@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAsync } from '../lib/hooks';
+import { chainFromSlug } from '../lib/chains';
+import { hrefFor } from '../lib/router';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
@@ -121,7 +123,7 @@ export default function PostPage({
           <span className="flex items-center gap-1">
             <span>作者：</span>
             <a
-              href={`/author/${meta.author}`}
+              href={hrefFor({ author: meta.author })}
               onClick={(e) => {
                 e.preventDefault();
                 onOpenAuthor?.();
@@ -176,13 +178,21 @@ export default function PostPage({
           className="article-column prose-glyph"
           dangerouslySetInnerHTML={{ __html: html }}
           onClick={(e) => {
-            // 0x… cross-article refs render as /tx/<hash>/<n> links —
-            // route them in-app instead of a full page load.
-            const a = e.target.closest?.('a[href^="/tx/"]');
-            if (!a) return;
+            // 0x… cross-article refs render as in-app post links (glyphRefs)
+            // — route them instead of reloading the page. The chain segment
+            // is optional here so a ref written before the prefix, or by
+            // hand, still lands somewhere sensible: the chain being read.
+            const href = e.target.closest?.('a[href]')?.getAttribute('href');
+            const m = href?.match(
+              /^#?\/(?:([^/]+)\/)?tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/,
+            );
+            if (!m) return; // an ordinary link — let the browser have it
             e.preventDefault();
-            const m = a.getAttribute('href').match(/^\/tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/);
-            if (m) navigate?.({ tx: m[1], txEvent: m[2] != null ? Number(m[2]) : 0 });
+            navigate?.({
+              chain: chainFromSlug(m[1]) ?? undefined,
+              tx: m[2],
+              txEvent: m[3] != null ? Number(m[3]) : 0,
+            });
           }}
         />
       )}

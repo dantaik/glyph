@@ -111,11 +111,14 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   html[data-fontsize='l'] { --article-size: 1.125rem; }
 }
 
-/* The article column measure — shared by the post header and the body
-   (36 × the reader font size, rem-based so it doesn't depend on the
-   element's own font-size). */
+/* The article column — shared by the post header, the body and the loading
+   skeleton. It is the same column the feed uses on `/`: the full width of
+   <main>, so a post and the list it came from line up.
+
+   Deliberately NOT a function of --article-size. 小/中/大 sets the type size
+   and nothing else; the column staying put is the point of the control. */
 .article-column {
-  max-width: calc(var(--article-size) * 36);
+  max-width: 64rem; /* = <main>'s max-w-5xl, which already caps it */
   margin-inline: auto;
 }
 
@@ -144,7 +147,11 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
 .prose-glyph h3 { font-size: 1.12em; line-height: 1.6;  font-weight: 600; margin: 1.8em 0 0.6em; }
 
 .prose-glyph p { margin: 1.25em 0; overflow-wrap: break-word; }
-.prose-glyph > p:first-of-type { font-size: 1.06em; }   /* editorial opening lift */
+/* Editorial opening lift — an essay's first paragraph carries a little more
+   weight. Not when it holds a photo: what follows the image in that same
+   paragraph is a caption, and a caption reading LARGER than the body is
+   backwards. Such a paragraph stays at the body size. */
+.prose-glyph > p:first-of-type:not(:has(img)) { font-size: 1.06em; }
 
 .prose-glyph a {
   color: var(--color-accent);

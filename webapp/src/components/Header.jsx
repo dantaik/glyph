@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useUrlState } from '../lib/router';
+import { hrefFor, useUrlState } from '../lib/router';
 import { useTheme } from '../lib/theme';
 import { useWallet } from '../lib/wallet';
 import { GlyphMark, Sun, Moon, Sliders, MoreHorizontal } from './Icons';
@@ -64,7 +64,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
         {/* Brand — the way back to the front page from anywhere. */}
         <a
-          href="/"
+          href={hrefFor({})}
           onClick={(e) => {
             e.preventDefault();
             goHome();

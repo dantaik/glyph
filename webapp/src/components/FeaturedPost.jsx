@@ -1,5 +1,6 @@
 import { useAsync } from '../lib/hooks';
 import { fmtTitle, excerpt } from '../lib/format';
+import { hrefFor } from '../lib/router';
 import PostMeta from './PostMeta';
 
 /**
@@ -15,7 +16,7 @@ export default function FeaturedPost({ reader, post, clock, navigate, excerptCha
     <article className="border-b border-edge pb-8">
       <h3>
         <a
-          href={`/tx/${post.txHash}/${post.eventIndex ?? 0}`}
+          href={hrefFor({ tx: post.txHash, txEvent: post.eventIndex ?? 0 })}
           onClick={(e) => {
             e.preventDefault();
             navigate({ tx: post.txHash, txEvent: post.eventIndex ?? 0 });

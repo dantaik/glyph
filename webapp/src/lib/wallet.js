@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 import { walletChainParams } from './chains';
+import { FROM_FILE } from './offline';
+
+// Browsers don't inject a wallet into a page opened from disk unless the
+// extension is given file-URL access, so the offline copy needs the fix, not
+// an install prompt.
+const NO_WALLET = FROM_FILE
+  ? '未检测到钱包。浏览器默认不把钱包注入本地文件页面：请在扩展管理页为钱包打开「允许访问文件网址」（MetaMask：详细信息 → 允许访问文件网址），然后刷新本页。'
+  : '未检测到钱包，请安装 MetaMask 等浏览器钱包。';
 
 const EVT = 'cairn:wallet';
 let state = { account: null, chainId: null, isConnecting: false };
@@ -54,7 +62,7 @@ async function init() {
  */
 export async function switchToConfiguredChain(chainId) {
   const eth = window.ethereum;
-  if (!eth) throw new Error('未检测到钱包');
+  if (!eth) throw new Error(NO_WALLET);
   const hex = `0x${chainId.toString(16)}`;
   try {
     await eth.request({
@@ -76,7 +84,7 @@ export async function switchToConfiguredChain(chainId) {
 
 export async function connect() {
   const eth = window.ethereum;
-  if (!eth) throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
+  if (!eth) throw new Error(NO_WALLET);
   emit({ isConnecting: true });
   try {
     const accounts = await eth.request({ method: 'eth_requestAccounts' });

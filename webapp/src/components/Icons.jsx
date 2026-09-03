@@ -122,6 +122,16 @@ export function ExternalLink({ size, ...rest }) {
   );
 }
 
+export function Download({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 /**
  * 雪泥 — a V formation of wild geese with echo arcs trailing the lead
  * bird. Empty-state placeholder: similar in spirit to the hand-drawn

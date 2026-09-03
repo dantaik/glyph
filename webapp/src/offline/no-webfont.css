@@ -1,0 +1,2 @@
+/* Offline build: no bundled webfont — the CSS stack falls back to the
+   system CJK serif (苹方/宋体/思源宋体). Aliased in from vite.config.js. */

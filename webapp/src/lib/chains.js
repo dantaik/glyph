@@ -22,6 +22,7 @@ export const CHAINS = {
   1: {
     id: 1,
     name: '以太坊',
+    slug: 'ethereum',
     viem: mainnet,
     explorer: 'https://etherscan.io',
     // Both serve the wide eth_getLogs ranges the home feed needs (10k on
@@ -46,6 +47,7 @@ export const CHAINS = {
   167000: {
     id: 167000,
     name: 'Taiko',
+    slug: 'taiko',
     viem: taiko,
     explorer: 'https://taikoscan.io',
     rpcs: ['https://rpc.mainnet.taiko.xyz', 'https://taiko.drpc.org'],
@@ -66,6 +68,7 @@ export const CHAINS = {
   11155111: {
     id: 11155111,
     name: 'Sepolia 测试网',
+    slug: 'sepolia',
     viem: sepolia,
     explorer: 'https://sepolia.etherscan.io',
     rpcs: ['https://sepolia.drpc.org'],
@@ -81,6 +84,7 @@ export const CHAINS = {
   167013: {
     id: 167013,
     name: 'Taiko Hoodi 测试网',
+    slug: 'taiko-hoodi',
     viem: taikoHoodi,
     explorer: 'https://hoodi.taikoscan.io',
     rpcs: ['https://rpc.hoodi.taiko.xyz'],
@@ -123,6 +127,26 @@ export const deployBlock = (id) => BigInt(getChain(id).deployBlock ?? 0);
 
 /** Human-readable name for `id`, or a generic label for an unknown chain. */
 export const chainName = (id) => CHAINS[Number(id)]?.name ?? `链 ${id}`;
+
+/**
+ * The chain's segment in a URL — every route carries one, so an address is
+ * unambiguous about which chain it was read on: /taiko/tx/0x…
+ *
+ * A chain with no slug of its own (a testnet reached through VITE_CHAIN_ID)
+ * uses its id, which chainFromSlug reads back.
+ */
+export const chainSlug = (id) => CHAINS[Number(id)]?.slug ?? String(Number(id));
+
+/** The chain a URL segment names, or null when it names none. */
+export function chainFromSlug(segment) {
+  if (!segment) return null;
+  const wanted = String(segment).toLowerCase();
+  for (const chain of Object.values(CHAINS)) {
+    if (chain.slug === wanted) return chain.id;
+  }
+  const asId = Number(wanted);
+  return Number.isInteger(asId) && isKnownChain(asId) ? asId : null;
+}
 
 /** Params for wallet_addEthereumChain, built from the same single source. */
 export function walletChainParams(id) {

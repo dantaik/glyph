@@ -4,6 +4,7 @@ import { useActiveChainId } from '../lib/config';
 import { getReader } from '../lib/data';
 import { lowest, highest, blockCount } from '../lib/segments';
 import { fmtBlock } from '../lib/format';
+import { hrefFor } from '../lib/router';
 import AddressLabel from './Address';
 import BackButton from './BackButton';
 import ListHeader from './ListHeader';
@@ -133,7 +134,7 @@ function ChainScan({ chainId, active, navigate }) {
               className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2.5"
             >
               <a
-                href={`/author/${a.address}`}
+                href={hrefFor({ author: a.address })}
                 onClick={(e) => {
                   e.preventDefault();
                   navigate({ author: a.address });

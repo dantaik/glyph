@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useReader } from '../lib/data';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
 import PostRoute from './PostRoute';
@@ -19,14 +19,12 @@ export default function Reader({ onStartWriting }) {
   const tx = params.tx;
   const txEvent = params.txEvent != null ? Number(params.txEvent) : 0;
 
-  // A transaction belongs to one chain: switching chains while a post is
-  // open goes back to the home feed of the new chain.
-  const shownChain = useRef(reader.chainId);
-  useEffect(() => {
-    if (shownChain.current === reader.chainId) return;
-    shownChain.current = reader.chainId;
-    if (tx) navigate({}, { replace: true });
-  }, [reader.chainId, tx, navigate]);
+  // A transaction belongs to one chain, but nothing has to be done about it
+  // here any more: the chain is a segment of the URL, so it cannot change
+  // without a navigation that already says where it is going — the chain
+  // menu sends a post to the new chain's feed, and /taiko/tx/… asks for that
+  // post on Taiko. Bouncing to the feed on a chain change would undo the
+  // second one.
 
   // Legacy ?author= query links converge onto the /author/<addr> path
   // (replace, so history stays clean).

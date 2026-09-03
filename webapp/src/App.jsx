@@ -1,19 +1,40 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import SettingsPage from './components/SettingsPage';
 import { FIXTURES_MODE, useReader } from './lib/data';
+import { DEFAULT_CHAIN_ID } from './lib/chains';
 import { GLYPH_ADDRESS } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
-import { useUrlState } from './lib/router';
+import { IS_OFFLINE_BUILD, OFFLINE_FILE } from './lib/offline';
+import { hrefFor, useUrlState } from './lib/router';
 
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
   const { chainId: walletChainId } = useWallet();
   const [params, navigate] = useUrlState();
+
+  // The chain lives in the URL, and router.js adopts the one the address
+  // names as it reads it — before any of this renders. Left for here is the
+  // other direction: an address that names no chain gets one, in place.
+  //
+  // A bare `/` is the front door and opens on Ethereum, whatever was read
+  // last — an address with nothing after the host states no preference, so
+  // it gets the canonical one. (Reaching the feed from inside the app is
+  // navigation, not the front door: it keeps the chain you are reading.)
+  // A chainless deep link — a link from before the prefix existed — keeps
+  // the chain being read instead, which is the only guess available.
+  useLayoutEffect(() => {
+    if (params.chain != null) return;
+    const frontDoor = !params.tx && !params.author && !params.scan && !params.settings;
+    navigate(
+      { ...params, chain: frontDoor ? DEFAULT_CHAIN_ID : undefined },
+      { replace: true },
+    );
+  }, [params, navigate]);
 
   // The URL names a surface — /scan, /tx/…, /author/…, /settings — and a
   // link to one of them IS the instruction to show it, whichever tab was
@@ -68,7 +89,9 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header
-        tab={writing ? 'write' : 'read'}
+        // 设置 is neither reading nor writing, so neither tab is current
+        // while it is open. /tx, /author and /scan still are 读.
+        tab={params.settings ? null : writing ? 'write' : 'read'}
         onTabChange={handleTabChange}
         onOpenSettings={() => navigate({ settings: '1' })}
       />
@@ -112,7 +135,7 @@ export default function App() {
           </a>
           <span className="select-none" aria-hidden="true">·</span>
           <a
-            href="/scan"
+            href={hrefFor({ scan: '1' })}
             onClick={(e) => {
               e.preventDefault();
               navigate({ scan: '1' });
@@ -124,6 +147,20 @@ export default function App() {
             {scanSpan}
             {feed.job && <span className="animate-pulse"> · 扫描中</span>}
           </a>
+          {/* The whole app as one file, for when this domain is gone. */}
+          {!IS_OFFLINE_BUILD && (
+            <>
+              <span className="select-none" aria-hidden="true">·</span>
+              <a
+                href={`/${OFFLINE_FILE}`}
+                download={OFFLINE_FILE}
+                title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
+                className="inline-block text-2xs text-ink-faint hover:text-accent transition-colors"
+              >
+                离线版
+              </a>
+            </>
+          )}
         </p>
       </footer>
       {FIXTURES_MODE && (

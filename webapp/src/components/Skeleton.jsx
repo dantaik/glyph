@@ -51,7 +51,7 @@ const ARTICLE_GROUPS = [
 /** An article body: two paragraphs of lines. */
 export function ArticleSkeleton() {
   return (
-    <div className="mx-auto max-w-[36em] space-y-9" aria-hidden="true">
+    <div className="article-column space-y-9" aria-hidden="true">
       {ARTICLE_GROUPS.map((widths, g) => (
         <div key={g} className="space-y-4">
           {widths.map((w, i) => (
