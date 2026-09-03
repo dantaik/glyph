@@ -22,7 +22,7 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
             e.preventDefault();
             navigate(target);
           }}
-          className="flex-1 font-serif text-lg leading-snug group-hover:text-accent transition-colors line-clamp-1"
+          className="flex-1 font-serif text-display sm:text-jumbo group-hover:text-accent transition-colors line-clamp-1"
         >
           {fmtTitle(post.title) ?? <span className="text-ink-ghost">无标题</span>}
         </a>
