@@ -114,7 +114,7 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
       {rows.length > 0 && (
         <>
           {frontier?.after === -1 && marker('div', 'mb-4 border-b border-edge')}
-          <FeaturedPost view={view} post={rows[0]} navigate={navigate} currentChain={currentChain} />
+          <FeaturedPost view={view} post={rows[0]} navigate={navigate} currentChain={currentChain} showIndex />
           {(rows.length > 1 || frontier?.after === 0) && (
             <ul className="divide-y divide-edge">
               {frontier?.after === 0 && marker('li')}

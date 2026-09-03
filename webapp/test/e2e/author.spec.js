@@ -11,6 +11,11 @@ test.describe('an author', () => {
     await expect.poll(async () => (await postHrefs(page)).length, { timeout: 60_000 }).toBe(c.total);
     await expect(page.locator('main')).toContainText('第 1 篇');
     await expect(page.locator('[data-frontier]')).toHaveCount(0);
+    // The featured card is written like the rows: it names the author and its 第 N 篇.
+    const featured = page.locator('main article');
+    await expect(featured.locator('a[href^="/author/"]')).toHaveAttribute('href', new RegExp(`^/author/${author}$`, 'i'));
+    await expect(featured).toContainText(/第 \d+ 篇/);
+    await expect(page.locator('main a[href^="/author/"]')).toHaveCount(c.total);
 
     await page.goto(`/taiko/author/${author}`);
     await expect(page.locator('main')).toContainText('只看Taiko');

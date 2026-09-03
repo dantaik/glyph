@@ -1,6 +1,6 @@
 import { fmtTitle, fmtIndex } from '../lib/format';
 import { hrefFor } from '../lib/router';
-import AddressLabel from './Address';
+import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
 
 /**
@@ -36,19 +36,7 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
           currentChain={currentChain}
           navigate={navigate}
           prefix={showIndex ? fmtIndex(post.index) : undefined}
-          lead={
-            <a
-              href={hrefFor({ author: post.author })}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate({ author: post.author });
-              }}
-              title={post.author}
-              className="inline-flex items-center text-ink-faint hover:text-accent transition-colors"
-            >
-              <AddressLabel address={post.author} size={14} tailClassName="text-2xs" />
-            </a>
-          }
+          lead={<AuthorLink author={post.author} navigate={navigate} />}
         />
       </div>
     </li>
