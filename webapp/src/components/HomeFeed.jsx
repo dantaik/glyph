@@ -41,9 +41,6 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
   const noteText = note
     ? `在${chainName(note.chainId)}上读取了 ${fmtBlock(note.fetched)} 个区块，没有找到更早的文章，可以继续加载。`
     : null;
-  const exhaustedLabel = chains.every((c) => c.floor > 0n)
-    ? '已扫描到合约部署的区块，没有更早的文章'
-    : '已扫描到链的起点';
 
   const subtitle = single ? (
     <>
@@ -61,7 +58,7 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
       </a>
     </>
   ) : (
-    `来自所有作者 · ${chains.map((c) => chainName(c.chainId)).join('与')}`
+    `来自所有作者 · ${chains.length}个区块链网络`
   );
 
   const marker = () =>
@@ -115,12 +112,11 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
             hasMore={!done}
             note={noteText}
             label="继续扫描更早的区块"
-            exhaustedLabel={exhaustedLabel}
           />
         </>
       ) : (
         <>
-          <ul className="divide-y divide-edge">
+          <ul>
             {frontier?.after === -1 && marker()}
             {rows.map((r, i) => {
               const gap = gapAfter(i);
@@ -143,7 +139,6 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
             disabled={job != null}
             hasMore={!done}
             note={noteText}
-            exhaustedLabel={exhaustedLabel}
           />
         </>
       )}

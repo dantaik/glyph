@@ -9,7 +9,7 @@ export function Bar({ className = '' }) {
 /** A reading list — the home feed or an author's: rows of a title, a preview line, a meta line (ArticleListItem). */
 export function ListSkeleton() {
   return (
-    <ul className="divide-y divide-edge" aria-hidden="true">
+    <ul aria-hidden="true">
       {[0, 1, 2, 3, 4].map((k) => (
         <li key={k} className="py-4">
           <Bar className="h-6 w-2/3" />

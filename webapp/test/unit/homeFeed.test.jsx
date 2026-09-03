@@ -77,7 +77,7 @@ describe('HomeFeed over two chains', () => {
       );
     });
 
-    expect(screen.getByText('来自所有作者 · Ethereum与Taiko')).toBeTruthy();
+    expect(screen.getByText('来自所有作者 · 2个区块链网络')).toBeTruthy();
   });
 
   it('marks where the merge stops being complete, and 继续扫描 completes it', async () => {

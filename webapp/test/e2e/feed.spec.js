@@ -8,7 +8,7 @@ test.describe('the home feed', () => {
     await page.goto('/');
     await expect(chip(page, 'Taiko').first()).toBeVisible();
     await expect(chip(page, 'Ethereum').first()).toBeVisible();
-    await expect(page.getByText('来自所有作者 · Ethereum与Taiko')).toBeVisible();
+    await expect(page.getByText('来自所有作者 · 2个区块链网络')).toBeVisible();
     // Every post is a row like the next — the newest gets no card of its own — and names its author.
     await expect(page.locator('main article')).toHaveCount(0);
     await expect(page.locator('main li:has(a[href*="/tx/"])').first().locator('a[href^="/author/"]')).toHaveCount(1);
@@ -27,7 +27,7 @@ test.describe('the home feed', () => {
     await marker.getByRole('button', { name: '继续扫描' }).click();
     await expect(marker).toHaveCount(0, { timeout: 60_000 });
     await expect.poll(() => postHrefs(page), { timeout: 30_000 }).toEqual(expected);
-    await expect(page.getByText('已扫描到合约部署的区块')).toBeVisible();
+    await expect(page.getByText('没有更多文章')).toBeVisible();
   });
 
   test('the footer names every chain, with what was scanned, and no contract address', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('the home feed', () => {
     await expect(page.locator('[data-frontier]')).toHaveCount(0);
     await page.getByRole('button', { name: '加载更早的文章' }).click();
     await expect.poll(() => postHrefs(page), { timeout: 60_000 }).toEqual(taiko);
-    await expect(page.getByText('已扫描到合约部署的区块')).toBeVisible();
+    await expect(page.getByText('没有更多文章')).toBeVisible();
     await page.getByRole('link', { name: '查看全部' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(chip(page, 'Ethereum').first()).toBeVisible();
