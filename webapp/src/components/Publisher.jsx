@@ -8,6 +8,7 @@ import {
 } from '../lib/publish';
 import { getClient } from '../lib/clients';
 import { getReader } from '../lib/data';
+import { chainName } from '../lib/chains';
 import { resolvePublishChain, usePublishChainId } from '../lib/config';
 import { useWallet } from '../lib/wallet';
 import { etherscanTxUrl } from '../lib/format';
@@ -16,6 +17,8 @@ import ImageUploader from './ImageUploader';
 import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
+import WalletPanel from './WalletPanel';
+import { SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 import {
   getMarketState,
   estimatePublishGas,
@@ -38,9 +41,6 @@ const PLACEHOLDER_MD = `# 小标题
 
 把图片拖入下方区域或点击上传；点击图片或名称即可复制引用，粘贴到正文。`;
 
-const SEGMENT_ON = 'rounded-full px-2.5 py-1 text-xs transition-colors bg-paper-sunken text-ink font-medium';
-const SEGMENT_OFF = 'rounded-full px-2.5 py-1 text-xs transition-colors text-ink-faint hover:text-accent';
-
 export default function Publisher() {
   const [title, setTitle] = useState(PLACEHOLDER_TITLE);
   const [tagsInput, setTagsInput] = useState('');
@@ -58,7 +58,8 @@ export default function Publisher() {
   // when Glyph is read on it, else Ethereum (config.js). Reading and
   // writing are separate things: the feed shows every chain, a post goes
   // to one.
-  const chainId = resolvePublishChain(usePublishChainId(), walletChainId);
+  const pickedChain = usePublishChainId();
+  const chainId = resolvePublishChain(pickedChain, walletChainId);
   const reader = getReader(chainId);
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
 
@@ -275,6 +276,12 @@ export default function Publisher() {
   // --- Render ---
   return (
     <div>
+      <WalletPanel
+        chainId={chainId}
+        picked={pickedChain != null}
+        disabled={status === 'processing' || status === 'signing'}
+      />
+
       <SectionHeader label="标题" />
       <div className="mb-10">
         <input
@@ -442,7 +449,7 @@ export default function Publisher() {
           <div className="mt-4 rounded-lg bg-success-wash px-4 py-3 text-sm text-success">
             <div className="flex flex-wrap items-center gap-2">
               <Check size={16} className="shrink-0" />
-              <span className="font-medium">已发布到链上</span>
+              <span className="font-medium">已发布到{chainName(chainId)}</span>
               <a
                 href={etherscanTxUrl(txHash, chainId)}
                 target="_blank"

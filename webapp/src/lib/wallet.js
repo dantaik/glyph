@@ -5,7 +5,7 @@ import { FROM_FILE } from './offline';
 // Browsers don't inject a wallet into a page opened from disk unless the
 // extension is given file-URL access, so the offline copy needs the fix, not
 // an install prompt.
-const NO_WALLET = FROM_FILE
+export const NO_WALLET = FROM_FILE
   ? '未检测到钱包。浏览器默认不把钱包注入本地文件页面：请在扩展管理页为钱包打开「允许访问文件网址」（MetaMask：详细信息 → 允许访问文件网址），然后刷新本页。'
   : '未检测到钱包，请安装 MetaMask 等浏览器钱包。';
 
