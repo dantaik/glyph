@@ -425,13 +425,7 @@ export function createScanStore(chainId) {
     notify();
   }
 
-  // --- Read-only views for the UI (/scan, footer) ---------------------
-
-  /** Global coverage as `{ head, segments, rows }`, or null before any scan. */
-  function readFeedScan() {
-    if (feedHead == null && feedSegments.length === 0) return null;
-    return { head: feedHead, segments: feedSegments, rows: allPosts() };
-  }
+  // --- Read-only views for the UI (/scan) ------------------------------
 
   /** Per-author coverage: `{ address, head, segments, count }`, newest head first. */
   function readAuthorScanEntries() {
@@ -518,7 +512,6 @@ export function createScanStore(chainId) {
     setAuthorScanHead,
     persistFeedScan,
     persistAuthorScan,
-    readFeedScan,
     readAuthorScanEntries,
     once,
     reset,

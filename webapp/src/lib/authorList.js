@@ -12,7 +12,6 @@
 // newest post down — never "every post the store happens to know", which
 // could have holes where a feed sweep saw one post and not its neighbours.
 
-import { useEffect, useSyncExternalStore } from 'react';
 import * as scanner from './scanner';
 import { indexCompare } from './scanStore';
 
@@ -213,13 +212,4 @@ export class AuthorListController {
     this.#rows = [...byIndex.values()].sort(indexCompare);
     this.#bump();
   }
-}
-
-/** React hook: an author list's snapshot, refreshed on mount when stale. */
-export function useAuthorList(list) {
-  const snapshot = useSyncExternalStore(list.subscribe, list.getSnapshot, list.getSnapshot);
-  useEffect(() => {
-    list.ensureFresh();
-  }, [list]);
-  return snapshot;
 }

@@ -1,28 +1,26 @@
 // feed.js — the home feed of one chain: a scan that outlives the page
 // showing it.
 //
-// The feed is derived from the chain's scan store — every post inside a
-// swept range, newest first — and this controller only decides what to
-// sweep next. Sweeps are jobs owned here, not by a component: a job started
-// on the home page keeps running after the reader opens a post, an author,
-// the settings, or another chain, and every window it fetches lands in the
-// store (and localStorage) the moment it arrives. Whoever is showing the
-// feed re-reads the store on each change, so posts appear as they are found
-// rather than when the whole scan is done — and a page that comes back
-// later finds everything the scan read in the meantime.
+// The rows themselves live in the chain's scan store — every post inside a
+// swept range — and what the page shows is the merged feed's business
+// (mergedFeed.js, over one chain or several): this controller only decides
+// what to sweep next. Sweeps are jobs owned here, not by a component: a job
+// started on the home page keeps running after the reader opens a post, an
+// author, the settings, and every window it fetches lands in the store (and
+// localStorage) the moment it arrives. Whoever is showing the feed re-reads
+// the store on each change, so posts appear as they are found rather than
+// when the whole scan is done — and a page that comes back later finds
+// everything the scan read in the meantime.
 //
 // Three kinds of job, one at a time per chain:
 //   refresh  — from the chain head down, until PAGE_SIZE posts are in hand
 //              (ranges already read are free, so usually only the blocks
 //              mined since the last visit are fetched);
-//   more     — from the oldest post on the page down, for another page
-//              (loadMore), or from the bottom of the head-contiguous range
-//              down, for another page of coverage (extend — what a merged,
-//              multi-chain feed asks for, see mergedFeed.js);
+//   more     — from the bottom of the head-contiguous range down, for
+//              another page of coverage (extend);
 //   gap      — the unswept blocks between two ranges the page straddles.
 // Each reads at most the chain's `scanBlocks` from the node (chains.js).
 
-import { useEffect, useSyncExternalStore } from 'react';
 import * as seg from './segments';
 import * as scanner from './scanner';
 
@@ -45,15 +43,11 @@ export class FeedController {
   #pageSize;
   #getTtlMs;
 
-  /** Rows the page shows (the newest `shown` of every covered post). */
-  #shown;
   /** The running job, or null. */
   #job = null;
   /** The running job's latest window, for the scanning indicator. */
   #progress = null;
   #error = null;
-  /** After a `more` that found nothing: how many blocks it read. */
-  #note = null;
   #refreshedAt = 0;
 
   #listeners = new Set();
@@ -71,9 +65,8 @@ export class FeedController {
     this.#scanBlocks = BigInt(scanBlocks);
     this.#pageSize = pageSize;
     this.#getTtlMs = getTtlMs;
-    this.#shown = pageSize;
-    // Rows come from the store; any change there (this chain's sweeps, an
-    // author walk, a /tx lookup) may change what the feed shows.
+    // Coverage comes from the store; any change there (this chain's sweeps,
+    // an author walk, a /tx lookup) may change what the feed shows.
     store.subscribe(() => this.#bump());
   }
 
@@ -106,48 +99,24 @@ export class FeedController {
   }
 
   /**
-   * What the page renders. Stable between changes (useSyncExternalStore
-   * relies on that), recomputed from the store after any change.
+   * The scan's state: what has been read, and what is being read. Stable
+   * between changes (useSyncExternalStore relies on that), recomputed from
+   * the store after any change.
    */
   getSnapshot = () => {
     if (this.#snapshot && this.#snapshotVersion === this.#version) return this.#snapshot;
-    const all = this.#store.coveredPosts();
     const coverage = this.#store.feedCoverage();
-    const rows = all.slice(0, this.#shown);
-
-    // Consecutive rows from different covered ranges have unswept blocks
-    // between them — usually because a scan ran out of budget before it
-    // reached ground read on an earlier visit. The page shows a marker
-    // there rather than pretending the list is continuous.
-    const gaps = [];
-    for (let i = 0; i + 1 < rows.length; i++) {
-      const upper = seg.segmentAt(coverage, rows[i].block);
-      const lower = seg.segmentAt(coverage, rows[i + 1].block);
-      if (upper && lower && upper !== lower) {
-        gaps.push({ after: i, from: lower[1] + 1n, to: upper[0] - 1n });
-      }
-    }
-
     // The range read continuously from the head down: everything the chain
     // published between its bottom and the head is known. Lower ranges sit
-    // below a gap and don't extend that claim.
+    // below a gap and don't extend that claim — a hole may hold posts, so
+    // the chain is `exhausted` only when that one range reaches the floor.
     const top = coverage.length ? coverage[coverage.length - 1] : null;
     const exhausted = top != null && top[0] <= this.#floor;
-    // Done means nothing older can exist: the chain read as ONE range from
-    // the head to the floor — a lower range with a hole above it doesn't
-    // count, the hole may hold posts — and every row held on the page.
-    const done = exhausted && all.length <= this.#shown;
 
     this.#snapshot = {
-      rows,
-      total: all.length,
-      shown: this.#shown,
-      gaps,
       job: this.#job?.kind ?? null,
       progress: this.#progress,
       error: this.#error,
-      note: this.#note,
-      done,
       head: this.#store.feedScanHead(),
       coverage,
       top,
@@ -174,23 +143,16 @@ export class FeedController {
     return this.#run('refresh', () => this.#refresh());
   }
 
-  /** Show another page, sweeping older blocks if the store runs out. */
-  loadMore() {
-    return this.#run('more', () => this.#more());
-  }
-
   /**
    * Deepen coverage by a page: sweep from the bottom of the head-contiguous
-   * range down (nothing to do with what this chain's own page shows — a
-   * merged feed paginates on its own and asks each chain for ground).
-   * Resolves to `{ fetched, found, reachedFloor }`, or to whatever a job
-   * already running resolves to when it joins one.
+   * range down. Resolves to `{ fetched, found, reachedFloor }`, or to
+   * whatever a job already running resolves to when it joins one.
    */
   extend() {
     return this.#run('more', () => this.#extend());
   }
 
-  /** Sweep the unswept blocks between two ranges the page straddles. */
+  /** Sweep the unswept blocks between two ranges the page straddles (`{ from, to }`). */
   fillGap(gap) {
     return this.#run('gap', () => this.#gap(gap));
   }
@@ -284,35 +246,6 @@ export class FeedController {
     this.#refreshedAt = Date.now();
   }
 
-  async #more() {
-    this.#note = null;
-    const all = this.#store.coveredPosts();
-    const target = this.#shown + this.#pageSize;
-    if (all.length >= target) {
-      this.#shown = target; // already in the store — no scan needed
-      return;
-    }
-    const displayed = all.slice(0, this.#shown);
-    const oldest = displayed[displayed.length - 1] ?? null;
-    const coverage = this.#store.feedCoverage();
-    // Start AT the oldest shown post's block, not below it: posts published
-    // in the same block but earlier within it are still unread, and that
-    // block is already covered so revisiting it costs nothing. With nothing
-    // shown yet, walk down from the top of coverage (covered ground is free).
-    const cursor = oldest ? oldest.block : seg.highest(coverage);
-    if (cursor == null) return this.#refresh(); // nothing swept yet
-    this.#shown = target; // rows show up as the sweep finds them
-    const swept = await this.#sweep({
-      cursor,
-      n: target - displayed.length,
-      olderThan: oldest,
-      floor: this.#floor,
-    });
-    const found = this.#store.coveredPosts().length - all.length;
-    if (found === 0 && !swept.reachedFloor) this.#note = { fetched: swept.fetched };
-    this.#store.persistFeedScan();
-  }
-
   async #extend() {
     const coverage = this.#store.feedCoverage();
     const top = coverage.length ? coverage[coverage.length - 1] : null;
@@ -334,20 +267,7 @@ export class FeedController {
   }
 
   async #gap({ from, to }) {
-    const before = this.#store.coveredPosts().length;
     await this.#sweep({ cursor: BigInt(to), n: Infinity, floor: BigInt(from) });
-    // Posts found in a gap belong in the middle of the page; widen the page
-    // by that many so nothing at the bottom is pushed out of view.
-    this.#shown += this.#store.coveredPosts().length - before;
     this.#store.persistFeedScan();
   }
-}
-
-/** React hook: a chain's feed snapshot, refreshed on mount when stale. */
-export function useFeed(feed) {
-  const snapshot = useSyncExternalStore(feed.subscribe, feed.getSnapshot, feed.getSnapshot);
-  useEffect(() => {
-    feed.ensureFresh();
-  }, [feed]);
-  return snapshot;
 }

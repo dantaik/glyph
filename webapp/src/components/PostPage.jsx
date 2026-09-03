@@ -27,7 +27,7 @@ import { ArticleSkeleton } from './Skeleton';
  *          null=absent), onNavigate(neighborMeta), onOpenAuthor() }
  *
  * Fetches the body (tags + markdown) from the publish() tx calldata through
- * the reader of the chain being shown, rewrites `0x<txhash>/<n>` article
+ * the reader of the chain the post is on, rewrites `0x<txhash>/<n>` article
  * refs to in-app links, then resolves any eth:<txhash> image refs to blob
  * URLs before rendering.
  */
@@ -189,7 +189,7 @@ export default function PostPage({
             // 0x… cross-article refs render as in-app post links (glyphRefs)
             // — route them instead of reloading the page. The chain segment
             // is optional here so a ref written before the prefix, or by
-            // hand, still lands somewhere sensible: the chain being read.
+            // hand, still lands somewhere sensible: this post's own chain.
             const href = e.target.closest?.('a[href]')?.getAttribute('href');
             const m = href?.match(
               /^#?\/(?:([^/]+)\/)?tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/,

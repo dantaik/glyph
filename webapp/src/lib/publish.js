@@ -37,8 +37,8 @@ const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
 
 /**
  * The wallet client for `chainId`. The chain object matters: viem checks
- * the wallet is on it before sending, so the chain being read (which the
- * mismatch banner asks the wallet to switch to) is the one to sign on.
+ * the wallet is on it before sending, so the publish chain picked in the
+ * write tab (which asks the wallet to switch to it) is the one to sign on.
  */
 async function getWallet(chainId) {
   if (!window.ethereum) {

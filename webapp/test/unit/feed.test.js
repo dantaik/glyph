@@ -46,7 +46,7 @@ describe('FeedController', () => {
     const { feed, chain, store } = make();
     await feed.refresh();
     const snap = feed.getSnapshot();
-    expect(blocks(snap.rows)).toEqual([2650, 2600, 2550, 2500, 2450]);
+    expect(blocks(store.coveredPosts()).slice(0, 5)).toEqual([2650, 2600, 2550, 2500, 2450]);
     expect(snap.job).toBeNull();
     expect(snap.error).toBeNull();
     // HEAD_LAG: the first window tops out one below the reported head.
@@ -55,7 +55,7 @@ describe('FeedController', () => {
     expect(getLogs(chain)).toHaveLength(2);
     expect(snap.coverage).toEqual([[2000n, 2999n]]);
     expect(store.feedScanHead()).toBe('2999');
-    expect(snap.total).toBe(14);
+    expect(store.coveredPosts()).toHaveLength(14);
     expect(snap.refreshedAt).toBeGreaterThan(0);
     expect(JSON.parse(localStorage.getItem('glyph.feedScan.v2.201')).rows).toHaveLength(14);
   });
@@ -88,51 +88,19 @@ describe('FeedController', () => {
     expect(store.feedCoverage()).toEqual([[2000n, 3199n]]);
   });
 
-  it('loadMore widens the page when the store already holds the rows', async () => {
-    const { feed, chain } = make();
-    await feed.refresh(); // holds 14 rows
-    const before = getLogs(chain).length;
-    await feed.loadMore();
-    expect(feed.getSnapshot().rows).toHaveLength(10);
-    expect(getLogs(chain).length).toBe(before);
-  });
-
-  it('loadMore sweeps below the oldest shown row when the store runs out', async () => {
-    const { feed, chain } = make();
-    await feed.refresh();
-    await feed.loadMore(); // 10 of 14 held rows
-    await feed.loadMore(); // 15 wanted: sweep below 2000
-    const snap = feed.getSnapshot();
-    expect(snap.rows).toHaveLength(15);
-    expect(snap.rows.at(-1).block).toBe(1950n);
-    expect(getLogs(chain).at(-1).args).toEqual([1500n, 1999n]);
-    expect(snap.done).toBe(false);
-  });
-
-  it('is done once everything held is shown and coverage reaches the floor', async () => {
+  it('is exhausted once the head-contiguous range reaches the floor', async () => {
     const { feed } = make({ posts: postsAt([2100, 2200, 2300, 2400, 2500, 2600]) });
-    await feed.refresh();
-    expect(feed.getSnapshot().done).toBe(false); // one held row still off the page
-    await feed.loadMore(); // sweeps to the floor looking for more
-    const snap = feed.getSnapshot();
-    expect(snap.rows).toHaveLength(6);
-    expect(snap.coverage).toEqual([[0n, 2999n]]);
-    expect(snap.done).toBe(true);
-    expect(snap.note).toBeNull();
+    await feed.refresh(); // 2000..2999 holds the six: the sweep stops there
+    expect(feed.getSnapshot().coverage).toEqual([[2000n, 2999n]]);
+    expect(feed.getSnapshot().exhausted).toBe(false);
+    let res;
+    do res = await feed.extend();
+    while (!res.reachedFloor);
+    expect(feed.getSnapshot().coverage).toEqual([[0n, 2999n]]);
+    expect(feed.getSnapshot().exhausted).toBe(true);
   });
 
-  it('notes a load-more that spent its budget and found nothing', async () => {
-    const { feed } = make({ posts: postsAt([2600, 2100, 2000]), scanBlocks: 400 });
-    await feed.refresh(); // 2600..2999: one post, budget spent
-    expect(feed.getSnapshot().rows).toHaveLength(1);
-    await feed.loadMore(); // 2200..2599: nothing there
-    const snap = feed.getSnapshot();
-    expect(snap.note).toEqual({ fetched: 400n });
-    expect(snap.rows).toHaveLength(1);
-    expect(snap.done).toBe(false);
-  });
-
-  it('reports gaps between rows that sit in different covered ranges, and fills them', async () => {
+  it('fills the unswept blocks between two covered ranges', async () => {
     const { feed, store } = make({ posts: postsAt([2500, 2600, 2700, 2800, 2900, 1000, 1100, 1200, 1300, 1400, 1500]) });
     // An earlier visit read 1000..1500 and holds its six posts.
     const chain = fakeChain({ chainId: 201, head: 3000, posts: postsAt([1000, 1100, 1200, 1300, 1400, 1500]) });
@@ -141,16 +109,11 @@ describe('FeedController', () => {
 
     await feed.refresh(); // 2500..2999 holds a full page: the sweep stops there
     expect(feed.getSnapshot().coverage).toEqual([[1000n, 1500n], [2500n, 2999n]]);
-    expect(feed.getSnapshot().gaps).toEqual([]);
+    expect(feed.getSnapshot().top).toEqual([2500n, 2999n]);
 
-    await feed.loadMore(); // widens onto the old rows: a gap now sits between the two ranges
-    const snap = feed.getSnapshot();
-    expect(snap.rows).toHaveLength(10);
-    expect(snap.gaps).toEqual([{ after: 4, from: 1501n, to: 2499n }]);
-
-    await feed.fillGap(snap.gaps[0]);
-    expect(feed.getSnapshot().gaps).toEqual([]);
+    await feed.fillGap({ from: 1501n, to: 2499n });
     expect(feed.getSnapshot().coverage).toEqual([[1000n, 2999n]]);
+    expect(store.coveredPosts()).toHaveLength(11);
   });
 
   it('captures a node failure in the snapshot and clears it on retry', async () => {
@@ -165,7 +128,7 @@ describe('FeedController', () => {
     broken = false;
     await feed.retry();
     expect(feed.getSnapshot().error).toBeNull();
-    expect(feed.getSnapshot().rows).toHaveLength(5);
+    expect(feed.getSnapshot().coverage).toEqual([[2000n, 2999n]]);
   });
 
   it('runs one job at a time and joins a running one', async () => {
@@ -197,7 +160,6 @@ describe('FeedController.extend', () => {
     const snap = feed.getSnapshot();
     expect(snap.top).toEqual([1500n, 2999n]);
     expect(snap.exhausted).toBe(false);
-    expect(snap.rows).toHaveLength(5); // the chain's own page is untouched
   });
 
   it('refreshes instead when nothing has been swept yet', async () => {
@@ -228,7 +190,7 @@ describe('FeedController.extend', () => {
 });
 
 describe('FeedController — holes, failures and heads', () => {
-  it('is not done while a hole sits below the head range, and is once it closes', async () => {
+  it('is not exhausted while a hole sits below the head range, and is once it closes', async () => {
     // An earlier visit read the whole chain when it was 100 blocks tall.
     const { store, feed, chain } = make({ chainId: 202, head: 3000, posts: postsAt([50]), scanBlocks: 500 });
     store.rememberPosts(chain.rows);
@@ -236,16 +198,13 @@ describe('FeedController — holes, failures and heads', () => {
     await feed.refresh();
     let snap = feed.getSnapshot();
     expect(snap.coverage).toEqual([[0n, 100n], [2500n, 2999n]]);
-    expect(blocks(snap.rows)).toEqual([50]);
-    expect(snap.exhausted).toBe(false);
-    expect(snap.done).toBe(false);
-    expect(snap.gaps).toEqual([]); // one row: no marker to hang a gap on
+    expect(blocks(store.coveredPosts())).toEqual([50]);
+    expect(snap.exhausted).toBe(false); // the hole may hold posts
     // Reading on merges the ranges; only then is there nothing older to read.
     for (let i = 0; i < 5; i++) await feed.extend();
     snap = feed.getSnapshot();
     expect(snap.coverage).toEqual([[0n, 2999n]]);
     expect(snap.exhausted).toBe(true);
-    expect(snap.done).toBe(true);
   });
 
   it('a sweep that fails part-way keeps its coverage but not the head; the next refresh re-reads from the head', async () => {
@@ -265,11 +224,11 @@ describe('FeedController — holes, failures and heads', () => {
     expect(snap.error).toMatch(/eth_getLogs failed/);
     expect(snap.coverage).toEqual([[2500n, 2999n]]);
     expect(snap.head).toBeNull();
-    expect(blocks(snap.rows)).toEqual([2600]);
+    expect(blocks(store.coveredPosts())).toEqual([2600]);
     await feed.refresh();
     snap = feed.getSnapshot();
     expect(snap.error).toBeNull();
-    expect(blocks(snap.rows)).toEqual([2600, 2100, 1600, 1100, 600]);
+    expect(blocks(store.coveredPosts())).toEqual([2600, 2100, 1600, 1100, 600]);
     expect(snap.coverage).toEqual([[500n, 2999n]]);
     expect(snap.head).toBe('2999');
     // The window read before the failure was not read again.
