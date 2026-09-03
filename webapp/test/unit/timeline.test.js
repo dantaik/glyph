@@ -75,3 +75,31 @@ describe('timeline.rowKey', () => {
     expect(rowKey({ chainId: 1, txHash: '0xab' })).toBe(a);
   });
 });
+
+describe('timeline.timeRows — exact times are anchors', () => {
+  it('clamps an estimate between the exact rows around it and never moves an exact row', () => {
+    // Newest first. Block 800's estimate (8_000) sits below the exact 8_500 of
+    // block 700, which was mined before it: it is lifted to 8_500.
+    const out = timeRows([row(950, { ts: 9000 }), row(800), row(700, { ts: 8500 }), row(600)], 1, clock);
+    expect(out.map((r) => [r.ts, r.tsExact])).toEqual([
+      [9000, true],
+      [8500, false],
+      [8500, true],
+      [6000, false],
+    ]);
+  });
+
+  it('a low estimate above an exact row is lifted; the exact row is not lowered to it', () => {
+    // Before, the exact 9_950 would have been clamped down to the estimate 9_900.
+    const out = timeRows([row(990), row(980, { ts: 9950 })], 1, clock);
+    expect(out.map((r) => [r.ts, r.tsExact])).toEqual([
+      [9950, false],
+      [9950, true],
+    ]);
+  });
+
+  it('with no clock, rows without a time stay timeless and exact ones keep theirs', () => {
+    const out = timeRows([row(990), row(980, { ts: 9950 }), row(970)], 1, null);
+    expect(out.map((r) => r.ts)).toEqual([null, 9950, null]);
+  });
+});

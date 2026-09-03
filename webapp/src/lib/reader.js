@@ -143,11 +143,16 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     });
   }
 
+  /** Every post a transaction published — one receipt read per transaction, kept. */
+  const txPosts = (txHash) =>
+    forever(`tx:${String(txHash).toLowerCase()}`, async () => store.rememberPosts(await io.postsInTx(txHash)));
+
   /**
    * Resolve post metadata from a publish transaction hash + the 0-based
    * ordinal of the Post event within that transaction (one tx can publish
    * several posts). One receipt read, no scanning. Null when there is no
-   * such event.
+   * such event — an answer that is kept too, since a mined transaction
+   * cannot grow one; a receipt that cannot be read yet is not.
    */
   function findMetaByTx(txHash, eventIndex = 0) {
     return forever(txMetaKey(txHash, eventIndex), async () => {
@@ -158,7 +163,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
       }
       // Remember every post in the transaction, not just the one asked for:
       // a sibling opened later in the session is then already resolved.
-      const rows = store.rememberPosts(await io.postsInTx(txHash));
+      const rows = await txPosts(txHash);
       return cacheMetaBoth(rows[eventIndex] ?? null);
     });
   }

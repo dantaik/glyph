@@ -142,6 +142,7 @@ export function excerpt(md, max = 80) {
 /** Turn a raw provider error into a short, human-friendly hint. */
 export function friendlyError(message) {
   const m = String(message || '');
+  if (/尚未同步/.test(m)) return m; // scanner.js: a node behind the chain, said plainly
   if (/rate limit|429|too many requests/i.test(m)) {
     return '节点请求过于频繁，请稍后重试，或到右上角设置更换 RPC 节点。';
   }

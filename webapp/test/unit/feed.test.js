@@ -226,3 +226,92 @@ describe('FeedController.extend', () => {
     expect((await p2).found).toBe(10);
   });
 });
+
+describe('FeedController — holes, failures and heads', () => {
+  it('is not done while a hole sits below the head range, and is once it closes', async () => {
+    // An earlier visit read the whole chain when it was 100 blocks tall.
+    const { store, feed, chain } = make({ chainId: 202, head: 3000, posts: postsAt([50]), scanBlocks: 500 });
+    store.rememberPosts(chain.rows);
+    store.rememberFeedRange(0n, 100n);
+    await feed.refresh();
+    let snap = feed.getSnapshot();
+    expect(snap.coverage).toEqual([[0n, 100n], [2500n, 2999n]]);
+    expect(blocks(snap.rows)).toEqual([50]);
+    expect(snap.exhausted).toBe(false);
+    expect(snap.done).toBe(false);
+    expect(snap.gaps).toEqual([]); // one row: no marker to hang a gap on
+    // Reading on merges the ranges; only then is there nothing older to read.
+    for (let i = 0; i < 5; i++) await feed.extend();
+    snap = feed.getSnapshot();
+    expect(snap.coverage).toEqual([[0n, 2999n]]);
+    expect(snap.exhausted).toBe(true);
+    expect(snap.done).toBe(true);
+  });
+
+  it('a sweep that fails part-way keeps its coverage but not the head; the next refresh re-reads from the head', async () => {
+    let n = 0;
+    const store = freshStore(203);
+    const chain = fakeChain({
+      chainId: 203,
+      head: 3000,
+      posts: postsAt([100, 600, 1100, 1600, 2100, 2600]),
+      fail: (c) => c.method === 'eth_getLogs' && ++n === 2,
+    });
+    const feed = new FeedController({
+      chainId: 203, store, io: chain.io, log: silentLog(), windowSize: 500, floor: 0n, scanBlocks: 10_000, pageSize: 5, getTtlMs: () => 0,
+    });
+    await feed.refresh();
+    let snap = feed.getSnapshot();
+    expect(snap.error).toMatch(/eth_getLogs failed/);
+    expect(snap.coverage).toEqual([[2500n, 2999n]]);
+    expect(snap.head).toBeNull();
+    expect(blocks(snap.rows)).toEqual([2600]);
+    await feed.refresh();
+    snap = feed.getSnapshot();
+    expect(snap.error).toBeNull();
+    expect(blocks(snap.rows)).toEqual([2600, 2100, 1600, 1100, 600]);
+    expect(snap.coverage).toEqual([[500n, 2999n]]);
+    expect(snap.head).toBe('2999');
+    // The window read before the failure was not read again.
+    expect(getLogs(chain).map((c) => String(c.args[1]))).toEqual(['2999', '2499', '2499', '1999', '1499', '999']);
+  });
+
+  it('records the head a node actually served, so the next refresh reads the rest', async () => {
+    const { feed, chain } = make({ chainId: 204 });
+    const real = chain.io.postsInRange.bind(chain.io);
+    let short = true;
+    chain.io.postsInRange = async (from, to) => {
+      if (!short) return real(from, to);
+      short = false; // the node is two blocks behind the head it reported
+      const res = await real(from, to - 2n);
+      return { rows: res.rows, to: to - 2n };
+    };
+    await feed.refresh();
+    let snap = feed.getSnapshot();
+    expect(snap.head).toBe('2997');
+    expect(snap.coverage[snap.coverage.length - 1][1]).toBe(2997n);
+    await feed.refresh();
+    snap = feed.getSnapshot();
+    expect(snap.head).toBe('2999');
+    expect(getLogs(chain).at(-1).args.map(String)).toEqual(['2998', '2999']);
+  });
+
+  it('ensureFresh refreshes when stale, never while a job runs', async () => {
+    const { feed, chain } = make({ chainId: 205, ttl: 0 });
+    feed.ensureFresh();
+    feed.ensureFresh(); // joins nothing: a job is running
+    await feed.refresh();
+    expect(chain.calls.filter((c) => c.method === 'eth_blockNumber')).toHaveLength(1);
+    feed.ensureFresh(); // stale at once with a zero delay
+    await feed.refresh();
+    expect(chain.calls.filter((c) => c.method === 'eth_blockNumber')).toHaveLength(2);
+  });
+
+  it('with a delay in force, ensureFresh is a no-op after a refresh', async () => {
+    const { feed, chain } = make({ chainId: 206, ttl: 60_000 });
+    await feed.refresh();
+    feed.ensureFresh();
+    await feed.refresh(); // joins nothing either: returns at once, no head read
+    expect(chain.calls.filter((c) => c.method === 'eth_blockNumber')).toHaveLength(2);
+  });
+});

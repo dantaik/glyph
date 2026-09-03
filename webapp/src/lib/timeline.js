@@ -23,25 +23,37 @@ export const toSec = (date) => Math.floor(date.getTime() / 1000);
  * Tag one chain's newest-first rows with `chainId`, `ts` and `tsExact`.
  *
  * A row without a timestamp gets an estimate from `clock` (null without
- * one). An estimate is clamped so it never lands above the row before it:
- * that row is newer on chain, whatever the clock says, and a legacy row
- * must not leap above an exact one it was mined behind.
+ * one). Exact times are anchors and are never touched. An estimate is
+ * clamped between them: no newer than the row before it (that row was
+ * mined after it, whatever the clock says) and no older than the nearest
+ * exact row below it (mined before it) — so a legacy row can neither leap
+ * above an exact one it was mined behind nor sink below one it preceded.
  */
 export function timeRows(rows, chainId, clock) {
   const id = Number(chainId);
-  let ceiling = Infinity;
-  return rows.map((r) => {
-    let ts = r.ts;
-    let exact = ts != null;
-    if (ts == null) {
-      const est = estimateBlockTime(clock, r.block);
-      ts = est ? toSec(est) : null;
-      exact = false;
-    }
-    if (ts != null && ts > ceiling) ts = ceiling;
-    if (ts != null) ceiling = ts;
-    return { ...r, chainId: id, ts, tsExact: exact };
+  const out = rows.map((r) => {
+    if (r.ts != null) return { ...r, chainId: id, ts: r.ts, tsExact: true };
+    const est = estimateBlockTime(clock, r.block);
+    return { ...r, chainId: id, ts: est ? toSec(est) : null, tsExact: false };
   });
+  // The nearest exact time below each row (older on chain), or -Infinity.
+  const floors = new Array(out.length);
+  let below = -Infinity;
+  for (let i = out.length - 1; i >= 0; i--) {
+    floors[i] = below;
+    if (out[i].tsExact) below = out[i].ts;
+  }
+  let ceiling = Infinity;
+  for (let i = 0; i < out.length; i++) {
+    const r = out[i];
+    if (r.ts == null) continue;
+    if (!r.tsExact) {
+      if (r.ts > ceiling) r.ts = ceiling;
+      if (r.ts < floors[i]) r.ts = floors[i];
+    }
+    ceiling = r.ts;
+  }
+  return out;
 }
 
 /**

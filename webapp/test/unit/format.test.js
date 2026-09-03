@@ -29,3 +29,13 @@ describe('format times', () => {
     expect(fmtAbsTime('x')).toBeNull();
   });
 });
+
+describe('friendlyError', () => {
+  it('passes a message written for the reader through, and maps the rest', async () => {
+    const { friendlyError } = await import('../../src/lib/format');
+    expect(friendlyError('节点尚未同步到区块 5，稍后重试即可')).toBe('节点尚未同步到区块 5，稍后重试即可');
+    expect(friendlyError('HTTP 429 too many requests')).toMatch(/过于频繁/);
+    expect(friendlyError('fetch failed')).toMatch(/网络连接/);
+    expect(friendlyError('something odd')).toMatch(/节点暂时不可用/);
+  });
+});

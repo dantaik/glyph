@@ -128,17 +128,15 @@ export class FeedController {
       }
     }
 
-    const oldest = rows[rows.length - 1];
-    const bottom = oldest
-      ? seg.segmentAt(coverage, oldest.block)
-      : coverage.length
-        ? coverage[coverage.length - 1]
-        : null;
-    const done = all.length <= this.#shown && bottom != null && bottom[0] <= this.#floor;
     // The range read continuously from the head down: everything the chain
     // published between its bottom and the head is known. Lower ranges sit
     // below a gap and don't extend that claim.
     const top = coverage.length ? coverage[coverage.length - 1] : null;
+    const exhausted = top != null && top[0] <= this.#floor;
+    // Done means nothing older can exist: the chain read as ONE range from
+    // the head to the floor — a lower range with a hole above it doesn't
+    // count, the hole may hold posts — and every row held on the page.
+    const done = exhausted && all.length <= this.#shown;
 
     this.#snapshot = {
       rows,
@@ -153,7 +151,7 @@ export class FeedController {
       head: this.#store.feedScanHead(),
       coverage,
       top,
-      exhausted: top != null && top[0] <= this.#floor,
+      exhausted,
       floor: this.#floor,
       scanBlocks: this.#scanBlocks,
       refreshedAt: this.#refreshedAt,

@@ -142,3 +142,89 @@ describe('scanner author reads', () => {
     expect(await scanner.findAuthorPost({ ...args, targetIndex: 7n })).toBeNull();
   });
 });
+
+describe('scanner.sweepFeed — budget and coverage', () => {
+  it('spends the budget only on uncovered ground and merges what it reads into one range', async () => {
+    const store = memoryStore(102);
+    const chain = fakeChain({
+      chainId: 102,
+      head: 3000,
+      posts: [
+        { author: A, index: 0, block: 800 },
+        { author: A, index: 1, block: 1500 },
+        { author: A, index: 2, block: 2500 },
+      ],
+    });
+    // An earlier read covered 1000..2000 and holds the post at 1500.
+    store.rememberPosts(chain.rows.filter((r) => r.block === 1500n));
+    store.rememberFeedRange(1000n, 2000n);
+    const res = await sweep(store, chain, { cursor: 2999n, n: 10, floor: 0n, windowSize: 1000n, maxBlocks: 1500n });
+    expect(chain.calls.map((c) => [String(c.args[0]), String(c.args[1])])).toEqual([
+      ['2001', '2999'],
+      ['499', '999'],
+    ]);
+    expect(res.fetched).toBe(1500n);
+    expect(res.reachedFloor).toBe(false);
+    expect(res.rows.map((r) => Number(r.block))).toEqual([2500, 1500, 800]);
+    expect(store.feedCoverage()).toEqual([[499n, 2999n]]);
+  });
+
+  it('stops at once when the cursor is below the floor', async () => {
+    const store = memoryStore(103);
+    const chain = fakeChain({ chainId: 103, head: 1000, posts });
+    const res = await sweep(store, chain, { cursor: 50n, n: 5, floor: 100n });
+    expect(chain.calls).toEqual([]);
+    expect(res).toMatchObject({ rows: [], fetched: 0n, windows: 0, reachedFloor: false });
+  });
+});
+
+describe('scanner.authorRowsAt — a block the chain points at holds a post', () => {
+  const fetcher = (chain, author) => (block) => chain.io.authorPostsInBlock(author, block);
+
+  it('an empty answer for such a block is a lagging node: no coverage, and the read fails', async () => {
+    const store = memoryStore(104);
+    const chain = fakeChain({ chainId: 104, head: 1000, posts });
+    let behind = true;
+    const fetchBlock = async (block) => (behind ? [] : fetcher(chain, A)(block));
+    await expect(
+      scanner.authorRowsAt({ store, log: silentLog(), author: A, block: 900n, fetchBlock }),
+    ).rejects.toThrow(/尚未同步到区块 900/);
+    expect(store.authorCoverage(A)).toEqual([]);
+    behind = false;
+    const rows = await scanner.authorRowsAt({ store, log: silentLog(), author: A, block: 900n, fetchBlock });
+    expect(rows.map((r) => Number(r.index))).toEqual([2]);
+    expect(store.authorCoverage(A)).toEqual([[900n, 900n]]);
+  });
+
+  it('coverage that claims the block yet holds none of the author\'s posts is read again', async () => {
+    const store = memoryStore(105);
+    const chain = fakeChain({ chainId: 105, head: 1000, posts });
+    store.rememberFeedRange(900n, 900n); // a sweep served by a lagging node saw nothing there
+    const rows = await scanner.authorRowsAt({ store, log: silentLog(), author: A, block: 900n, fetchBlock: fetcher(chain, A) });
+    expect(rows).toHaveLength(1);
+    expect(chain.calls.map((c) => c.method)).toEqual(['eth_getLogs:author']);
+    // …and now it is genuinely known.
+    await scanner.authorRowsAt({ store, log: silentLog(), author: A, block: 900n, fetchBlock: fetcher(chain, A) });
+    expect(chain.calls).toHaveLength(1);
+  });
+
+  it('two walks wanting the same block share one read', async () => {
+    const store = memoryStore(106);
+    const chain = fakeChain({ chainId: 106, head: 1000, posts });
+    const args = { store, log: silentLog(), author: A, block: 400n, fetchBlock: fetcher(chain, A) };
+    const [x, y] = await Promise.all([scanner.authorRowsAt(args), scanner.authorRowsAt(args)]);
+    expect(x).toEqual(y);
+    expect(chain.calls).toHaveLength(1);
+  });
+});
+
+describe('scanner.findAuthorPost — a chain that does not descend', () => {
+  it('gives up instead of looping', async () => {
+    const store = memoryStore(107);
+    const fetchBlock = async (block) => [
+      { author: A, index: 5, block, prevBlock: block, title: 'loop', txHash: '0x5', eventIndex: 0, logIndex: 0 },
+    ];
+    const found = await scanner.findAuthorPost({ store, log: silentLog(), author: A, targetIndex: 1, startBlock: 900n, fetchBlock });
+    expect(found).toBeNull();
+  });
+});
