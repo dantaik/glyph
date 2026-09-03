@@ -7,7 +7,7 @@ import ChainIcon from './components/ChainIcon';
 import { ExternalLink } from './components/Icons';
 import { FIXTURES_MODE } from './lib/data';
 import { GLYPH_ADDRESS } from './lib/config';
-import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
+import { etherscanAddrUrl, chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
 import { IS_OFFLINE_BUILD, OFFLINE_FILE } from './lib/offline';
 import { hrefFor, useUrlState } from './lib/router';
@@ -84,10 +84,9 @@ function Footer({ navigate }) {
   return (
     <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
       <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-        <span className="font-mono text-2xs">合约：{shortAddr(GLYPH_ADDRESS)}</span>
-        {feed.chains.map((c) => (
+        {feed.chains.map((c, i) => (
           <Fragment key={c.chainId}>
-            <span className="select-none" aria-hidden="true">·</span>
+            {i > 0 && <span className="select-none" aria-hidden="true">·</span>}
             <a
               href={etherscanAddrUrl(GLYPH_ADDRESS, c.chainId)}
               target="_blank"
