@@ -184,3 +184,45 @@ describe('FeedController', () => {
     expect(feed.getSnapshot()).toBe(feed.getSnapshot());
   });
 });
+
+describe('FeedController.extend', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('sweeps from just below the head-contiguous range and reports what it found', async () => {
+    const { feed, chain } = make();
+    await feed.refresh(); // coverage 2000..2999
+    const res = await feed.extend();
+    expect(getLogs(chain).at(-1).args).toEqual([1500n, 1999n]);
+    expect(res).toEqual({ fetched: 500n, found: 10, reachedFloor: false });
+    const snap = feed.getSnapshot();
+    expect(snap.top).toEqual([1500n, 2999n]);
+    expect(snap.exhausted).toBe(false);
+    expect(snap.rows).toHaveLength(5); // the chain's own page is untouched
+  });
+
+  it('refreshes instead when nothing has been swept yet', async () => {
+    const { feed, chain } = make();
+    const res = await feed.extend();
+    expect(res).toEqual({ fetched: 0n, found: 0, reachedFloor: false });
+    expect(getLogs(chain)[0].args).toEqual([2500n, 2999n]);
+    expect(feed.getSnapshot().top).toEqual([2000n, 2999n]);
+  });
+
+  it('answers at once once the floor is reached', async () => {
+    const { feed, chain } = make({ posts: postsAt([2600]) });
+    await feed.refresh(); // sweeps to the floor looking for a page
+    expect(feed.getSnapshot().exhausted).toBe(true);
+    const n = getLogs(chain).length;
+    expect(await feed.extend()).toEqual({ fetched: 0n, found: 0, reachedFloor: true });
+    expect(getLogs(chain).length).toBe(n);
+  });
+
+  it('a joined job resolves to that job\'s result', async () => {
+    const { feed } = make();
+    await feed.refresh();
+    const p1 = feed.extend();
+    const p2 = feed.extend();
+    expect(p2).toBe(p1);
+    expect((await p2).found).toBe(10);
+  });
+});

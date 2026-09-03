@@ -15,7 +15,10 @@
 //   refresh  — from the chain head down, until PAGE_SIZE posts are in hand
 //              (ranges already read are free, so usually only the blocks
 //              mined since the last visit are fetched);
-//   more     — from the oldest post on the page down, for another page;
+//   more     — from the oldest post on the page down, for another page
+//              (loadMore), or from the bottom of the head-contiguous range
+//              down, for another page of coverage (extend — what a merged,
+//              multi-chain feed asks for, see mergedFeed.js);
 //   gap      — the unswept blocks between two ranges the page straddles.
 // Each reads at most the chain's `scanBlocks` from the node (chains.js).
 
@@ -132,6 +135,10 @@ export class FeedController {
         ? coverage[coverage.length - 1]
         : null;
     const done = all.length <= this.#shown && bottom != null && bottom[0] <= this.#floor;
+    // The range read continuously from the head down: everything the chain
+    // published between its bottom and the head is known. Lower ranges sit
+    // below a gap and don't extend that claim.
+    const top = coverage.length ? coverage[coverage.length - 1] : null;
 
     this.#snapshot = {
       rows,
@@ -145,6 +152,8 @@ export class FeedController {
       done,
       head: this.#store.feedScanHead(),
       coverage,
+      top,
+      exhausted: top != null && top[0] <= this.#floor,
       floor: this.#floor,
       scanBlocks: this.#scanBlocks,
       refreshedAt: this.#refreshedAt,
@@ -172,6 +181,17 @@ export class FeedController {
     return this.#run('more', () => this.#more());
   }
 
+  /**
+   * Deepen coverage by a page: sweep from the bottom of the head-contiguous
+   * range down (nothing to do with what this chain's own page shows — a
+   * merged feed paginates on its own and asks each chain for ground).
+   * Resolves to `{ fetched, found, reachedFloor }`, or to whatever a job
+   * already running resolves to when it joins one.
+   */
+  extend() {
+    return this.#run('more', () => this.#extend());
+  }
+
   /** Sweep the unswept blocks between two ranges the page straddles. */
   fillGap(gap) {
     return this.#run('gap', () => this.#gap(gap));
@@ -187,8 +207,9 @@ export class FeedController {
     this.#error = null;
     const job = { kind, promise: null };
     job.promise = (async () => {
+      let out;
       try {
-        await fn();
+        out = await fn();
       } catch (err) {
         this.#error = err?.message || String(err);
       } finally {
@@ -198,6 +219,7 @@ export class FeedController {
         }
         this.#bump();
       }
+      return out;
     })();
     this.#job = job;
     this.#bump();
@@ -291,6 +313,26 @@ export class FeedController {
     const found = this.#store.coveredPosts().length - all.length;
     if (found === 0 && !swept.reachedFloor) this.#note = { fetched: swept.fetched };
     this.#store.persistFeedScan();
+  }
+
+  async #extend() {
+    const coverage = this.#store.feedCoverage();
+    const top = coverage.length ? coverage[coverage.length - 1] : null;
+    if (!top) {
+      await this.#refresh(); // nothing swept yet: the head is the place to start
+      return { fetched: 0n, found: 0, reachedFloor: false };
+    }
+    if (top[0] <= this.#floor) return { fetched: 0n, found: 0, reachedFloor: true };
+    const before = this.#store.coveredPosts().length;
+    // The cursor is the first uncovered block; a lower range met on the way
+    // is served from the store, and the two ranges merge into one.
+    const swept = await this.#sweep({ cursor: top[0] - 1n, n: this.#pageSize, floor: this.#floor });
+    this.#store.persistFeedScan();
+    return {
+      fetched: swept.fetched,
+      found: this.#store.coveredPosts().length - before,
+      reachedFloor: swept.reachedFloor,
+    };
   }
 
   async #gap({ from, to }) {

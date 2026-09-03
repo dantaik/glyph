@@ -32,13 +32,15 @@ const short = (s) => `${String(s).slice(0, 10)}…`;
 
 /**
  * Build the reader for `chainId`. `makeIO(chainId, log)` swaps the chain
- * I/O — fixtures.js uses it to run the reader on an in-memory chain.
+ * I/O — fixtures.js uses it to run the reader on an in-memory chain — and
+ * `store` swaps the chain's scan store (tests hand in a fresh one; the app
+ * uses the page-wide store for the chain).
  */
-export function createReader(chainId, makeIO = null) {
+export function createReader(chainId, { makeIO = null, store: ownStore = null } = {}) {
   const id = Number(chainId);
   const chain = getChain(id);
   const log = rpcLog.scoped(chain.name);
-  const store = getScanStore(id);
+  const store = ownStore ?? getScanStore(id);
   const io = makeIO ? makeIO(id, log) : createChainIO(id, log);
   // Two caches, because there are two kinds of read.
   //

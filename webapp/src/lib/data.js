@@ -39,7 +39,7 @@ export function getReader(chainId) {
   const id = Number(chainId);
   let reader = readers.get(id);
   if (!reader) {
-    reader = createReader(id, makeIO);
+    reader = createReader(id, { makeIO });
     readers.set(id, reader);
   }
   return reader;
