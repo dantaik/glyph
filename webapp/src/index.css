@@ -37,13 +37,16 @@
     "Songti SC", "SimSun", serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Source Code Pro", monospace;
 
-  /* --- Type scale — 8 named tiers, nothing else is used:
+  /* --- Type scale — 9 named tiers, nothing else is used:
         2xs 11px · xs 12px · sm 14px · base 16px ·
-        lg 18px · xl 20px · 2xl 24px · display 28px --- */
+        lg 18px · xl 20px · 2xl 24px · display 28px · jumbo 32px --- */
   --text-2xs: 0.6875rem;             /* 11px micro meta */
-  --text-display: 1.75rem;           /* 28px article / hero headline (sm+) */
+  --text-display: 1.75rem;           /* 28px hero headline / article title (mobile) */
   --text-display--line-height: 1.45;
   --text-display--font-weight: 700;
+  --text-jumbo: 2rem;                /* 32px article title (sm+) */
+  --text-jumbo--line-height: 1.4;
+  --text-jumbo--font-weight: 900;
 
   --tracking-label: 0.08em;
   --shadow-pop: 0 4px 12px rgb(18 20 26 / 0.10), 0 12px 32px rgb(18 20 26 / 0.16);

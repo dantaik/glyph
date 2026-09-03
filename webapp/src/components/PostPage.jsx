@@ -122,7 +122,7 @@ export default function PostPage({
 
       <header className="mb-10">
         <div className="article-column text-center">
-        <h1 className="font-serif text-2xl leading-[1.45] font-bold sm:text-display">
+        <h1 className="font-serif text-display font-black sm:text-jumbo">
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 text-xs text-ink-faint tabular-nums">
