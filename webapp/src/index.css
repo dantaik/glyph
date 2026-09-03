@@ -125,7 +125,7 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   margin-inline: auto;
 }
 
-/* Body prose is the UI sans — serif belongs to headings only. */
+/* Body prose inherits the article's serif face; code stays mono. */
 .prose-glyph {
   font-size: var(--article-size);
   line-height: 1.95;

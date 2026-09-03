@@ -114,7 +114,7 @@ export default function PostPage({
   const loaded = !loading && !error && html != null;
 
   return (
-    <article>
+    <article className="font-serif">
       <div className="mb-8 flex items-center justify-between">
         <BackButton onClick={onBack} />
         <FontSizeControl />
