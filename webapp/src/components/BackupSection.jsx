@@ -77,7 +77,7 @@ export default function BackupSection() {
       {review && (
         <div className="mt-4 rounded-lg border border-edge bg-paper-raised px-4 py-3" data-settings-review="">
           <p className="text-sm text-ink-soft">
-            来自 <span className="font-mono text-xs">{review.name}</span>
+            来自 <span className="text-xs">{review.name}</span>
             {review.summary.length ? '，应用后将：' : '：'}
           </p>
           {review.summary.length > 0 && (

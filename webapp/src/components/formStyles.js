@@ -26,9 +26,8 @@ export const BTN_OUTLINE =
 export const ICON_BTN =
   'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-ghost hover:text-accent hover:bg-paper-sunken disabled:opacity-25 disabled:hover:text-ink-ghost disabled:hover:bg-transparent transition-colors';
 
-/** A text field. Addresses and URLs take `INPUT_MONO`; numbers and words, `INPUT`. */
+/** A text field — addresses, URLs, numbers and words alike. */
 export const INPUT =
   'w-full rounded-lg border border-edge-strong bg-paper px-3 py-2 text-sm placeholder:text-ink-ghost focus:border-accent focus:outline-none';
-export const INPUT_MONO = `${INPUT} font-mono`;
 /** The label above a field. */
 export const FIELD_LABEL = 'mb-1.5 block text-xs tracking-label text-ink-faint';
