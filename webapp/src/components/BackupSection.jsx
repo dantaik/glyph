@@ -54,7 +54,7 @@ export default function BackupSection() {
       <SectionHeader label="备份与恢复" />
       <Note>
         把这一页的全部设置——各链的节点列表、扫描延迟、发布目标、主题、正文字号、控制台日志——存成一个 JSON 文件，
-        换浏览器、换电脑或打开离线版时再导入。导入前会先列出将要改动的项目，确认后才生效，无需刷新。
+        换浏览器、换电脑时再导入。导入前会先列出将要改动的项目，确认后才生效，无需刷新。
       </Note>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" onClick={exportFile} className={BTN_OUTLINE}>

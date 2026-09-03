@@ -78,11 +78,10 @@ async function del(storeName, key) {
 
 // --- Fallback for browsers that refuse IndexedDB -----------------------
 //
-// Some browsers deny the API to file:// pages — where the offline single-file
-// copy runs — and a private window can deny it anywhere. Without a stand-in
-// every navigation would re-read the same body from the node, so a bounded
-// Map holds the session's worth. It dies with the page; IndexedDB, wherever
-// it is allowed, remains the permanent cache.
+// A private window (and some browsers in other modes) can deny the API.
+// Without a stand-in every navigation would re-read the same body from the
+// node, so a bounded Map holds the session's worth. It dies with the page;
+// IndexedDB, wherever it is allowed, remains the permanent cache.
 
 export const MEMORY_MAX = 500;
 const memory = new Map();

@@ -18,7 +18,6 @@ import BackButton from './BackButton';
 import BackupSection from './BackupSection';
 import ListHeader from './ListHeader';
 import Note from './Note';
-import OfflineSection from './OfflineSection';
 import SectionHeader from './SectionHeader';
 import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT, INPUT_MONO } from './formStyles';
 
@@ -28,7 +27,7 @@ const readLists = () => Object.fromEntries(chainIds.map((id) => [id, getRpcUrls(
 
 /**
  * Settings page (/settings): each chain's ordered RPC endpoints, the
- * rescan delay, backup and restore, and the offline copy. Endpoints are
+ * rescan delay, backup and restore. Endpoints are
  * tried top-down and the reader falls back to the next when one fails,
  * so order is the setting — hence move-up / move-down rather than a
  * single URL field. Saving takes effect at once, without a reload: even a
@@ -201,8 +200,6 @@ export default function SettingsPage({ navigate }) {
       </section>
 
       <BackupSection />
-
-      <OfflineSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
         <button type="button" onClick={() => resetEndpointConfig()} className={BTN_QUIET}>

@@ -38,7 +38,7 @@ test.describe('the home feed', () => {
     await expect(lines).toHaveCount(2);
     await expect(lines.nth(0)).toContainText('Ethereum');
     await expect(lines.nth(1)).toContainText('Taiko');
-    await expect(lines.nth(0)).toContainText(/扫描范围 [\d,]+ 至 [\d,]+/);
+    await expect(lines.nth(0)).toContainText(/已扫描区块 [\d,]+ - [\d,]+/);
     await expect(page.locator('footer')).not.toContainText('合约');
   });
 

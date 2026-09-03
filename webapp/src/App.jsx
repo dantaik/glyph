@@ -7,7 +7,6 @@ import ChainIcon from './components/ChainIcon';
 import { FIXTURES_MODE } from './lib/data';
 import { chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
-import { IS_OFFLINE_BUILD, OFFLINE_FILE } from './lib/offline';
 import { hrefFor, useUrlState } from './lib/router';
 import { getAllChainsView } from './lib/view';
 
@@ -81,20 +80,7 @@ function Footer({ navigate }) {
 
   return (
     <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
-      {/* The whole app as one file, for when this domain is gone. */}
-      {!IS_OFFLINE_BUILD && (
-        <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-          <a
-            href={`/${OFFLINE_FILE}`}
-            download={OFFLINE_FILE}
-            title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
-            className={`${FOOT_LINK} text-2xs`}
-          >
-            离线版
-          </a>
-        </p>
-      )}
-      <ul className="mt-2 space-y-1 text-2xs text-ink-faint tabular-nums">
+      <ul className="space-y-1 text-2xs text-ink-faint tabular-nums">
         {feed.chains.map((c) => (
           <ChainLine key={c.chainId} chainId={c.chainId} span={scanSpan(c.coverage)} scanning={c.job != null} go={go} />
         ))}
