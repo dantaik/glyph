@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, AlertCircle, Close } from './Icons';
+import { Check, AlertCircle, Close, Plus } from './Icons';
 
 /**
  * Copy text to the clipboard. Secure contexts use the async Clipboard API;
@@ -106,105 +106,111 @@ export default function ImageUploader({
         </div>
       )}
 
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="上传图片"
-        className={`rounded-xl border-2 border-dashed p-7 text-center transition-colors cursor-pointer ${
-          isDragging
-            ? 'border-accent bg-accent-wash/50'
-            : 'border-edge-strong bg-paper-raised hover:border-accent'
-        }`}
-        onClick={() => fileInputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            fileInputRef.current?.click();
-          }
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsDragging(false);
-          if (e.dataTransfer.files.length) {
-            addFiles(e.dataTransfer.files);
-          }
-        }}
-      >
-        <p className="text-sm text-ink-faint">拖入图片或点击上传</p>
-        <p className="text-xs text-ink-ghost mt-1">
-          自动转换为 WebP q60，最大长边 1600px
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleFileChange}
-          className="hidden"
-        />
-      </div>
-
       {Object.keys(files).length > 0 && (
-        <>
-          <p className="mt-2 text-2xs text-ink-ghost">
-            图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。
-          </p>
-          <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {Object.entries(files).map(([key, file]) => (
-            <div
-              key={key}
-              role="button"
-              tabIndex={0}
-              aria-label={`复制引用 ${key}`}
-              title="点击复制引用"
-              onClick={() => copyRef(key)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  copyRef(key);
-                }
-              }}
-              className="relative group cursor-pointer rounded-lg"
-            >
-              <img
-                src={previewUrls[key]}
-                alt={key}
-                className="w-full h-24 object-cover rounded-lg border border-edge"
-              />
-              {copiedKey === key && (
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-ink/50">
-                  <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-medium text-ink">
-                    已复制引用
-                  </span>
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(key);
-                }}
-                aria-label={`移除图片 ${key}`}
-                className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full
-                             bg-paper-raised/90 text-ink-faint hover:text-danger shadow-sm
-                             opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"
-              >
-                <Close size={12} />
-              </button>
-              <span className="block text-2xs text-ink-faint mt-0.5 truncate">
-                {key} · {(file.size / 1024).toFixed(0)}KB
-                {!used.has(key) && <span className="text-ink-ghost"> · 未引用</span>}
-              </span>
-            </div>
-          ))}
-          </div>
-        </>
+        <p className="mt-2 text-2xs text-ink-ghost">
+          图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。
+        </p>
       )}
+
+      <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {Object.entries(files).map(([key, file]) => (
+          <div
+            key={key}
+            role="button"
+            tabIndex={0}
+            aria-label={`复制引用 ${key}`}
+            title="点击复制引用"
+            onClick={() => copyRef(key)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                copyRef(key);
+              }
+            }}
+            className="relative group cursor-pointer rounded-lg"
+          >
+            <img
+              src={previewUrls[key]}
+              alt={key}
+              className="w-full h-24 object-cover rounded-lg border border-edge"
+            />
+            {copiedKey === key && (
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-ink/50">
+                <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-medium text-ink">
+                  已复制引用
+                </span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeFile(key);
+              }}
+              aria-label={`移除图片 ${key}`}
+              className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full
+                           bg-paper-raised/90 text-ink-faint hover:text-danger shadow-sm
+                           opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"
+            >
+              <Close size={12} />
+            </button>
+            <span className="block text-2xs text-ink-faint mt-0.5 truncate">
+              {key} · {(file.size / 1024).toFixed(0)}KB
+              {!used.has(key) && <span className="text-ink-ghost"> · 未引用</span>}
+            </span>
+          </div>
+        ))}
+
+        {/* The add tile — same frame as an image, a big plus, and it always
+            sits after the last loaded image. */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="上传图片"
+          title="上传图片"
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            if (e.dataTransfer.files.length) {
+              addFiles(e.dataTransfer.files);
+            }
+          }}
+          className="group cursor-pointer rounded-lg"
+        >
+          <div
+            className={`flex h-24 w-full items-center justify-center rounded-lg border transition-colors ${
+              isDragging
+                ? 'border-accent bg-accent-wash/50'
+                : 'border-edge bg-paper-raised group-hover:border-accent'
+            }`}
+          >
+            <Plus size={36} className="text-ink-ghost group-hover:text-accent transition-colors" />
+          </div>
+          <span className="block text-2xs text-ink-ghost mt-0.5 text-center">
+            拖入图片或点击上传，最大长边 1600px
+          </span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+      </div>
     </div>
   );
 }

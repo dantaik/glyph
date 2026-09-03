@@ -24,10 +24,19 @@ import { ArticleSkeleton } from './Skeleton';
  *          null=absent), onNavigate(neighborMeta), onOpenAuthor() }
  *
  * Fetches the body (tags + markdown) from the publish() tx calldata through
- * the reader of the chain being shown, then resolves any eth:<txhash> image
- * refs to blob URLs before rendering.
+ * the reader of the chain being shown, rewrites `0x<txhash>/<n>` article
+ * refs to in-app links, then resolves any eth:<txhash> image refs to blob
+ * URLs before rendering.
  */
-export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, onOpenAuthor }) {
+export default function PostPage({
+  reader,
+  meta,
+  navigate,
+  onBack,
+  neighbors,
+  onNavigate,
+  onOpenAuthor,
+}) {
   const [body, setBody] = useState(null); // { tags, markdown }
   const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
@@ -54,7 +63,8 @@ export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, 
       const b = res.body;
       setBody(b);
       setFromCache(res.fromCache);
-      const { markdown: resolved, urls } = await reader.resolveImages(b.markdown);
+      const md = await reader.resolveGlyphRefs(b.markdown);
+      const { markdown: resolved, urls } = await reader.resolveImages(md);
       urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
     } catch (err) {
@@ -78,9 +88,9 @@ export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, 
 
   // Tab title mirrors the open letter; restore the site title on leave.
   useEffect(() => {
-    document.title = `${fmtTitle(meta.title) || '无标题'} · 留声`;
+    document.title = `${fmtTitle(meta.title) || '无标题'} · 雪泥`;
     return () => {
-      document.title = '留声';
+      document.title = '雪泥';
     };
   }, [meta.title]);
 
@@ -165,6 +175,15 @@ export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, 
         <div
           className="article-column prose-glyph"
           dangerouslySetInnerHTML={{ __html: html }}
+          onClick={(e) => {
+            // 0x… cross-article refs render as /tx/<hash>/<n> links —
+            // route them in-app instead of a full page load.
+            const a = e.target.closest?.('a[href^="/tx/"]');
+            if (!a) return;
+            e.preventDefault();
+            const m = a.getAttribute('href').match(/^\/tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/);
+            if (m) navigate?.({ tx: m[1], txEvent: m[2] != null ? Number(m[2]) : 0 });
+          }}
         />
       )}
 

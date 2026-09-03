@@ -204,7 +204,27 @@ export class FeedController {
     return job.promise;
   }
 
+  /**
+   * How many blocks a sweep from `cursor` can fetch before it meets ground
+   * already read (or the floor), capped by the budget — the denominator of
+   * the progress bar. An estimate: only the first stretch of fresh ground
+   * below the cursor is counted.
+   */
+  #reach(cursor, floor) {
+    const coverage = this.#store.feedCoverage();
+    const held = seg.segmentAt(coverage, cursor);
+    const top = held ? held[0] - 1n : cursor;
+    const below = seg.topBelow(coverage, top);
+    const bottom = below != null && below + 1n > floor ? below + 1n : floor;
+    const span = top - bottom + 1n;
+    if (span <= 0n) return 0n;
+    return span < this.#scanBlocks ? span : this.#scanBlocks;
+  }
+
   #sweep(opts) {
+    const cursor = BigInt(opts.cursor);
+    const floor = BigInt(opts.floor ?? this.#floor);
+    const reach = this.#reach(cursor, floor);
     return scanner.sweepFeed({
       store: this.#store,
       log: this.#log,
@@ -212,7 +232,8 @@ export class FeedController {
       maxBlocks: this.#scanBlocks,
       fetchRange: (from, to) => this.#io.postsInRange(from, to),
       onProgress: (p) => {
-        this.#progress = p;
+        const fraction = reach > 0n ? Math.min(1, Number(p.fetched) / Number(reach)) : 1;
+        this.#progress = { ...p, budget: this.#scanBlocks, fraction };
         // Persist after every window: an interrupted scan keeps its reads.
         if (p.phase === 'fetched') this.#store.persistFeedScan();
         this.#bump();

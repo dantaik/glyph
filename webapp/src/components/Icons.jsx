@@ -14,12 +14,30 @@ function iconProps(size) {
   };
 }
 
+/**
+ * 雪泥 — a simple square seal (印章) stamped with a swallow's footprint:
+ * three toes forward, one behind. The seal face takes the current colour;
+ * the print is carved out in the paper tone.
+ */
 export function GlyphMark({ size, ...rest }) {
   return (
+    <svg {...iconProps(size)} {...rest} stroke="none">
+      <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5" fill="currentColor" />
+      <g stroke="var(--color-paper-raised)" strokeWidth="2" strokeLinecap="round" fill="none">
+        <path d="M12.3 13.9V7.9" />
+        <path d="M12.3 13.9L7.9 10.9" />
+        <path d="M12.3 13.9L16.7 10.9" />
+        <path d="M12.3 13.9L13.8 18" />
+      </g>
+    </svg>
+  );
+}
+
+export function Plus({ size, ...rest }) {
+  return (
     <svg {...iconProps(size)} {...rest}>
-      <polygon points="12,2 21,12 12,22 3,12" />
-      <line x1="12" y1="7" x2="12" y2="17" />
-      <line x1="7" y1="12" x2="17" y2="12" />
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
@@ -105,7 +123,7 @@ export function ExternalLink({ size, ...rest }) {
 }
 
 /**
- * 雁过留声 — a V formation of wild geese with echo arcs trailing the lead
+ * 雪泥 — a V formation of wild geese with echo arcs trailing the lead
  * bird. Empty-state placeholder: similar in spirit to the hand-drawn
  * line illustrations other writing products use, but unique to the brand.
  */
@@ -118,7 +136,7 @@ export function GeeseMark({ size, ...rest }) {
       viewBox="0 0 200 100"
       {...rest}
     >
-      {/* 留声 — echo arcs left behind by the lead goose */}
+      {/* 雪泥 — echo arcs left behind by the lead goose */}
       <path d="M112 10 A10 10 0 0 0 112 30" />
       <path d="M102 4 A16 16 0 0 0 102 36" />
       {/* lead goose */}
@@ -168,14 +186,6 @@ export function ChevronUp({ size, ...rest }) {
   return (
     <svg {...iconProps(size)} {...rest}>
       <path d="M18 15l-6-6-6 6" />
-    </svg>
-  );
-}
-
-export function Plus({ size, ...rest }) {
-  return (
-    <svg {...iconProps(size)} {...rest}>
-      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }

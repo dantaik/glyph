@@ -28,6 +28,8 @@ export class AuthorListController {
   /** The walked chain, newest first. */
   #rows;
   #job = null;
+  /** The running walk's latest block and tally, for the scanning indicator. */
+  #progress = null;
   #error = null;
   #refreshedAt = 0;
 
@@ -68,6 +70,7 @@ export class AuthorListController {
     this.#snapshot = {
       rows,
       job: this.#job?.kind ?? null,
+      progress: this.#progress,
       // Index 0 is the author's first post: once it is on the page there is
       // nothing older to walk to.
       hasMore: oldest ? oldest.index > 0n : false,
@@ -107,7 +110,10 @@ export class AuthorListController {
       } catch (err) {
         this.#error = err?.message || String(err);
       } finally {
-        if (this.#job === job) this.#job = null;
+        if (this.#job === job) {
+          this.#job = null;
+          this.#progress = null;
+        }
         this.#bump();
       }
     })();
@@ -170,9 +176,17 @@ export class AuthorListController {
     const fetchBlock = (block) => this.#io.authorPostsInBlock(author, block);
     let block = BigInt(from);
     let skip = skipIndex == null ? null : BigInt(skipIndex);
+    const startCount = this.#rows.length;
+    const wanted = target - startCount;
     while (block > 0n) {
       const connected = connectTo == null || block <= connectTo;
       if (connected && this.#rows.length >= target) break;
+      this.#progress = {
+        block,
+        found: this.#rows.length - startCount,
+        target: wanted > 0 ? wanted : null,
+      };
+      this.#bump();
       const covered = Boolean(seg.segmentAt(store.authorCoverage(author), block));
       const rows = await scanner.authorRowsAt({
         store,

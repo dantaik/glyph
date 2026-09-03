@@ -16,9 +16,11 @@
 // first and falls back to the next when one fails, so a flaky public node
 // degrades instead of breaking the page.
 //
-// GLYPH_ADDRESS is env-only — it identifies the deployed contract and
-// shouldn't be user-tunable. CREATE2 puts it at the same address everywhere,
-// which is why one address serves every chain here.
+// GLYPH_ADDRESS identifies the deployed contract and isn't user-tunable.
+// CREATE2 puts it at the same address on every chain, so it is a constant,
+// not configuration: the deployed address is the built-in default and the
+// app works out of the box on any host. VITE_GLYPH_ADDRESS overrides it only
+// for a private redeploy (a changed Blog.sol yields a different address).
 
 import { useSyncExternalStore } from 'react';
 import { DEFAULT_CHAIN_ID, defaultRpcs, isKnownChain } from './chains';
@@ -63,11 +65,10 @@ const subscribeTo = (name) => (callback) => {
   return () => window.removeEventListener(name, callback);
 };
 
-export const GLYPH_ADDRESS =
-  import.meta.env.VITE_GLYPH_ADDRESS || '0xYourGlyphContractAddress';
+/** The canonical CREATE2 deployment — identical on every EVM chain. */
+export const DEFAULT_GLYPH_ADDRESS = '0x000000AE2f2249c497cfc5F262dd1491634C361C';
 
-/** False until VITE_GLYPH_ADDRESS names a deployed contract. */
-export const CONTRACT_CONFIGURED = GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
+export const GLYPH_ADDRESS = import.meta.env.VITE_GLYPH_ADDRESS || DEFAULT_GLYPH_ADDRESS;
 
 /** The chain the env vars describe (VITE_RPC_URL applies to this one). */
 const ENV_CHAIN_ID = (() => {

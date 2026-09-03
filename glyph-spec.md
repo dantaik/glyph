@@ -1,10 +1,10 @@
-# 岩刻 (Glyph) — 完全存在以太坊上的岩刻系统
+# 雪泥 (Glyph) — 完全存在以太坊上的写作系统
 
 > 技术方案与参考实现 · 2026-06
 >
 > 一个把全部内容（文字与图片）存在 Ethereum L1 calldata 上的多作者博客，
 > 零链下依赖，按"比作者活得更久、孩子几十年后仍能读"来设计。
-> 工作名：**岩刻** / **Glyph**（项目代号）。
+> 产品名：**雪泥**（取自"雪泥鸿爪"）；项目代号 **Glyph**。
 
 ---
 
@@ -375,11 +375,25 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 
 存的是 Markdown，但只用一个**小而安全的子集**——缩的是功能集，不是字符（不要 minify，brotli 已把空白压到几乎为零，minify 会毁掉"任何人都能直接读"这一核心价值）。
 
-**支持**：标题 `# ## ###` · `**粗体**` `*斜体*` · 链接 `[文字](url)` · 图片 `![alt](eth:0x<txhash>)` · 列表 `-` 与 `1.` · 引用 `>` · 行内 / 围栏代码 · 段落（空行分隔）。
+**支持**：标题 `# ## ###` · `**粗体**` `*斜体*` · 链接 `[文字](url)`（含文章间引用 `[文字](0x<txhash>/<n>)`，见 §8.1）· 图片 `![alt](eth:0x<txhash>)` · 列表 `-` 与 `1.` · 引用 `>` · 行内 / 围栏代码 · 段落（空行分隔）。
 
 **砍掉**：裸 HTML（顺带消除 XSS）、表格、脚注、引用式链接、定义列表。
 
-**渲染顺序**：`loadTitleList` → 用户点击 → `loadPostBody`（cache-first）→ `resolveImages`（eth: → blob）→ 受限解析器渲染 → 净化。
+**渲染顺序**：`loadTitleList` → 用户点击 → `loadPostBody`（cache-first）→ `resolveGlyphRefs`（0x… → /tx/ 路径，空文字时取对方标题）→ `resolveImages`（eth: → blob）→ 受限解析器渲染 → 净化。
+
+### 8.1 文章间引用
+
+在正文里引用另一篇文章，链接目标直接写目标文章的发布交易哈希：
+
+```markdown
+[显示文字](0x<交易哈希>/<事件序号>)
+```
+
+- **交易哈希**：目标文章的 `publish()` 交易，64 位 hex。
+- **事件序号**：该交易内 `Post` 事件的 0-based 序号（一笔交易可以发布多篇）；可省略——`[文字](0x<交易哈希>)` 与 `[文字](0x<交易哈希>/0)` 完全等价。
+- **文字留空**：`[](0x…/0)` 在阅读时自动解析目标文章的标题作为链接文字；解析不到则显示交易短哈希。
+- **渲染**：引用被重写为站内规范路径 `/tx/<hash>/<n>`，点击在应用内跳转；目标无效时落到「没有找到这篇文章」页。
+- 例：`[外婆的香樟木箱](0x41663fee6dd678632e23c8365076b466603b0d0694925e13b0d0d2007bec7844)`（等同于带 `/0`）
 
 ---
 
@@ -453,9 +467,14 @@ forge create src/Blog.sol:Glyph \
 ```
 
 **前端配置**
+
+合约地址由 CREATE2 决定、所有链相同，因此作为常量内置于 `webapp/src/lib/config.js`
+（`DEFAULT_GLYPH_ADDRESS`），默认无需配置。下列变量由 Vite 在**构建时**内联，仅在
+需要指向自己部署的那份合约时才用得上：
+
 ```bash
-# webapp/.env.local
-VITE_GLYPH_ADDRESS=0x...          # 合约地址
+# webapp/.env.local（可选）
+VITE_GLYPH_ADDRESS=0x...          # 覆盖内置合约地址
 VITE_RPC_URL=https://...          # RPC 默认（可在 UI 设置里覆盖）
 VITE_CHAIN_ID=1                   # 1=mainnet, 11155111=sepolia
 ```

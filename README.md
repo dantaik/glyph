@@ -1,30 +1,37 @@
-# 岩刻 · Glyph
+# 雪泥 · Glyph
 
-完全存在以太坊上的多作者岩刻系统。**一份不可升级、无所有者的智能合约**，任意钱包都是它自己的作者（`msg.sender`）。文字、标题、标签、图片全部存于 L1 calldata，零链下依赖。
+完全存在以太坊上的多作者写作系统（取自"雪泥鸿爪"）。**一份不可升级、无所有者的智能合约**，任意钱包都是它自己的作者（`msg.sender`）。文字、标题、标签、图片全部存于 L1 calldata，零链下依赖。
 
 技术方案：[`glyph-spec.md`](./glyph-spec.md)
 
 ## 快速开始
 
+合约已部署，地址（CREATE2，所有链相同）与各链的默认 RPC 节点都内置在前端里——
+克隆即可运行，**无需任何配置**：
+
 ```bash
-# 1. 部署合约（任何人都可以部署；部署者无任何特权）
+cd webapp && npm install && npm run dev
+```
+
+部署到 Vercel / Netlify 等静态托管同样零配置：`vercel.json` 已就绪，直接导入仓库即可。
+
+**可选——自己部署一份合约**（任何人都可以部署；部署者无任何特权）：
+
+```bash
 cd contracts && forge install foundry-rs/forge-std
 forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
   --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY 经环境变量传入（脚本用 vm.envUint 读取）
 
-# 2. 配置前端
+# 让前端指向自己那份。Vite 在构建时内联这些变量，改动后必须重新构建
 cat > webapp/.env.local <<EOF
-VITE_GLYPH_ADDRESS=0x000000AE2f2249c497cfc5F262dd1491634C361C
+VITE_GLYPH_ADDRESS=0x你自己部署的地址
 VITE_RPC_URL=https://eth.drpc.org
 VITE_CHAIN_ID=1
 EOF
-
-# 3. 运行
-cd webapp && npm install && npm run dev
 ```
 
 **阅读**：访问 `/`（全网最新文章）、`/author/0x作者地址`（某作者的列表）、`/tx/0x交易哈希/0`（单篇文章，末尾是交易内的事件序号）、`/scan`（本机增量扫描已覆盖的多段区块范围，页脚可直达）。
-**写作**：连接钱包 → 标题（最多 32 字节）+ 标签 + Markdown 正文（CodeMirror 编辑 / 全宽预览）→ 发布。
+**写作**：连接钱包 → 标题（最多 32 字节）+ 标签 + Markdown 正文（CodeMirror 编辑 / 全宽预览）→ 发布。正文引用另一篇文章用 `[文字](0x交易哈希/0)`（规范见 glyph-spec §8.1）。
 **翻页**：首页与作者页底部的「加载更早的文章」按段向前扫描——已经扫过的区块范围直接命中本地缓存，不再重复请求。首页两段扫描范围之间若有未扫的区块，会在列表中间标出，可单独补扫。
 **网络**：合约在以太坊主网与 Taiko 主网是同一个地址，右上角下拉菜单切换，不刷新页面。每条链的扫描范围、标题、正文与图片缓存各自独立；切换网络时，正在进行的扫描会在后台继续完成并缓存结果，切回来就直接可用。
 **扫描**：首页流按区块范围倒序扫描，每扫完一段（一次 `eth_getLogs`）就立刻显示找到的文章，不必等整次扫描结束；离开首页（打开文章、作者页、设置）扫描也不会中断。每次扫描（打开首页、点一次「加载更早的文章」）最多向节点读取 `scanBlocks` 个区块（默认 270,000，见 `webapp/src/lib/chains.js`），已扫过的范围不计入；从合约部署区块（`deployBlock`）再往前一律不读。页面上的扫描进度、`/scan` 页和控制台都会写明这个上限。

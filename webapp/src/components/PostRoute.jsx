@@ -35,6 +35,7 @@ export default function PostRoute({ reader, txHash, eventIndex, navigate }) {
     <PostPage
       reader={reader}
       meta={post}
+      navigate={navigate}
       onBack={() => navigate({ author: post.author })}
       neighbors={neighbors}
       onNavigate={(m) => navigate({ tx: m.txHash, txEvent: m.eventIndex ?? 0 })}

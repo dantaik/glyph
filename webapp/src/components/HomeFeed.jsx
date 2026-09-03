@@ -8,6 +8,7 @@ import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import ScanProgress from './ScanProgress';
 import { FeedSkeleton } from './Skeleton';
 
 const EXCERPT_CHARS = 80;
@@ -36,6 +37,17 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
   const noteText = note
     ? `这 ${fmtBlock(note.fetched)} 个区块里没有更早的文章，可以继续加载。`
     : null;
+  const scanLabel =
+    job === 'more' ? '正在扫描更早的文章…' : job === 'gap' ? '正在补扫中间的区块…' : '正在扫描最近区块…';
+  const scanProgress = progress
+    ? {
+        fromBlock: progress.from,
+        toBlock: progress.to,
+        fraction: progress.fraction,
+        fetched: progress.fetched,
+        budget: scanBlocks,
+      }
+    : null;
   const exhaustedLabel =
     floor > 0n ? '已扫描到合约部署的区块，没有更早的文章' : '已扫描到链的起点';
 
@@ -46,9 +58,7 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
     <div>
       <section className="mb-9 text-center">
         <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-display">
-          人过留名，雁过留声。
-          <br />
-          人海亿万，唯留字者不朽。
+          人海亿万，唯文字不朽。
         </h1>
       </section>
 
@@ -57,7 +67,7 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
       {loading ? (
         <>
           <FeedSkeleton />
-          <ScanStatus kind={job} progress={progress} scanBlocks={scanBlocks} />
+          <ScanProgress label={scanLabel} progress={scanProgress} className="mt-10" />
         </>
       ) : error && rows.length === 0 ? (
         <ErrorState error={error} onRetry={() => reader.feed.retry()} />
@@ -70,7 +80,7 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
       ) : rows.length === 0 ? (
         <>
           <EmptyState title="这一段区块里还没有文章" />
-          {scanning && <ScanStatus kind={job} progress={progress} scanBlocks={scanBlocks} />}
+          {scanning && <ScanProgress label={scanLabel} progress={scanProgress} className="mt-8" />}
           <LoadMoreButton
             onClick={() => reader.feed.loadMore()}
             loading={job === 'more'}
@@ -123,7 +133,7 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
           </ul>
 
           {scanning && job !== 'gap' && (
-            <ScanStatus kind={job} progress={progress} scanBlocks={scanBlocks} />
+            <ScanProgress label={scanLabel} progress={scanProgress} className="mt-8" />
           )}
           {error && (
             <p className="mt-4 text-center text-sm text-danger">{friendlyError(error)}</p>
@@ -140,27 +150,6 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
         </>
       )}
     </div>
-  );
-}
-
-/**
- * One line under the list while a scan runs: which blocks are being read
- * right now, how many this scan has read, and the most it may read.
- */
-function ScanStatus({ kind, progress, scanBlocks }) {
-  const label =
-    kind === 'more'
-      ? '正在扫描更早的区块'
-      : kind === 'gap'
-        ? '正在补扫中间的区块'
-        : '正在扫描最新区块';
-  return (
-    <p className="mt-8 animate-pulse text-center text-xs tabular-nums text-ink-ghost">
-      {label}
-      {progress
-        ? `：区块 ${fmtBlock(progress.from)} 至 ${fmtBlock(progress.to)} · 本次已读 ${fmtBlock(progress.fetched)} / 最多 ${fmtBlock(scanBlocks)} 个区块`
-        : '…'}
-    </p>
   );
 }
 

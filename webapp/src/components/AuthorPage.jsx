@@ -7,6 +7,7 @@ import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import ScanProgress from './ScanProgress';
 import { ListSkeleton } from './Skeleton';
 
 /**
@@ -23,9 +24,18 @@ export default function AuthorPage({ reader, author, navigate }) {
   // Show the author's ENS name when the address has one, else the address.
   const ens = useAsync(() => reader.ensName(author), [reader, author]);
 
-  const { rows: titles, job, hasMore, error } = list;
+  const { rows: titles, job, progress, hasMore, error } = list;
   const loading = titles.length === 0 && job === 'refresh';
   const empty = titles.length === 0 && job == null && !error;
+  const scanProgress = progress
+    ? {
+        fromBlock: progress.block,
+        toBlock: progress.block,
+        posts: progress.target != null ? progress.found : null,
+        target: progress.target,
+        fraction: progress.target ? Math.min(1, progress.found / progress.target) : 0,
+      }
+    : null;
 
   return (
     <div>
@@ -35,7 +45,12 @@ export default function AuthorPage({ reader, author, navigate }) {
         subtitle={count.value != null ? `共 ${Number(count.value)} 篇` : undefined}
       />
 
-      {loading && <ListSkeleton />}
+      {loading && (
+        <>
+          <ListSkeleton />
+          <ScanProgress label="正在读取文章列表…" progress={scanProgress} className="mt-10" />
+        </>
+      )}
 
       {error && titles.length === 0 && !loading && (
         <ErrorState error={error} onRetry={() => controller.retry()} />
@@ -62,8 +77,12 @@ export default function AuthorPage({ reader, author, navigate }) {
         </>
       )}
 
-      {job === 'refresh' && titles.length > 0 && (
-        <p className="mt-6 animate-pulse text-center text-xs text-ink-ghost">正在读取最新文章…</p>
+      {job != null && titles.length > 0 && (
+        <ScanProgress
+          label={job === 'more' ? '正在扫描更早的文章…' : '正在读取最新文章…'}
+          progress={scanProgress}
+          className="mt-8"
+        />
       )}
 
       {error && titles.length > 0 && (

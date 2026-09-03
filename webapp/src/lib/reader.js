@@ -19,6 +19,7 @@ import { createChainIO } from './chainIO';
 import { FeedController } from './feed';
 import { AuthorListController } from './authorList';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
+import { createRefResolver } from './glyphRefs';
 
 /** Posts per page, on the feed and on author lists. */
 export const PAGE_SIZE = 20;
@@ -143,6 +144,9 @@ export function createReader(chainId, makeIO = null) {
 
   const count = (author) => ttl(`count:${addrKey(author)}`, () => io.count(author));
 
+  /** Rewrite `0x<txhash>/<n>` article refs to in-app links (glyphRefs.js). */
+  const resolveGlyphRefs = createRefResolver(findMetaByTx);
+
   /**
    * `{ block, ts, secondsPerBlock }` — the chain's newest block and how
    * fast blocks have been coming, measured over the last CLOCK_SAMPLE
@@ -265,6 +269,7 @@ export function createReader(chainId, makeIO = null) {
     clock,
     ensName,
     loadPostBody,
+    resolveGlyphRefs,
     resolveImages,
   };
 }

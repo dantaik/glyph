@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useReader } from '../lib/data';
-import { CONTRACT_CONFIGURED } from '../lib/config';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
-import EmptyState from './EmptyState';
 import PostRoute from './PostRoute';
 import HomeFeed from './HomeFeed';
 import AuthorPage from './AuthorPage';
@@ -20,7 +18,6 @@ export default function Reader({ onStartWriting }) {
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const tx = params.tx;
   const txEvent = params.txEvent != null ? Number(params.txEvent) : 0;
-  const isConfigured = CONTRACT_CONFIGURED || Boolean(reader.io.ephemeral);
 
   // A transaction belongs to one chain: switching chains while a post is
   // open goes back to the home feed of the new chain.
@@ -45,22 +42,6 @@ export default function Reader({ onStartWriting }) {
     navigate({ tx, txEvent: 0 }, { replace: true });
   }, [tx, params.txEvent, navigate]);
 
-  if (!isConfigured) {
-    return (
-      <EmptyState
-        title="尚未配置"
-        body={
-          <>
-            请先部署 Glyph 合约，然后通过{' '}
-            <code className="rounded bg-paper-sunken px-1.5 py-0.5 font-mono text-xs text-ink-soft">
-              VITE_GLYPH_ADDRESS
-            </code>{' '}
-            配置合约地址。
-          </>
-        }
-      />
-    );
-  }
   if (params.scan) return <ScanPage navigate={navigate} />;
   if (tx) return <PostRoute reader={reader} txHash={tx} eventIndex={txEvent} navigate={navigate} />;
   if (author) return <AuthorPage reader={reader} author={author} navigate={navigate} />;

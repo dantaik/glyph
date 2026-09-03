@@ -4,7 +4,7 @@ import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import SettingsPage from './components/SettingsPage';
 import { FIXTURES_MODE, useReader } from './lib/data';
-import { GLYPH_ADDRESS, CONTRACT_CONFIGURED } from './lib/config';
+import { GLYPH_ADDRESS } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
@@ -82,35 +82,33 @@ export default function App() {
         )}
       </main>
       <footer className="border-t border-edge py-10 text-center">
-        {(CONTRACT_CONFIGURED || reader.io.ephemeral) && (
-          <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-            <span>{chainName(chainId)}</span>
-            <span className="select-none" aria-hidden="true">·</span>
-            <a
-              href={etherscanAddrUrl(GLYPH_ADDRESS, chainId)}
-              target="_blank"
-              rel="noreferrer"
-              title="在区块浏览器查看合约"
-              className="inline-block font-mono text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
-            >
-              合约：{shortAddr(GLYPH_ADDRESS)}
-            </a>
-            <span className="select-none" aria-hidden="true">·</span>
-            <a
-              href="/scan"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate({ scan: '1' });
-              }}
-              title="查看扫描范围"
-              className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
-            >
-              扫描范围
-              {scanSpan}
-              {feed.job && <span className="animate-pulse"> · 扫描中</span>}
-            </a>
-          </p>
-        )}
+        <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
+          <span>{chainName(chainId)}</span>
+          <span className="select-none" aria-hidden="true">·</span>
+          <a
+            href={etherscanAddrUrl(GLYPH_ADDRESS, chainId)}
+            target="_blank"
+            rel="noreferrer"
+            title="在区块浏览器查看合约"
+            className="inline-block font-mono text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
+          >
+            合约：{shortAddr(GLYPH_ADDRESS)}
+          </a>
+          <span className="select-none" aria-hidden="true">·</span>
+          <a
+            href="/scan"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate({ scan: '1' });
+            }}
+            title="查看扫描范围"
+            className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
+          >
+            扫描范围
+            {scanSpan}
+            {feed.job && <span className="animate-pulse"> · 扫描中</span>}
+          </a>
+        </p>
       </footer>
       {FIXTURES_MODE && (
         <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
