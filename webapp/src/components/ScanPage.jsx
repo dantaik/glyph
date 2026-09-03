@@ -3,7 +3,8 @@ import { CHAINS, SELECTABLE_CHAIN_IDS } from '../lib/chains';
 import { useActiveChainId } from '../lib/config';
 import { getReader } from '../lib/data';
 import { lowest, highest, blockCount } from '../lib/segments';
-import { fmtBlock, shortAddr } from '../lib/format';
+import { fmtBlock } from '../lib/format';
+import AddressLabel from './Address';
 import BackButton from './BackButton';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
@@ -138,9 +139,9 @@ function ChainScan({ chainId, active, navigate }) {
                   navigate({ author: a.address });
                 }}
                 title={a.address}
-                className="font-mono text-xs text-ink-soft hover:text-accent transition-colors"
+                className="inline-flex items-center text-ink-soft hover:text-accent transition-colors"
               >
-                {shortAddr(a.address)}
+                <AddressLabel address={a.address} size={14} tailClassName="text-xs" />
               </a>
               {a.segments.length > 0 ? (
                 <span className="text-sm tabular-nums text-ink-faint">

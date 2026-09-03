@@ -278,7 +278,7 @@ export default function Publisher() {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="周末爬山"
+          placeholder="我想表达什么"
           aria-invalid={titleOver}
           aria-describedby="post-title-bytes"
           className={`w-full bg-transparent pb-2.5 font-serif text-2xl font-bold border-0 border-b
@@ -321,7 +321,7 @@ export default function Publisher() {
             onChange={(e) => setTagsInput(e.target.value)}
             onKeyDown={handleTagKey}
             onBlur={addTagFromInput}
-            placeholder={tags.length === 0 ? '回车、逗号或分号分隔' : ''}
+            placeholder={tags.length === 0 ? '回车或逗号分隔' : ''}
             className="flex-1 min-w-[6rem] bg-transparent text-sm outline-none placeholder:text-ink-ghost"
           />
         </div>

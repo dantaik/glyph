@@ -5,13 +5,13 @@ import {
   fmtBlock,
   fmtIndex,
   fmtTitle,
-  shortAddr,
   estimateBlockTime,
   fmtRelTime,
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
 import { AlertCircle } from './Icons';
+import AddressLabel from './Address';
 import BackButton from './BackButton';
 import FontSizeControl from './FontSizeControl';
 import PostNav from './PostNav';
@@ -127,9 +127,9 @@ export default function PostPage({
                 onOpenAuthor?.();
               }}
               title={meta.author}
-              className="hover:text-accent transition-colors"
+              className="inline-flex items-center hover:text-accent transition-colors"
             >
-              {ensName || shortAddr(meta.author)}
+              {ensName || <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />}
             </a>
           </span>
           <span className="flex items-center gap-2">

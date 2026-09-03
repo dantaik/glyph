@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CHAINS, SELECTABLE_CHAIN_IDS } from '../lib/chains';
 import { setActiveChain, useActiveChainId } from '../lib/config';
 import { Check, ChevronDown } from './Icons';
+import ChainIcon from './ChainIcon';
 
 /**
  * Chain switcher in the masthead. Glyph is CREATE2-deployed to the same
@@ -12,6 +13,9 @@ import { Check, ChevronDown } from './Icons';
  *
  * The active chain is always listed even when it isn't one of the selectable
  * ones (a testnet from VITE_CHAIN_ID), so the menu never hides where you are.
+ *
+ * The trigger is the chain's mark alone; the menu is where the marks get
+ * their names.
  */
 export default function ChainMenu() {
   const chainId = useActiveChainId();
@@ -44,11 +48,14 @@ export default function ChainMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="切换网络"
-        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs text-ink-soft hover:bg-paper-sunken hover:text-accent transition-colors"
+        title={current?.name ?? `链 ${chainId}`}
+        className="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-full px-1.5 text-ink-soft hover:bg-paper-sunken hover:text-accent transition-colors"
       >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-        <span className="hidden min-[380px]:inline">{current?.name ?? `链 ${chainId}`}</span>
-        <ChevronDown size={14} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+        {/* Mark only — the chain's logo says which chain this is at any
+            width, and the name would be the widest thing in the masthead.
+            It is spelled out in the menu, and in the page footer. */}
+        <ChainIcon chainId={chainId} size={18} className="shrink-0 text-accent" />
+        <ChevronDown size={13} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
       </button>
 
       {open && (
@@ -69,13 +76,14 @@ export default function ChainMenu() {
                   setOpen(false);
                   if (!active) setActiveChain(id);
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
                   active ? 'text-accent' : 'text-ink-soft hover:bg-paper-sunken hover:text-accent'
                 }`}
               >
-                <span className="w-4 shrink-0">{active && <Check size={14} />}</span>
+                <ChainIcon chainId={id} size={16} className="shrink-0" />
                 <span className="flex-1 truncate">{chain?.name ?? `链 ${id}`}</span>
                 <span className="shrink-0 font-mono text-2xs text-ink-ghost">{id}</span>
+                <span className="w-4 shrink-0">{active && <Check size={14} />}</span>
               </button>
             );
           })}

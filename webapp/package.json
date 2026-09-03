@@ -14,6 +14,7 @@
     "@codemirror/view": "^6.34.0",
     "@fontsource-variable/noto-serif-sc": "^5.2.10",
     "@uiw/react-codemirror": "^4.23.7",
+    "blo": "^2.0.0",
     "brotli-wasm": "^3.0.1",
     "lucide-react": "^1.17.0",
     "marked": "^15.0.0",

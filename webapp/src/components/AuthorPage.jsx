@@ -1,6 +1,7 @@
 import { useAuthorList } from '../lib/authorList';
 import { useAsync } from '../lib/hooks';
-import { friendlyError, shortAddr } from '../lib/format';
+import { friendlyError } from '../lib/format';
+import AddressLabel from './Address';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
@@ -40,7 +41,16 @@ export default function AuthorPage({ reader, author, navigate }) {
   return (
     <div>
       <ListHeader
-        title={`${ens.value || shortAddr(author)} 的文章`}
+        title={
+          ens.value ? (
+            `${ens.value} 的文章`
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <AddressLabel address={author} size={18} tailClassName="text-lg" />
+              <span>的文章</span>
+            </span>
+          )
+        }
         titleAttr={author}
         subtitle={count.value != null ? `共 ${Number(count.value)} 篇` : undefined}
       />

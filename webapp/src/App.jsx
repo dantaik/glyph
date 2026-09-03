@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
@@ -14,6 +14,22 @@ export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
   const { chainId: walletChainId } = useWallet();
   const [params, navigate] = useUrlState();
+
+  // The URL names a surface — /scan, /tx/…, /author/…, /settings — and a
+  // link to one of them IS the instruction to show it, whichever tab was
+  // picked last. Without this, following 扫描范围 in the footer while the
+  // 写 tab is open moves the URL to /scan and keeps rendering the editor.
+  // Picking 写 is the opposite instruction, so it clears the URL surface.
+  const urlSurface = Boolean(params.settings || params.scan || params.tx || params.author);
+  const writing = tab === 'write' && !urlSurface;
+
+  const handleTabChange = useCallback(
+    (key) => {
+      if (key === 'write' && urlSurface) navigate({}, { replace: true });
+      setTab(key);
+    },
+    [urlSurface, navigate],
+  );
   const reader = useReader();
   const chainId = reader.chainId;
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
@@ -52,14 +68,14 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header
-        tab={tab}
-        onTabChange={setTab}
+        tab={writing ? 'write' : 'read'}
+        onTabChange={handleTabChange}
         onOpenSettings={() => navigate({ settings: '1' })}
       />
       {chainMismatch && (
         <div
           role="alert"
-          className="border-b border-danger-wash bg-danger-wash/60 px-5 py-2 text-center text-sm text-danger"
+          className="border-b border-danger-wash bg-danger-wash/60 px-4 py-2 text-center text-sm text-danger sm:px-6"
         >
           钱包连接的链（ID {walletChainId}）与正在阅读的链（ID {chainId}）不一致。
           <button
@@ -72,16 +88,16 @@ export default function App() {
           </button>
         </div>
       )}
-      <main className="flex-1 w-full mx-auto max-w-5xl px-5 sm:px-6 pt-8 pb-16">
+      <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-8 pb-16">
         {params.settings ? (
           <SettingsPage navigate={navigate} />
-        ) : tab === 'read' ? (
-          <Reader onStartWriting={() => setTab('write')} />
-        ) : (
+        ) : writing ? (
           <Publisher />
+        ) : (
+          <Reader onStartWriting={() => handleTabChange('write')} />
         )}
       </main>
-      <footer className="border-t border-edge py-10 text-center">
+      <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
         <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
           <span>{chainName(chainId)}</span>
           <span className="select-none" aria-hidden="true">·</span>
