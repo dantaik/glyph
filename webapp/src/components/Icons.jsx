@@ -14,12 +14,21 @@ function iconProps(size) {
   };
 }
 
+/**
+ * 雪泥 — a simple square seal (印章) stamped with a swallow's footprint:
+ * three toes forward, one behind. The seal face takes the current colour;
+ * the print is carved out in the paper tone.
+ */
 export function GlyphMark({ size, ...rest }) {
   return (
-    <svg {...iconProps(size)} {...rest}>
-      <polygon points="12,2 21,12 12,22 3,12" />
-      <line x1="12" y1="7" x2="12" y2="17" />
-      <line x1="7" y1="12" x2="17" y2="12" />
+    <svg {...iconProps(size)} {...rest} stroke="none">
+      <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5" fill="currentColor" />
+      <g stroke="var(--color-paper-raised)" strokeWidth="2" strokeLinecap="round" fill="none">
+        <path d="M12.3 13.9V7.9" />
+        <path d="M12.3 13.9L7.9 10.9" />
+        <path d="M12.3 13.9L16.7 10.9" />
+        <path d="M12.3 13.9L13.8 18" />
+      </g>
     </svg>
   );
 }
