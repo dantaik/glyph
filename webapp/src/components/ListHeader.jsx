@@ -5,7 +5,7 @@
 export default function ListHeader({ title, subtitle, titleAttr }) {
   return (
     <header className="mb-8 flex items-baseline justify-between border-b border-edge pb-3">
-      <h2 className="text-xl font-semibold" title={titleAttr}>{title}</h2>
+      <h2 className="font-serif text-xl font-semibold" title={titleAttr}>{title}</h2>
       {subtitle && <p className="text-xs text-ink-ghost">{subtitle}</p>}
     </header>
   );
