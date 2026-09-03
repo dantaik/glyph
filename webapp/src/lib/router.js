@@ -45,7 +45,7 @@ function currentUrl() {
   return q === -1 ? { path: raw, search: '' } : { path: raw.slice(0, q), search: raw.slice(q) };
 }
 
-function readParams() {
+export function readParams() {
   if (typeof window === 'undefined') return {};
   const { path, search } = currentUrl();
   const sp = new URLSearchParams(search);

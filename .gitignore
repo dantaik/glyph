@@ -8,6 +8,11 @@ webapp/node_modules/
 # Build output
 webapp/dist/
 webapp/dist-offline/
+
+# Test output
+webapp/coverage/
+webapp/test-results/
+webapp/playwright-report/
 contracts/out/
 contracts/cache/
 contracts/lib/forge-std/
