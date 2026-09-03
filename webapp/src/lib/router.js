@@ -6,6 +6,14 @@
 // all of them — history.replaceState fires no popstate, so a per-instance
 // state would silently drift apart.
 //
+// Every route names the chain it is read on, as its first segment:
+// /ethereum, /taiko/tx/0x…/0, /taiko/author/0x…. The same post hash means
+// different things on different chains, so an address that omits the chain
+// is ambiguous — and the address bar, not a stored preference, is what a
+// shared link carries. The chain segment is therefore the source of truth:
+// App follows it into the chain switcher, and everything that changes the
+// chain navigates rather than setting it directly.
+//
 // Two URL shapes, one route vocabulary. Served over http(s) the routes are
 // real paths (`/tx/0x…/0?tab=write`) that the host rewrites to index.html.
 // In the downloadable single-file build there is no host to rewrite anything
@@ -14,6 +22,8 @@
 // navigation goes through location.hash instead.
 
 import { useEffect, useState, useCallback } from 'react';
+import { chainFromSlug, chainSlug } from './chains';
+import { getActiveChainId, setActiveChain } from './config';
 import { IS_OFFLINE_BUILD } from './offline';
 
 const EVT = 'cairn:urlstate';
@@ -41,21 +51,30 @@ function readParams() {
   const sp = new URLSearchParams(search);
   const out = {};
   for (const [k, v] of sp.entries()) out[k] = v;
+
+  // The chain segment comes off the front; what is left is the route. A URL
+  // that names no chain — a bare `/`, or a link from before the prefix —
+  // parses as the route alone, with `chain` null for App to canonicalise.
+  const [, head = '', tail = ''] = path.match(/^\/([^/]*)(.*)$/) ?? [];
+  const chain = chainFromSlug(head);
+  out.chain = chain;
+  const route = chain ? tail || '/' : path;
+
   // Path deep links: /tx/0x<hash> → tx; /author/0x<addr> → author.
-  const mTx = path.match(/^\/tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/);
+  const mTx = route.match(/^\/tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/);
   if (mTx) {
     out.tx = mTx[1];
     if (mTx[2] != null) out.txEvent = mTx[2];
   }
-  const mAuthor = path.match(/^\/author\/(0x[0-9a-fA-F]{40})\/?$/);
+  const mAuthor = route.match(/^\/author\/(0x[0-9a-fA-F]{40})\/?$/);
   if (mAuthor) {
     out.author = mAuthor[1];
   } else if (out.author) {
     out.authorFromQuery = true; // legacy ?author= link
   }
   // Local status / configuration pages.
-  if (path.match(/^\/scan\/?$/)) out.scan = '1';
-  if (path.match(/^\/settings\/?$/)) out.settings = '1';
+  if (route.match(/^\/scan\/?$/)) out.scan = '1';
+  if (route.match(/^\/settings\/?$/)) out.settings = '1';
   return out;
 }
 
@@ -69,7 +88,15 @@ function buildUrl(next) {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(next)) {
     // These live in the path, never in the query.
-    if (k === 'tx' || k === 'txEvent' || k === 'author' || k === 'scan' || k === 'settings')
+    if (
+      k === 'chain' ||
+      k === 'tx' ||
+      k === 'txEvent' ||
+      k === 'author' ||
+      k === 'scan' ||
+      k === 'settings' ||
+      k === 'authorFromQuery'
+    )
       continue;
     if (v != null && v !== '') sp.set(k, String(v));
   }
@@ -78,7 +105,7 @@ function buildUrl(next) {
   const search = sp.toString();
   // Deep links use their paths; everything else is the root path
   // with query params.
-  const path = next.tx
+  const route = next.tx
     ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
     : next.author
       ? `/author/${next.author}`
@@ -87,7 +114,9 @@ function buildUrl(next) {
         : next.settings
           ? '/settings'
           : '/';
-  return `${path}${search ? `?${search}` : ''}`;
+  // Always prefixed: a URL the app writes always says which chain it is on.
+  const prefix = `/${chainSlug(next.chain ?? getActiveChainId())}`;
+  return `${prefix}${route === '/' ? '' : route}${search ? `?${search}` : ''}`;
 }
 
 /** The href an <a> should carry for `next` — `#`-prefixed off a file:// page. */
@@ -96,14 +125,27 @@ export function hrefFor(next) {
   return HASH_MODE ? `#${url}` : url;
 }
 
-let state = readParams();
+/**
+ * Read the URL and adopt the chain it names — before anything renders.
+ *
+ * It has to happen here rather than in an effect: a post is looked up on the
+ * chain the address names, and an effect runs after the first render, so the
+ * lookup would go to last session's chain, miss, and bounce to the feed.
+ */
+function readState() {
+  const next = readParams();
+  if (next.chain != null) setActiveChain(next.chain);
+  return next;
+}
+
+let state = readState();
 
 export function useUrlState() {
   const [, force] = useState(0);
 
   useEffect(() => {
     const sync = () => {
-      state = readParams();
+      state = readState();
       force((n) => n + 1);
     };
     window.addEventListener('popstate', sync);
@@ -129,7 +171,7 @@ export function useUrlState() {
     } else {
       window.history.pushState({}, '', url);
     }
-    state = readParams();
+    state = readState();
     window.dispatchEvent(new CustomEvent(EVT));
   }, []);
 

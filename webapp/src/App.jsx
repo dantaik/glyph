@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
@@ -15,6 +15,15 @@ export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
   const { chainId: walletChainId } = useWallet();
   const [params, navigate] = useUrlState();
+
+  // The chain lives in the URL, and router.js adopts the one the address
+  // names as it reads it — before any of this renders. Left for here is the
+  // other direction: an address that names no chain (a bare `/`, or a link
+  // from before the prefix existed) is rewritten in place to the chain being
+  // read, which is Ethereum until someone picks otherwise.
+  useLayoutEffect(() => {
+    if (params.chain == null) navigate(params, { replace: true });
+  }, [params, navigate]);
 
   // The URL names a surface — /scan, /tx/…, /author/…, /settings — and a
   // link to one of them IS the instruction to show it, whichever tab was
@@ -69,7 +78,9 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header
-        tab={writing ? 'write' : 'read'}
+        // 设置 is neither reading nor writing, so neither tab is current
+        // while it is open. /tx, /author and /scan still are 读.
+        tab={params.settings ? null : writing ? 'write' : 'read'}
         onTabChange={handleTabChange}
         onOpenSettings={() => navigate({ settings: '1' })}
       />

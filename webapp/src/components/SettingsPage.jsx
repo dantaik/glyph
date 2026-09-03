@@ -6,10 +6,10 @@ import {
   getRpcUrls,
   hasCustomRpcs,
   hasOverrides,
+  getActiveChainId,
   resetEndpointConfig,
   saveRescanDelay,
   saveRpcUrls,
-  setActiveChain,
   useActiveChainId,
   useRpcVersion,
 } from '../lib/config';
@@ -124,7 +124,7 @@ export default function SettingsPage({ navigate }) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setActiveChain(id)}
+                    onClick={() => navigate({ chain: id, settings: '1' })}
                     className="text-xs text-ink-faint hover:text-accent transition-colors"
                   >
                     切换到此网络
@@ -255,7 +255,16 @@ export default function SettingsPage({ navigate }) {
       <OfflineSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
-        <button type="button" onClick={resetEndpointConfig} className={BTN_QUIET}>
+        <button
+          type="button"
+          onClick={() => {
+            resetEndpointConfig();
+            // The reset can drop a stored chain choice; the URL carries the
+            // chain, so it has to be told where the reset left us.
+            navigate({ chain: getActiveChainId(), settings: '1' }, { replace: true });
+          }}
+          className={BTN_QUIET}
+        >
           恢复默认
         </button>
         <div className="flex items-center gap-2">

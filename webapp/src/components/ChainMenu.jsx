@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHAINS, SELECTABLE_CHAIN_IDS } from '../lib/chains';
-import { setActiveChain, useActiveChainId } from '../lib/config';
+import { useActiveChainId } from '../lib/config';
+import { useUrlState } from '../lib/router';
 import { Check, ChevronDown } from './Icons';
 import ChainIcon from './ChainIcon';
 
@@ -19,6 +20,7 @@ import ChainIcon from './ChainIcon';
  */
 export default function ChainMenu() {
   const chainId = useActiveChainId();
+  const [params, navigate] = useUrlState();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const ids = SELECTABLE_CHAIN_IDS.includes(chainId)
@@ -49,12 +51,16 @@ export default function ChainMenu() {
         aria-expanded={open}
         aria-label="切换网络"
         title={current?.name ?? `链 ${chainId}`}
-        className="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-full px-1.5 text-ink-soft hover:bg-paper-sunken hover:text-accent transition-colors"
+        className="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-full px-1.5 text-ink-faint hover:bg-paper-sunken hover:text-accent transition-colors"
       >
         {/* Mark only — the chain's logo says which chain this is at any
             width, and the name would be the widest thing in the masthead.
-            It is spelled out in the menu, and in the page footer. */}
-        <ChainIcon chainId={chainId} size={18} className="shrink-0 text-accent" />
+            It is spelled out in the menu, and in the page footer.
+
+            Sized and coloured exactly like the theme and settings buttons
+            beside it: 20px, ink-faint, accent only on hover. The masthead
+            has one accent, and it belongs to the wordmark. */}
+        <ChainIcon chainId={chainId} size={20} className="shrink-0" />
         <ChevronDown size={13} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
       </button>
 
@@ -74,7 +80,17 @@ export default function ChainMenu() {
                 aria-checked={active}
                 onClick={() => {
                   setOpen(false);
-                  if (!active) setActiveChain(id);
+                  if (active) return;
+                  // The chain is a URL segment, so switching is navigation.
+                  // A post belongs to the chain it was published on, so
+                  // leaving that chain lands on the new one's feed; an
+                  // author, /scan and /settings mean something on every
+                  // chain and stay where they are.
+                  const next = { chain: id };
+                  if (params.author) next.author = params.author;
+                  else if (params.scan) next.scan = '1';
+                  else if (params.settings) next.settings = '1';
+                  navigate(next);
                 }}
                 className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
                   active ? 'text-accent' : 'text-ink-soft hover:bg-paper-sunken hover:text-accent'

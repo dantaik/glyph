@@ -152,7 +152,7 @@ export function createReader(chainId, makeIO = null) {
   const count = (author) => volatile(`count:${addrKey(author)}`, () => io.count(author));
 
   /** Rewrite `0x<txhash>/<n>` article refs to in-app links (glyphRefs.js). */
-  const resolveGlyphRefs = createRefResolver(findMetaByTx);
+  const resolveGlyphRefs = createRefResolver(findMetaByTx, id);
 
   /**
    * `{ block, ts, secondsPerBlock }` — the chain's newest block and how
