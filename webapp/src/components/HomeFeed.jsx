@@ -86,12 +86,6 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
 
   return (
     <div>
-      <section className="mb-9 text-center">
-        <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-display">
-          人海亿万，唯文字不朽。
-        </h1>
-      </section>
-
       <ListHeader title="最新文章" subtitle={subtitle} />
 
       {loading ? (
