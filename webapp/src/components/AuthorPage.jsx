@@ -9,7 +9,6 @@ import AddressLabel from './Address';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
-import FeaturedPost from './FeaturedPost';
 import FrontierMarker from './FrontierMarker';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
@@ -49,11 +48,9 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
     return `${total} · ${per}`;
   })();
 
-  const marker = (as, className) =>
+  const marker = () =>
     frontier && (
       <FrontierMarker
-        as={as}
-        className={className}
         variant="author"
         frontier={frontier}
         busy={job != null}
@@ -112,21 +109,15 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
       {empty && <EmptyState title="该地址没发表过文章" />}
 
       {rows.length > 0 && (
-        <>
-          {frontier?.after === -1 && marker('div', 'mb-4 border-b border-edge')}
-          <FeaturedPost view={view} post={rows[0]} navigate={navigate} currentChain={currentChain} showIndex />
-          {(rows.length > 1 || frontier?.after === 0) && (
-            <ul className="divide-y divide-edge">
-              {frontier?.after === 0 && marker('li')}
-              {rows.slice(1).map((t, i) => (
-                <Fragment key={rowKey(t)}>
-                  <ArticleListItem post={t} navigate={navigate} currentChain={currentChain} showIndex />
-                  {frontier?.after === i + 1 && marker('li')}
-                </Fragment>
-              ))}
-            </ul>
-          )}
-        </>
+        <ul className="divide-y divide-edge">
+          {frontier?.after === -1 && marker()}
+          {rows.map((t, i) => (
+            <Fragment key={rowKey(t)}>
+              <ArticleListItem post={t} navigate={navigate} currentChain={currentChain} showIndex />
+              {frontier?.after === i && marker()}
+            </Fragment>
+          ))}
+        </ul>
       )}
 
       {scanning && rows.length > 0 && <ChainProgress running={running} className="mt-8" />}

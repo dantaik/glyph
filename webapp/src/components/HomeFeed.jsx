@@ -7,19 +7,17 @@ import { rowKey } from '../lib/timeline';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
-import FeaturedPost from './FeaturedPost';
 import FrontierMarker from './FrontierMarker';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
 import ScanProgress from './ScanProgress';
-import { FeedSkeleton } from './Skeleton';
-
-const EXCERPT_CHARS = 80;
+import { ListSkeleton } from './Skeleton';
 
 /**
- * Home feed: literary-magazine front page with the most recent posts
- * across all authors — and, by default, across every chain, merged by
- * time (mergedFeed.js). Each chain's scan is owned by its reader, not by
+ * Home feed: the most recent posts across all authors — and, by default,
+ * across every chain, merged by time (mergedFeed.js) — as one list, every
+ * post a row like the next (ArticleListItem), the newest first. Each
+ * chain's scan is owned by its reader, not by
  * this component: leaving the page doesn't stop it, and coming back shows
  * what it found meanwhile. Rows appear window by window as the scans find
  * them; a marker shows where the merge stops being complete; 加载更早的文章
@@ -66,11 +64,9 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
     `来自所有作者 · ${chains.map((c) => chainName(c.chainId)).join('与')}`
   );
 
-  const marker = (as, className) =>
+  const marker = () =>
     frontier && (
       <FrontierMarker
-        as={as}
-        className={className}
         frontier={frontier}
         busy={job != null}
         onLoadMore={() => view.feed.loadMore()}
@@ -88,9 +84,6 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
     />
   );
 
-  const featured = rows[0];
-  const rest = rows.slice(1);
-
   return (
     <div>
       <section className="mb-9 text-center">
@@ -103,7 +96,7 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
 
       {loading ? (
         <>
-          <FeedSkeleton />
+          <ListSkeleton />
           <ChainProgress running={running} className="mt-10" />
         </>
       ) : allErrored && rows.length === 0 ? (
@@ -127,25 +120,14 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
         </>
       ) : (
         <>
-          {frontier?.after === -1 && marker('div', 'mb-4 border-b border-edge')}
-          <FeaturedPost
-            view={view}
-            post={featured}
-            navigate={navigate}
-            currentChain={currentChain}
-            excerptChars={EXCERPT_CHARS}
-          />
-
           <ul className="divide-y divide-edge">
-            {frontier?.after === 0 && marker('li')}
-            {gapAfter(0) && gapMarker(gapAfter(0))}
-            {rest.map((r, i) => {
-              const at = i + 1;
-              const gap = gapAfter(at);
+            {frontier?.after === -1 && marker()}
+            {rows.map((r, i) => {
+              const gap = gapAfter(i);
               return (
                 <Fragment key={rowKey(r)}>
                   <ArticleListItem post={r} navigate={navigate} currentChain={currentChain} />
-                  {frontier?.after === at && marker('li')}
+                  {frontier?.after === i && marker()}
                   {gap && gapMarker(gap)}
                 </Fragment>
               );
