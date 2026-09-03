@@ -21,7 +21,7 @@ const taikoHoodi = {
 export const CHAINS = {
   1: {
     id: 1,
-    name: '以太坊',
+    name: 'Ethereum',
     slug: 'ethereum',
     viem: mainnet,
     explorer: 'https://etherscan.io',
