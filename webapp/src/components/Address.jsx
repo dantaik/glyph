@@ -42,7 +42,7 @@ export default function AddressLabel({ address, size = 16, className = '', tailC
   return (
     <span className={`inline-flex items-center gap-1.5 align-middle ${className}`}>
       <Identicon address={address} size={size} />
-      <span className={`font-mono tabular-nums ${tailClassName}`}>{shortAddr(address)}</span>
+      <span className={`tabular-nums ${tailClassName}`}>{shortAddr(address)}</span>
     </span>
   );
 }

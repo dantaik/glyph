@@ -51,7 +51,7 @@ describe('settingsFile', () => {
     const { settings, problems, summary } = parseSettingsFile(text);
     expect(problems).toEqual([]);
     expect(summary).toEqual([
-      '以太坊：默认节点',
+      'Ethereum：默认节点',
       'Taiko：2 个自定义节点',
       '扫描延迟：5 分钟',
       '发布到：Taiko',
@@ -94,9 +94,9 @@ describe('settingsFile', () => {
       }),
     );
     expect(settings).toEqual({ rpcs: { 1: ['https://a.example'] } });
-    expect(summary).toEqual(['以太坊：1 个自定义节点']);
+    expect(summary).toEqual(['Ethereum：1 个自定义节点']);
     expect(problems).toEqual([
-      '以太坊：忽略 2 个不是 http(s) 地址的节点。',
+      'Ethereum：忽略 2 个不是 http(s) 地址的节点。',
       '跳过未知的链 ID 999。',
       'Taiko 的节点列表应是数组。',
       'rescanDelayMinutes 应是不小于 0 的数字。',
@@ -110,7 +110,7 @@ describe('settingsFile', () => {
   it('a list equal to the defaults is applied as "not customized"', () => {
     saveRpcUrls(1, ['https://custom.example']);
     const { settings, summary } = parseSettingsFile(doc({ rpcs: { 1: defaultRpcs(1) } }));
-    expect(summary).toEqual(['以太坊：默认节点']);
+    expect(summary).toEqual(['Ethereum：默认节点']);
     applySettings(settings);
     expect(hasCustomRpcs(1)).toBe(false);
     expect(getRpcUrls(1)).toEqual(defaultRpcs(1));

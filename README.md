@@ -14,7 +14,7 @@ cd webapp && npm install && npm run dev
 ```
 
 部署到 Vercel / Netlify 等静态托管同样零配置：`vercel.json` 已就绪，直接导入仓库即可。
-`npm run build` 会产出两份东西：`dist/`（网站）和 `dist/glyph.html`（下面的离线副本，把整个应用装进一个文件）。
+`npm run build` 的产物在 `dist/`。
 
 **可选——自己部署一份合约**（任何人都可以部署；部署者无任何特权）：
 
@@ -42,43 +42,18 @@ EOF
 **界面**：作者用地址生成的 blockies 图标 + 地址末 6 位表示（合约与交易哈希仍用 `0x1234…abcd`）。窄屏下主题与设置收进 ⋯ 菜单，其余控件留在同一行。
 **控制台**：每次向节点请求、每次命中本地缓存都会在浏览器控制台留一行日志（标注链名）；`?log=0` 关闭。
 **成本估算**：发布前实时显示 gas（节点）+ ETH/USD（CoinGecko）估算。
-**离线副本**：页脚和 `/settings` 的「下载离线版」把整个应用存成一个 HTML 文件，见下节。
 
 ## 测试
 
 ```bash
 cd webapp
 npm test            # vitest：数据层（扫描、缓存、合并流、路由、配置）与组件
-npm run build       # 两趟构建：网站 + 自包含的离线单文件（含自包含断言）
+npm run build       # 构建网站到 dist/
 npm run test:e2e    # Playwright（Chromium）：构建产物 + 本地 JSON-RPC mock 节点（双链）
 npm run check       # 以上三步
 ```
 
 e2e 的 mock 节点（`webapp/test/e2e/rpcServer.mjs`）把演示世界（`src/lib/fixtureWorld.js`）按真实合约的部署高度以 JSON-RPC 提供：`eth_getLogs` 返回 ABI 编码的 Post 事件，正文是 brotli 压缩后的 `publish()` calldata，所以 viem、chainIO 与 brotli WASM 都是真跑。开发时 `npm run dev` 后访问 `/?fixtures=1` 可在内存里看同一套演示数据。GitHub Actions（`.github/workflows/ci.yml`）在每个 PR 上跑全部三步。
-
-## 离线副本（单个 HTML 文件）
-
-文章在链上，网站只是读它的一扇窗。窗子可以再开一扇：`npm run build` 除了 `dist/`
-还会产出 `dist/glyph.html`——**一个自包含的 HTML 文件**，JS、CSS、brotli WASM 全部内联，
-合约地址与默认节点也在里面。存到硬盘或 U 盘，双击用浏览器打开就能读，本仓库的域名是否还在都不影响。
-
-线上站点从页脚的「离线版」和 `/settings` 的「下载离线版」提供它（约 4 MB）。
-
-它与线上版的差别，都是浏览器给本地文件页面的限制决定的：
-
-- **路由**：本地文件没有服务器做 `/tx/…` 的重写，`pushState` 在 file:// 的 opaque origin 上也会被拒，
-  所以离线副本把同一套路由放进 fragment：`glyph.html#/tx/0x…/0`、`#/author/0x…`、`#/settings`。
-- **阅读**：完全可用。文件直接向 RPC 节点发请求——公共节点对 `Origin: null` 都返回
-  `Access-Control-Allow-Origin: *`（或 `null`），所以 file:// 页面能正常读链。节点可在设置页改。
-- **发布**：浏览器默认不把钱包注入本地文件页面。需要在扩展管理页给钱包开
-  「允许访问文件网址」（MetaMask：详细信息 → 允许访问文件网址），之后本地文件里也能连钱包发文。
-- **缓存**：有的浏览器不允许本地文件页面用 IndexedDB。不允许时正文/图片缓存退回内存，只在本次会话内有效；
-  节点列表与扫描记录（localStorage）不受影响。离线副本的设置页会写明当前实际情况。
-- **字体**：离线副本不打包思源宋体（十几 MB 的 CJK 分片，本地也取不到），改用系统中文衬线字体
-  （苹方 / 宋体 / 思源宋体，若已装）。
-
-只想构建离线副本：`cd webapp && npm run build:offline`（产物在 `webapp/dist-offline/index.html`，
-同时复制一份到 `webapp/dist/glyph.html`）。
 
 ## 确定性部署（CREATE2 · 全网同一地址）
 

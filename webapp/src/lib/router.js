@@ -15,34 +15,18 @@
 // choice — which chain the reader asked to look at — is remembered here
 // and inherited by every route that doesn't say otherwise.
 //
-// Two URL shapes, one route vocabulary. Served over http(s) the routes are
-// real paths (`/taiko/tx/0x…/0?tab=write`) that the host rewrites to
-// index.html. In the downloadable single-file build there is no host to
-// rewrite anything — and off a file:// page pushState is refused on the
-// opaque origin anyway — so the very same routes live in the fragment
-// (`#/taiko/tx/0x…/0?tab=write`) and navigation goes through location.hash.
+// Routes are real paths (`/taiko/tx/0x…/0?tab=write`) that the host
+// rewrites to index.html (vercel.json; test/e2e/serve.mjs does the same).
 
 import { useEffect, useState, useCallback } from 'react';
 import { chainFromSlug, chainSlug } from './chains';
-import { IS_OFFLINE_BUILD } from './offline';
 
 const EVT = 'cairn:urlstate';
 
-/**
- * Whether routes live in the fragment. True whenever nothing is going to
- * rewrite `/tx/…` back to the app: opened from disk, or the single-file
- * build however it is being served.
- */
-export const HASH_MODE =
-  IS_OFFLINE_BUILD || (typeof window !== 'undefined' && window.location.protocol === 'file:');
-
-/** The route path and query string of the current URL, whichever mode. */
+/** The route path and query string of the current URL. */
 function currentUrl() {
   if (typeof window === 'undefined') return { path: '/', search: '' };
-  if (!HASH_MODE) return { path: window.location.pathname, search: window.location.search };
-  const raw = window.location.hash.slice(1) || '/';
-  const q = raw.indexOf('?');
-  return q === -1 ? { path: raw, search: '' } : { path: raw.slice(0, q), search: raw.slice(q) };
+  return { path: window.location.pathname, search: window.location.search };
 }
 
 export function readParams() {
@@ -140,10 +124,9 @@ function buildUrl(next) {
   return `${path}${search ? `?${search}` : ''}`;
 }
 
-/** The href an <a> should carry for `next` — `#`-prefixed off a file:// page. */
+/** The href an <a> should carry for `next`. */
 export function hrefFor(next) {
-  const url = buildUrl(next);
-  return HASH_MODE ? `#${url}` : url;
+  return buildUrl(next);
 }
 
 function readState() {
@@ -156,17 +139,8 @@ function readState() {
 export function navigateTo(next, { replace = false } = {}) {
   const url = buildUrl(next);
   if (!next.tx) choice = inheritedChain(next);
-  if (HASH_MODE) {
-    // pushState is refused on file://'s opaque origin, so the fragment is
-    // written directly. A same-value assignment fires no hashchange — the
-    // explicit re-read below covers that.
-    if (replace) window.location.replace(`#${url}`);
-    else window.location.hash = url;
-  } else if (replace) {
-    window.history.replaceState({}, '', url);
-  } else {
-    window.history.pushState({}, '', url);
-  }
+  if (replace) window.history.replaceState({}, '', url);
+  else window.history.pushState({}, '', url);
   state = readState();
   window.dispatchEvent(new CustomEvent(EVT));
 }
@@ -180,11 +154,9 @@ export function useUrlState() {
       force((n) => n + 1);
     };
     window.addEventListener('popstate', sync);
-    window.addEventListener('hashchange', sync);
     window.addEventListener(EVT, sync);
     return () => {
       window.removeEventListener('popstate', sync);
-      window.removeEventListener('hashchange', sync);
       window.removeEventListener(EVT, sync);
     };
   }, []);
@@ -194,7 +166,7 @@ export function useUrlState() {
   return [state, navigate];
 }
 
-/** A query param off the current URL, wherever the query lives. */
+/** A query param off the current URL. */
 export function queryParam(name) {
   return new URLSearchParams(currentUrl().search).get(name);
 }

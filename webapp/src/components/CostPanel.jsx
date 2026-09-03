@@ -15,7 +15,7 @@ export default function CostPanel({ estimate, market, chainId }) {
   return (
     <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
       <div className="mb-3 flex justify-end">
-        <span className="font-mono text-2xs tabular-nums text-ink-faint">
+        <span className="text-2xs tabular-nums text-ink-faint">
           {fmtGwei(market.gasPriceWei)}
           {usdAvailable && market.ethUsd != null ? (
             <> · ETH ${market.ethUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}</>
@@ -28,7 +28,7 @@ export default function CostPanel({ estimate, market, chainId }) {
       <ul className="space-y-1.5 text-sm">
         <li className="flex items-baseline justify-between gap-4 text-ink-soft">
           <span>正文（~{estCompressed} B 压缩后）</span>
-          <span className="font-mono tabular-nums text-right">
+          <span className="tabular-nums text-right">
             {fmtEth(postCost.eth)}
             {usdAvailable && (
               <span className="ml-2 text-ink-faint">{fmtUsd(postCost.usd)}</span>
@@ -41,7 +41,7 @@ export default function CostPanel({ estimate, market, chainId }) {
             className="flex items-baseline justify-between gap-4 text-sm text-ink-soft"
           >
             <span className="truncate">图片 {c.key}</span>
-            <span className="font-mono tabular-nums text-right shrink-0">
+            <span className="tabular-nums text-right shrink-0">
               {fmtEth(c.eth)}
               {usdAvailable && (
                 <span className="ml-2 text-ink-faint">{fmtUsd(c.usd)}</span>
@@ -60,7 +60,7 @@ export default function CostPanel({ estimate, market, chainId }) {
 
       <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-edge pt-2.5 text-sm font-medium text-ink">
         <span>合计</span>
-        <span className="font-mono tabular-nums text-right">
+        <span className="tabular-nums text-right">
           {fmtEth(totalCost.eth)}
           {usdAvailable && (
             <span className="ml-2 font-normal text-ink-soft">

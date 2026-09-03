@@ -11,13 +11,12 @@ export default function LoadMoreButton({
   hasMore,
   label = '加载更早的文章',
   loadingLabel = '正在加载…',
-  exhaustedLabel = '已是全部文章',
   note,
 }) {
   if (!hasMore) {
     return (
       <div className="mt-8 text-center">
-        <p className="text-xs text-ink-ghost">{exhaustedLabel}</p>
+        <p className="text-xs text-ink-ghost">没有更多文章</p>
       </div>
     );
   }

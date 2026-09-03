@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { EXCERPT_CHARS } from '../../src/components/ArticleListItem';
 import HomeFeed from '../../src/components/HomeFeed';
 import { chainSlug } from '../../src/lib/chains';
 import { createFixtureIO } from '../../src/lib/fixtures';
 import { buildWorlds, expectedMergedOrder } from '../../src/lib/fixtureWorld';
+import { excerpt } from '../../src/lib/format';
 import { createReader } from '../../src/lib/reader';
 import { hrefFor } from '../../src/lib/router';
 import { createScanStore } from '../../src/lib/scanStore';
@@ -48,7 +50,7 @@ describe('HomeFeed over two chains', () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
 
     // Each row names its chain; the name is the way into that chain's view.
-    const eth = container.querySelectorAll('a[title="只看以太坊"]');
+    const eth = container.querySelectorAll('a[title="只看Ethereum"]');
     const taiko = container.querySelectorAll('a[title="只看Taiko"]');
     expect(eth.length).toBe(snap.rows.filter((r) => r.chainId === 1).length);
     expect(taiko.length).toBe(snap.rows.filter((r) => r.chainId === 167000).length);
@@ -66,7 +68,16 @@ describe('HomeFeed over two chains', () => {
     fireEvent.click(authors[0]);
     expect(navigate).toHaveBeenCalledWith({ author: snap.rows[0].author });
 
-    expect(screen.getByText('来自所有作者 · 以太坊与Taiko')).toBeTruthy();
+    // Under its title, every row previews the body — read through the view
+    // once the row is on the page — as the row's excerpt of the markdown.
+    const worlds = buildWorlds([1, 167000], { now: NOW });
+    await waitFor(() => {
+      expect(rowsOnPage.map((li) => li.querySelector('p')?.textContent)).toEqual(
+        snap.rows.map((r) => excerpt(worlds.get(r.chainId).bodyByTx.get(r.txHash).markdown, EXCERPT_CHARS)),
+      );
+    });
+
+    expect(screen.getByText('来自所有作者 · 2个区块链网络')).toBeTruthy();
   });
 
   it('marks where the merge stops being complete, and 继续扫描 completes it', async () => {
@@ -108,7 +119,7 @@ describe('HomeFeed over two chains', () => {
     const { container } = mount(view);
     await settled(view);
 
-    expect(container.querySelectorAll('a[title="只看以太坊"]').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('a[title="只看Ethereum"]').length).toBeGreaterThan(0);
     expect(container.querySelectorAll('a[title="只看Taiko"]').length).toBe(0);
     const marker = container.querySelector('[data-frontier]');
     expect(marker.textContent).toContain('Taiko 读取失败');

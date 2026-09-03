@@ -109,7 +109,7 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
       {empty && <EmptyState title="该地址没发表过文章" />}
 
       {rows.length > 0 && (
-        <ul className="divide-y divide-edge">
+        <ul>
           {frontier?.after === -1 && marker()}
           {rows.map((t, i) => (
             <Fragment key={rowKey(t)}>

@@ -114,7 +114,7 @@ export default function PostPage({
   const loaded = !loading && !error && html != null;
 
   return (
-    <article className="font-serif">
+    <article>
       <div className="mb-8 flex items-center justify-between">
         <BackButton onClick={onBack} />
         <FontSizeControl />
@@ -122,7 +122,7 @@ export default function PostPage({
 
       <header className="mb-10">
         <div className="article-column text-center">
-        <h1 className="font-serif text-display font-black sm:text-jumbo">
+        <h1 className="text-display font-black sm:text-jumbo">
           {title || <span className="text-ink-ghost">无标题</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 text-xs text-ink-faint tabular-nums">
@@ -167,7 +167,7 @@ export default function PostPage({
             <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-accent transition-colors">
               技术细节
             </summary>
-            <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 font-mono text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">
+            <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">
               {error}
             </pre>
           </details>

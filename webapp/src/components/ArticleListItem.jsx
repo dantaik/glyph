@@ -4,7 +4,7 @@ import { hrefFor } from '../lib/router';
 import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
 
-const EXCERPT_CHARS = 256;
+export const EXCERPT_CHARS = 256;
 
 /**
  * One article row in a reading list — shared by the home feed and the
@@ -42,7 +42,7 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
             e.preventDefault();
             navigate(target);
           }}
-          className="flex-1 font-serif text-display sm:text-jumbo group-hover:text-accent transition-colors line-clamp-1"
+          className="flex-1 text-display sm:text-jumbo group-hover:text-accent transition-colors line-clamp-1"
         >
           {fmtTitle(post.title) ?? <span className="text-ink-ghost">无标题</span>}
         </a>

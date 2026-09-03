@@ -95,7 +95,7 @@ describe('WalletPanel', () => {
     await mountPanel();
     expect(screen.getByText(/未检测到钱包/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: '连接钱包' })).toBeNull();
-    expect(pressed('以太坊')).toBeTruthy();
+    expect(pressed('Ethereum')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Taiko' }));
     expect(pressed('Taiko')).toBeTruthy();
     expect(localStorage.getItem('glyph.publishChain.v1')).toBe('167000');
@@ -123,14 +123,14 @@ describe('WalletPanel', () => {
     const provider = fakeProvider({ accounts: [ACCOUNT], chainId: '0x28c58' });
     await mountPanel({ provider });
     await waitFor(() => expect(pressed('Taiko')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: '以太坊' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ethereum' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('钱包在Taiko');
-    expect(alert.textContent).toContain('发布目标是以太坊');
+    expect(alert.textContent).toContain('发布目标是Ethereum');
     fireEvent.click(screen.getByRole('button', { name: '切换钱包网络' }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     expect(provider.calls.at(-1)).toEqual({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x1' }] });
-    expect(screen.getByText(/钱包已在以太坊上/)).toBeTruthy();
+    expect(screen.getByText(/钱包已在Ethereum上/)).toBeTruthy();
   });
 
   it('adds a chain the wallet does not know before switching to it', async () => {
@@ -149,7 +149,7 @@ describe('WalletPanel', () => {
     await mountPanel({ provider: fakeProvider({ accounts: [ACCOUNT], chainId: '0xaa36a7' }) });
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('ID 11155111');
-    expect(pressed('以太坊')).toBeTruthy();
+    expect(pressed('Ethereum')).toBeTruthy();
   });
 
   it('keeps the pick while a publish is in flight', async () => {

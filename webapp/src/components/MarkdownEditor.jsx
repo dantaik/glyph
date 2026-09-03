@@ -43,7 +43,7 @@ export default function MarkdownEditor({
               color: 'var(--color-ink)',
             },
             '.cm-content': {
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'inherit',
               fontSize: '14px',
               padding: '14px 16px',
               caretColor: 'var(--color-accent)',

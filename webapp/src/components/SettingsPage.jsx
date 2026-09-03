@@ -1,26 +1,14 @@
 import { useEffect, useState } from 'react';
 import { CHAINS, defaultRpcs } from '../lib/chains';
-import {
-  GLYPH_ADDRESS,
-  READ_CHAIN_IDS,
-  getRescanDelayMs,
-  getRpcUrls,
-  hasCustomRpcs,
-  hasOverrides,
-  resetEndpointConfig,
-  saveRescanDelay,
-  saveRpcUrls,
-  useRpcVersion,
-} from '../lib/config';
+import { GLYPH_ADDRESS, READ_CHAIN_IDS, getRescanDelayMs, getRpcUrls, hasCustomRpcs, hasOverrides, resetEndpointConfig, saveRescanDelay, saveRpcUrls, useRpcVersion } from '../lib/config';
 import { shortAddr } from '../lib/format';
 import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
 import BackupSection from './BackupSection';
 import ListHeader from './ListHeader';
 import Note from './Note';
-import OfflineSection from './OfflineSection';
 import SectionHeader from './SectionHeader';
-import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT, INPUT_MONO } from './formStyles';
+import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT } from './formStyles';
 
 const chainIds = READ_CHAIN_IDS;
 
@@ -28,7 +16,7 @@ const readLists = () => Object.fromEntries(chainIds.map((id) => [id, getRpcUrls(
 
 /**
  * Settings page (/settings): each chain's ordered RPC endpoints, the
- * rescan delay, backup and restore, and the offline copy. Endpoints are
+ * rescan delay, backup and restore. Endpoints are
  * tried top-down and the reader falls back to the next when one fails,
  * so order is the setting — hence move-up / move-down rather than a
  * single URL field. Saving takes effect at once, without a reload: even a
@@ -107,7 +95,7 @@ export default function SettingsPage({ navigate }) {
                     <span className="w-6 shrink-0 text-center text-2xs tabular-nums text-ink-ghost">{i + 1}</span>
                     <span
                       title={url}
-                      className={`min-w-0 flex-1 truncate font-mono text-xs ${i === 0 ? 'text-ink-soft' : 'text-ink-faint'}`}
+                      className={`min-w-0 flex-1 truncate text-xs ${i === 0 ? 'text-ink-soft' : 'text-ink-faint'}`}
                     >
                       {url}
                     </span>
@@ -157,7 +145,7 @@ export default function SettingsPage({ navigate }) {
                 }}
                 placeholder="https://你的节点地址"
                 aria-label={`为 ${chain?.name ?? id} 添加 RPC 节点`}
-                className={INPUT_MONO}
+                className={INPUT}
               />
               <button type="button" onClick={() => add(id)} className={`${BTN_OUTLINE} shrink-0 px-3`}>
                 <Plus size={15} />
@@ -201,8 +189,6 @@ export default function SettingsPage({ navigate }) {
       </section>
 
       <BackupSection />
-
-      <OfflineSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
         <button type="button" onClick={() => resetEndpointConfig()} className={BTN_QUIET}>
