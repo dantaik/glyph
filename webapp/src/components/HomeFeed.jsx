@@ -3,7 +3,7 @@ import {
   loadRecentAcrossAuthors,
   getChainClock,
 } from '../lib/data';
-import { friendlyError } from '../lib/format';
+import { friendlyError, fmtBlock } from '../lib/format';
 import EmptyState from './EmptyState';
 import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
@@ -24,15 +24,28 @@ export default function HomeFeed({ navigate, onStartWriting }) {
   const [error, setError] = useState(null);
   const [clock, setClock] = useState(null);
   const [tick, setTick] = useState(0);
+  // Live scan progress: { head, fromBlock, toBlock, fraction } or null.
+  const [scanProgress, setScanProgress] = useState(null);
+
+  useEffect(() => {
+    const onProgress = (e) => setScanProgress(e.detail);
+    window.addEventListener('glyph:scanprogress', onProgress);
+    return () => window.removeEventListener('glyph:scanprogress', onProgress);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setScanProgress(null);
     loadRecentAcrossAuthors(FEED_SIZE)
       .then((r) => !cancelled && setRows(r))
       .catch((e) => !cancelled && setError(e.message || '加载失败'))
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+        setScanProgress(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -63,7 +76,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
       <ListHeader title="最新文章" subtitle={`来自所有作者的最近 ${FEED_SIZE} 篇`} />
 
       {loading ? (
-        <FeedSkeleton />
+        <FeedSkeleton progress={scanProgress} />
       ) : error ? (
         <EmptyState
           tone="danger"
@@ -100,26 +113,44 @@ export default function HomeFeed({ navigate, onStartWriting }) {
 }
 
 
-function FeedSkeleton() {
+function FeedSkeleton({ progress }) {
+  const pct = progress ? Math.round(progress.fraction * 100) : 0;
   return (
-    <div aria-hidden="true">
-      <div className="border-b border-edge pb-8">
-        <div className="h-7 w-3/5 animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-4 h-4 w-full animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-2 h-4 w-4/5 animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-4 h-3 w-2/5 animate-pulse rounded bg-paper-sunken" />
+    <div>
+      <div aria-hidden="true">
+        <div className="border-b border-edge pb-8">
+          <div className="h-7 w-3/5 animate-pulse rounded bg-paper-sunken" />
+          <div className="mt-4 h-4 w-full animate-pulse rounded bg-paper-sunken" />
+          <div className="mt-2 h-4 w-4/5 animate-pulse rounded bg-paper-sunken" />
+          <div className="mt-4 h-3 w-2/5 animate-pulse rounded bg-paper-sunken" />
+        </div>
+        <ul className="divide-y divide-edge">
+          {[0, 1, 2, 3].map((k) => (
+            <li key={k} className="py-5">
+              <div className="h-5 w-2/3 animate-pulse rounded bg-paper-sunken" />
+              <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-paper-sunken" />
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="divide-y divide-edge">
-        {[0, 1, 2, 3].map((k) => (
-          <li key={k} className="py-5">
-            <div className="h-5 w-2/3 animate-pulse rounded bg-paper-sunken" />
-            <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-paper-sunken" />
-          </li>
-        ))}
-      </ul>
-      <p className="mt-10 animate-pulse text-center text-xs text-ink-ghost">
-        正在扫描最近区块…
-      </p>
+      <div role="status" aria-live="polite" className="mt-10 text-center">
+        <p className={"text-xs text-ink-ghost " + (progress ? "" : "animate-pulse")}>
+          正在扫描最近区块…
+        </p>
+        {progress && (
+          <>
+            <p className="mt-2 text-2xs tabular-nums text-ink-faint">
+              区块 {fmtBlock(progress.fromBlock)} 至 {fmtBlock(progress.toBlock)} · 约 {pct}%
+            </p>
+            <div className="mx-auto mt-1.5 h-1 w-44 max-w-full overflow-hidden rounded-full bg-paper-sunken">
+              <div
+                className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
+                style={{ width: `${Math.max(4, pct)}%` }}
+              />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

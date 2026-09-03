@@ -402,11 +402,37 @@ export async function loadRecentAcrossAuthors(
   // exceed the answering node's head.
   const storedFrontier = stored?.frontier != null ? BigInt(stored.frontier) : null;
   let coveredFrontier = storedFrontier;
+  // Progress anchor: how far down this scan could walk — bounded by
+  // maxWindows on the first visit, by the stored frontier afterwards.
+  const targetBottom =
+    storedFrontier != null
+      ? storedFrontier
+      : head > span * BigInt(maxWindows)
+        ? head - span * BigInt(maxWindows) + 1n
+        : 0n;
   let toBlock = head;
   let logs;
   for (let w = 0; w < maxWindows && out.length < n && toBlock > 0n; w++) {
     if (storedFrontier != null && toBlock <= storedFrontier) break; // already covered
     const fromBlock = toBlock >= span ? toBlock - span + 1n : 0n;
+    // Pulse the UI with the window about to be scanned + overall fraction.
+    try {
+      const scanSpan = head - targetBottom + 1n;
+      const fraction =
+        scanSpan <= 0n
+          ? 1
+          : Math.min(
+              1,
+              Math.max(0, Number(((head - fromBlock + 1n) * 1000n) / scanSpan) / 1000),
+            );
+      window.dispatchEvent(
+        new CustomEvent('glyph:scanprogress', {
+          detail: { head, fromBlock, toBlock, targetBottom, fraction },
+        }),
+      );
+    } catch {
+      /* non-browser context */
+    }
     logs = await withRetry(() =>
       client.getLogs({
         address: GLYPH_ADDRESS,

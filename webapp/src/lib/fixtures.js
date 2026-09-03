@@ -259,8 +259,26 @@ export function makeFixtures(mode) {
     },
 
     async loadRecentAcrossAuthors(n) {
+      const rows = feed.slice(0, n).map((p) => ({ ...p }));
+      // Mimic the real scan's progress pulses while the fake delay runs.
+      const head = feed.length ? Number(feed[0].block) : 0;
+      const bottom = feed.length ? Number(feed[feed.length - 1].block) : 0;
+      const emit = (fromBlock, fraction) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('glyph:scanprogress', {
+              detail: { head, fromBlock, toBlock: fromBlock + 799, targetBottom: bottom, fraction },
+            }),
+          );
+        } catch {
+          /* non-browser context */
+        }
+      };
+      emit(Math.max(0, head - 800), 0.05);
       await delay();
-      return feed.slice(0, n).map((p) => ({ ...p }));
+      emit(Math.max(0, head - 12000), 0.5);
+      await delay();
+      return rows;
     },
 
     async loadPostBody(txHash) {
