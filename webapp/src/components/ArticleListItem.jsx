@@ -1,4 +1,5 @@
 import { fmtTitle, fmtIndex } from '../lib/format';
+import { hrefFor } from '../lib/router';
 import AddressLabel from './Address';
 import PostMeta from './PostMeta';
 
@@ -13,7 +14,7 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
     <li className="py-4">
       <div className="flex items-baseline gap-3">
         <a
-          href={`/tx/${post.txHash}/${post.eventIndex ?? 0}`}
+          href={hrefFor({ tx: post.txHash, txEvent: post.eventIndex ?? 0 })}
           onClick={(e) => {
             e.preventDefault();
             navigate({ tx: post.txHash, txEvent: post.eventIndex ?? 0 });
@@ -30,7 +31,7 @@ export default function ArticleListItem({ post, clock, navigate, showIndex = fal
           prefix={showIndex ? fmtIndex(post.index) : undefined}
           lead={
             <a
-              href={`/author/${post.author}`}
+              href={hrefFor({ author: post.author })}
               onClick={(e) => {
                 e.preventDefault();
                 navigate({ author: post.author });

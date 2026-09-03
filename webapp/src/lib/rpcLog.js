@@ -13,11 +13,13 @@
 // On by default. Silence it with `localStorage['glyph.log.v1'] = '0'` (or
 // `?log=0`); `?log=1` turns it back on.
 
+import { queryParam } from './router';
+
 const KEY = 'glyph.log.v1';
 
 function enabled() {
   try {
-    const q = new URLSearchParams(window.location.search).get('log');
+    const q = queryParam('log');
     if (q === '0' || q === '1') {
       localStorage.setItem(KEY, q);
       return q === '1';

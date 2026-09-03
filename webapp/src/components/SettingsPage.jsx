@@ -17,6 +17,7 @@ import { shortAddr } from '../lib/format';
 import { Check, ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
 import ListHeader from './ListHeader';
+import OfflineSection from './OfflineSection';
 import SectionHeader from './SectionHeader';
 
 const INPUT =
@@ -250,6 +251,8 @@ export default function SettingsPage({ navigate }) {
           </span>
         </label>
       </section>
+
+      <OfflineSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
         <button type="button" onClick={resetEndpointConfig} className={BTN_QUIET}>

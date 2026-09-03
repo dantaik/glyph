@@ -8,7 +8,8 @@ import { GLYPH_ADDRESS } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
-import { useUrlState } from './lib/router';
+import { IS_OFFLINE_BUILD, OFFLINE_FILE } from './lib/offline';
+import { hrefFor, useUrlState } from './lib/router';
 
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
@@ -112,7 +113,7 @@ export default function App() {
           </a>
           <span className="select-none" aria-hidden="true">·</span>
           <a
-            href="/scan"
+            href={hrefFor({ scan: '1' })}
             onClick={(e) => {
               e.preventDefault();
               navigate({ scan: '1' });
@@ -124,6 +125,20 @@ export default function App() {
             {scanSpan}
             {feed.job && <span className="animate-pulse"> · 扫描中</span>}
           </a>
+          {/* The whole app as one file, for when this domain is gone. */}
+          {!IS_OFFLINE_BUILD && (
+            <>
+              <span className="select-none" aria-hidden="true">·</span>
+              <a
+                href={`/${OFFLINE_FILE}`}
+                download={OFFLINE_FILE}
+                title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
+                className="inline-block text-2xs text-ink-faint hover:text-accent transition-colors"
+              >
+                离线版
+              </a>
+            </>
+          )}
         </p>
       </footer>
       {FIXTURES_MODE && (

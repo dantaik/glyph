@@ -7,6 +7,7 @@ webapp/node_modules/
 
 # Build output
 webapp/dist/
+webapp/dist-offline/
 contracts/out/
 contracts/cache/
 contracts/lib/forge-std/

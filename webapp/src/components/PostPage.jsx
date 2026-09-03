@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAsync } from '../lib/hooks';
+import { hrefFor } from '../lib/router';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
@@ -121,7 +122,7 @@ export default function PostPage({
           <span className="flex items-center gap-1">
             <span>作者：</span>
             <a
-              href={`/author/${meta.author}`}
+              href={hrefFor({ author: meta.author })}
               onClick={(e) => {
                 e.preventDefault();
                 onOpenAuthor?.();

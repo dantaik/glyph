@@ -76,8 +76,30 @@ async function del(storeName, key) {
   await promisify(db.transaction(storeName, 'readwrite').objectStore(storeName).delete(key));
 }
 
+// --- Fallback for browsers that refuse IndexedDB -----------------------
+//
+// Some browsers deny the API to file:// pages — where the offline single-file
+// copy runs — and a private window can deny it anywhere. Without a stand-in
+// every navigation would re-read the same body from the node, so a bounded
+// Map holds the session's worth. It dies with the page; IndexedDB, wherever
+// it is allowed, remains the permanent cache.
+
+const MEMORY_MAX = 500;
+const memory = new Map();
+let idbDenied = false;
+
+const memKey = (storeName, chainId, txHash) => `${storeName}:${scopedKey(chainId, txHash)}`;
+
+function memWrite(storeName, chainId, txHash, value) {
+  const key = memKey(storeName, chainId, txHash);
+  memory.delete(key); // re-insert so the eviction order is by last write
+  memory.set(key, value);
+  while (memory.size > MEMORY_MAX) memory.delete(memory.keys().next().value);
+}
+
 /** Read under the scoped key, falling back to (and re-filing) a legacy entry. */
 async function read(storeName, chainId, txHash) {
+  if (idbDenied) return memory.get(memKey(storeName, chainId, txHash)) ?? null;
   try {
     const key = scopedKey(chainId, txHash);
     const hit = await get(storeName, key);
@@ -89,15 +111,39 @@ async function read(storeName, chainId, txHash) {
       .catch(() => {});
     return legacy;
   } catch {
-    return null;
+    idbDenied = true;
+    return memory.get(memKey(storeName, chainId, txHash)) ?? null;
   }
 }
 
 async function write(storeName, chainId, txHash, value) {
+  if (idbDenied) {
+    memWrite(storeName, chainId, txHash, value);
+    return;
+  }
   try {
     await put(storeName, scopedKey(chainId, txHash), value);
   } catch {
-    // quota exceeded or privacy mode — silent degrade
+    // Denied (file://, privacy mode) or out of quota: keep it in memory so the
+    // page at least stops asking the node for what it already has.
+    idbDenied = true;
+    memWrite(storeName, chainId, txHash, value);
+  }
+}
+
+/**
+ * Whether the permanent cache is actually available here. False when the
+ * browser refuses IndexedDB — some do to a page opened from disk — in which
+ * case reads are only cached for this session.
+ */
+export async function cachePersists() {
+  if (idbDenied) return false;
+  try {
+    await openDB();
+    return true;
+  } catch {
+    idbDenied = true;
+    return false;
   }
 }
 
