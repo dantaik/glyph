@@ -4,12 +4,13 @@ import {
   loadMoreAcrossAuthors,
   getChainClock,
 } from '../lib/data';
-import { friendlyError, fmtBlock } from '../lib/format';
+import { friendlyError } from '../lib/format';
 import EmptyState from './EmptyState';
 import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import ScanProgress from './ScanProgress';
 
 const FEED_SIZE = 20;
 const EXCERPT_CHARS = 80;
@@ -79,6 +80,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     if (loadingMore || done) return;
     setLoadingMore(true);
     setNote(null);
+    setScanProgress(null);
     try {
       const oldest = rows[rows.length - 1] ?? null;
       const { rows: more = [], done: finished } =
@@ -93,6 +95,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
       setNote(friendlyError(e?.message));
     } finally {
       setLoadingMore(false);
+      setScanProgress(null);
     }
   }, [rows, loadingMore, done]);
 
@@ -141,6 +144,13 @@ export default function HomeFeed({ navigate, onStartWriting }) {
             ))}
           </ul>
 
+          {loadingMore && (
+            <ScanProgress
+              label="正在扫描更早的文章…"
+              progress={scanProgress}
+              className="mt-8"
+            />
+          )}
           <LoadMoreButton
             onClick={loadMore}
             loading={loadingMore}
@@ -175,24 +185,7 @@ function FeedSkeleton({ progress }) {
           ))}
         </ul>
       </div>
-      <div role="status" aria-live="polite" className="mt-10 text-center">
-        <p className={"text-xs text-ink-ghost " + (progress ? "" : "animate-pulse")}>
-          正在扫描最近区块…
-        </p>
-        {progress && (
-          <>
-            <p className="mt-2 text-2xs tabular-nums text-ink-faint">
-              区块 {fmtBlock(progress.fromBlock)} 至 {fmtBlock(progress.toBlock)} · 约 {pct}%
-            </p>
-            <div className="mx-auto mt-1.5 h-1 w-44 max-w-full overflow-hidden rounded-full bg-paper-sunken">
-              <div
-                className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
-                style={{ width: `${Math.max(4, pct)}%` }}
-              />
-            </div>
-          </>
-        )}
-      </div>
+      <ScanProgress label="正在扫描最近区块…" progress={progress} className="mt-10" />
     </div>
   );
 }

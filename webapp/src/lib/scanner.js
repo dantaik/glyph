@@ -168,7 +168,7 @@ export async function authorRowsAt(author, block, fetchBlock) {
  * Walk the author's chain from `startBlock`, skipping posts at or newer than
  * `skipIndex`, until `n` rows are collected or the chain runs out.
  */
-export async function walkAuthorTitles(author, startBlock, skipIndex, n, fetchBlock) {
+export async function walkAuthorTitles(author, startBlock, skipIndex, n, fetchBlock, onStep) {
   let block = BigInt(startBlock);
   let skip = skipIndex == null ? null : BigInt(skipIndex);
   const out = [];
@@ -181,6 +181,7 @@ export async function walkAuthorTitles(author, startBlock, skipIndex, n, fetchBl
       if (out.length >= n) break;
     }
     skip = null;
+    onStep?.({ block, collected: out.length, target: n });
     // The chain must strictly descend; anything else (a truncated cache, a
     // reorg, an inconsistent node) would loop forever.
     const next = rows[rows.length - 1].prevBlock;

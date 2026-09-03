@@ -242,13 +242,36 @@ export function makeFixtures(mode) {
     },
 
     async loadMoreTitles(author, oldestShown, n) {
-      await delay();
       if (!oldestShown) return [];
-      return postsOf(author)
+      const rows = postsOf(author)
         .filter((p) => p.index < oldestShown.index)
         .reverse()
         .slice(0, n)
         .map((p) => ({ ...p }));
+      // Mimic the real author-walk progress pulses while the fake delay runs.
+      const block = Number(oldestShown.block);
+      const emit = (posts, blockNum) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('glyph:scanprogress', {
+              detail: {
+                fromBlock: blockNum,
+                toBlock: blockNum,
+                fraction: Math.min(1, posts / Math.max(1, n)),
+                posts,
+                target: n,
+              },
+            }),
+          );
+        } catch {
+          /* non-browser context */
+        }
+      };
+      emit(0, Math.max(0, block - 1));
+      await delay();
+      emit(rows.length, Math.max(0, block - 2));
+      await delay();
+      return rows;
     },
 
     async findTitleMeta(author, targetIndex) {
@@ -282,10 +305,27 @@ export function makeFixtures(mode) {
     },
 
     async loadMoreAcrossAuthors(oldestShown, n) {
-      await delay();
       if (!oldestShown) return { rows: [], done: feed.length === 0 };
       const older = feed.filter((p) => p.block < BigInt(oldestShown.block));
-      return { rows: older.slice(0, n).map((p) => ({ ...p })), done: older.length <= n };
+      const rows = older.slice(0, n).map((p) => ({ ...p }));
+      // Mimic the real feed-sweep progress pulses while the fake delay runs.
+      const cursor = Number(oldestShown.block);
+      const emit = (fromBlock, fraction) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('glyph:scanprogress', {
+              detail: { fromBlock, toBlock: fromBlock + 799, fraction },
+            }),
+          );
+        } catch {
+          /* non-browser context */
+        }
+      };
+      emit(Math.max(0, cursor - 800), 0.1);
+      await delay();
+      emit(Math.max(0, cursor - 12000), 0.6);
+      await delay();
+      return { rows, done: older.length <= n };
     },
 
     async loadPostBody(txHash) {
