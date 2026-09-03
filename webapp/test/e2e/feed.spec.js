@@ -9,8 +9,9 @@ test.describe('the home feed', () => {
     await expect(chip(page, 'Taiko').first()).toBeVisible();
     await expect(chip(page, '以太坊').first()).toBeVisible();
     await expect(page.getByText('来自所有作者 · 以太坊与Taiko')).toBeVisible();
-    // The featured card names its author, as every row does.
-    await expect(page.locator('main article a[href^="/author/"]')).toHaveCount(1);
+    // Every post is a row like the next — the newest gets no card of its own — and names its author.
+    await expect(page.locator('main article')).toHaveCount(0);
+    await expect(page.locator('main li:has(a[href*="/tx/"])').first().locator('a[href^="/author/"]')).toHaveCount(1);
 
     // Taiko's first sweep stops short of its oldest letters: the page says so,
     // and everything shown is in the order the worlds dictate.

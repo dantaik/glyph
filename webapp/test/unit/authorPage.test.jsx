@@ -21,7 +21,7 @@ function mount(view, props = {}) {
 }
 
 describe('AuthorPage', () => {
-  it('writes the featured post like the rows: author, chain, 第 N 篇, time', async () => {
+  it('lists every post as a row — the newest too — with author, chain, 第 N 篇, time', async () => {
     const view = createView([worldReader(1), worldReader(167000)]);
     const { container, navigate } = mount(view);
     const list = view.authorList(A0);
@@ -30,19 +30,22 @@ describe('AuthorPage', () => {
     const { rows } = list.getSnapshot();
     expect(rows.length).toBeGreaterThan(1);
 
-    // Every post names its author, the featured card first — and each
-    // says which 第 N 篇 it is on its chain.
-    const authorLinks = [...container.querySelectorAll(`a[href="${hrefFor({ author: rows[0].author })}"]`)];
-    expect(authorLinks).toHaveLength(rows.length);
-    expect(container.textContent.match(/第 \d+ 篇/g)).toHaveLength(rows.length);
+    // One row per post, the newest first and written like the rest: no
+    // card of its own.
+    const rowsOnPage = [...container.querySelectorAll('li')].filter((li) => li.querySelector('a[href*="/tx/"]'));
+    expect(rowsOnPage).toHaveLength(rows.length);
+    expect(container.querySelector('article')).toBeNull();
 
-    const featured = container.querySelector('article');
-    expect(featured.contains(authorLinks[0])).toBe(true);
-    expect(featured.textContent).toContain(fmtIndex(rows[0].index));
-    expect(featured.querySelector('a[title^="只看"]')).not.toBeNull();
+    // Every row names the author and says which 第 N 篇 it is on its chain.
+    const authorHref = hrefFor({ author: rows[0].author });
+    rowsOnPage.forEach((li, i) => {
+      expect(li.querySelector(`a[href="${authorHref}"]`)).not.toBeNull();
+      expect(li.textContent).toContain(fmtIndex(rows[i].index));
+      expect(li.querySelector('a[title^="只看"]')).not.toBeNull();
+    });
 
-    // The author link is the way into the author's page, as on the rows.
-    fireEvent.click(authorLinks[0]);
+    // The author link is the way into the author's page.
+    fireEvent.click(rowsOnPage[0].querySelector(`a[href="${authorHref}"]`));
     expect(navigate).toHaveBeenCalledWith({ author: rows[0].author });
   });
 });

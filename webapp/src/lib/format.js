@@ -114,31 +114,6 @@ export function fmtAbsTime(ts) {
   return Number.isNaN(date.getTime()) ? null : ABS_FMT.format(date);
 }
 
-/**
- * Plain-text teaser from Markdown: drops front-matter remnants, fenced
- * code blocks, images and hr lines; keeps link text; strips heading /
- * quote markers and emphasis chars; collapses whitespace; code-point-safe
- * slice to `max` chars with a trailing ellipsis.
- */
-export function excerpt(md, max = 80) {
-  if (!md) return '';
-  const text = String(md)
-    .replace(/\r\n?/g, '\n')
-    .replace(/^\uFEFF/, '')
-    .replace(/^---\n[\s\S]*?\n---\n?/, '')
-    .replace(/```[\s\S]*?(?:```|$)/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^[ \t]{0,3}(?:#{1,6}|>+)[ \t]*/gm, '')
-    .replace(/^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, ' ')
-    .replace(/[*_~`]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const chars = Array.from(text);
-  if (chars.length <= max) return text;
-  return `${chars.slice(0, max).join('').trimEnd()}…`;
-}
-
 /** Turn a raw provider error into a short, human-friendly hint. */
 export function friendlyError(message) {
   const m = String(message || '');

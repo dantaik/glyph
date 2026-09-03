@@ -6,37 +6,14 @@ export function Bar({ className = '' }) {
   return <div className={`animate-pulse rounded bg-paper-sunken ${className}`} />;
 }
 
-/** The home feed: a featured entry over a few rows. */
-export function FeedSkeleton() {
-  return (
-    <div aria-hidden="true">
-      <div className="border-b border-edge pb-8">
-        <Bar className="h-7 w-3/5" />
-        <Bar className="mt-4 h-4 w-full" />
-        <Bar className="mt-2 h-4 w-4/5" />
-        <Bar className="mt-4 h-3 w-2/5" />
-      </div>
-      <ul className="divide-y divide-edge">
-        {[0, 1, 2, 3].map((k) => (
-          <li key={k} className="py-5">
-            <Bar className="h-5 w-2/3" />
-            <Bar className="mt-3 h-3 w-1/3" />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** An author's title list. */
+/** A reading list — the home feed or an author's: rows of a title over a meta line (ArticleListItem). */
 export function ListSkeleton() {
   return (
     <ul className="divide-y divide-edge" aria-hidden="true">
       {[0, 1, 2, 3, 4].map((k) => (
-        <li key={k} className="flex items-baseline gap-4 py-4">
-          <Bar className="h-3 w-8" />
-          <Bar className="h-5 max-w-[60%] flex-1" />
-          <Bar className="ml-auto h-3 w-16" />
+        <li key={k} className="py-4">
+          <Bar className="h-5 w-2/3" />
+          <Bar className="mt-3 h-3 w-1/3" />
         </li>
       ))}
     </ul>

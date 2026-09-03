@@ -17,9 +17,8 @@ beforeEach(() => localStorage.clear());
 
 const postHref = (r) => `/${chainSlug(r.chainId)}/tx/${r.txHash}/0`;
 
-/** The post links on the page in document order, once each (the featured card links its title too). */
-const postHrefs = (container) =>
-  [...new Set([...container.querySelectorAll('a[href*="/tx/"]')].map((a) => a.getAttribute('href')))];
+/** The post links on the page in document order — one per row, each row linking its title once. */
+const postHrefs = (container) => [...container.querySelectorAll('a[href*="/tx/"]')].map((a) => a.getAttribute('href'));
 
 function mount(view, props = {}) {
   const navigate = vi.fn();
@@ -57,11 +56,13 @@ describe('HomeFeed over two chains', () => {
     fireEvent.click(taiko[0]);
     expect(navigate).toHaveBeenCalledWith({ chain: 167000 });
 
-    // Every post names its author — the featured card no differently from
-    // the rows — and the name is the way into the author's page.
-    const authors = [...container.querySelectorAll('a[href^="/author/"]')];
-    expect(authors.map((a) => a.getAttribute('href'))).toEqual(snap.rows.map((r) => hrefFor({ author: r.author })));
-    expect(container.querySelector('article').contains(authors[0])).toBe(true);
+    // Every post is a row like the next — the newest gets no card of its
+    // own — and each row names its author, the way into the author's page.
+    const rowsOnPage = [...container.querySelectorAll('li')].filter((li) => li.querySelector('a[href*="/tx/"]'));
+    expect(rowsOnPage.map((li) => li.querySelector('a[href*="/tx/"]').getAttribute('href'))).toEqual(snap.rows.map(postHref));
+    expect(container.querySelector('article')).toBeNull();
+    const authors = rowsOnPage.map((li) => li.querySelector('a[href^="/author/"]'));
+    expect(authors.map((a) => a?.getAttribute('href'))).toEqual(snap.rows.map((r) => hrefFor({ author: r.author })));
     fireEvent.click(authors[0]);
     expect(navigate).toHaveBeenCalledWith({ author: snap.rows[0].author });
 

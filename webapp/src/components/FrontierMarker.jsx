@@ -10,12 +10,12 @@ const ACTION =
  * read; below it, the chains named here have not been read that far back
  * yet, so posts from them may be missing among the rows that follow. The
  * text says why, and what the action does: deepen those chains, or retry
- * the one that failed.
+ * the one that failed. A row of the list it sits in (an `li`).
  *
  * `frontier`: { ts, leaders: [{ chainId, state: 'covered'|'scanning'|'error'|'idle', error, exact }] }
  * `variant`: 'feed' (scans) or 'author' (walks).
  */
-export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, variant = 'feed', as: Tag = 'li', className = '' }) {
+export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, variant = 'feed' }) {
   const names = frontier.leaders.map((l) => chainName(l.chainId)).join('与');
   const states = new Set(frontier.leaders.map((l) => l.state));
   let text;
@@ -39,7 +39,7 @@ export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, va
     action = { label: variant === 'author' ? '继续读取' : '继续扫描', onClick: onLoadMore };
   }
   return (
-    <Tag className={`${LINE} ${className}`} data-frontier="">
+    <li className={LINE} data-frontier="">
       <span>{text}</span>
       {action && (
         <>
@@ -49,6 +49,6 @@ export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, va
           </button>
         </>
       )}
-    </Tag>
+    </li>
   );
 }
