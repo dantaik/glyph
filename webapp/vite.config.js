@@ -5,7 +5,7 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import tailwindcss from '@tailwindcss/postcss';
 import { createRequire } from 'node:module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
@@ -13,6 +13,12 @@ const require = createRequire(import.meta.url);
 // Where the offline build lands, and what the hosted build serves it as.
 const OFFLINE_OUT_DIR = 'dist-offline';
 const OFFLINE_FILE = 'glyph.html';
+
+// A tripwire, not a target. Everything the single file needs is inlined, so a
+// dependency that drags assets in stays "self-contained" while quietly turning
+// a 4 MB download into a 12 MB one — dropping the webfont alias does exactly
+// that. Growth past this is a decision to make on purpose, not to discover.
+const OFFLINE_MAX_KB = 6144;
 
 /**
  * Offline build only: replace `brotli-wasm` with a shim that carries the
@@ -58,20 +64,97 @@ export default init(wasmBytes()).then(() => brotliWasm);
   };
 }
 
-/** Offline build only: publish the single file as `dist/glyph.html`. */
+/** Every file under `dir`, as paths relative to it. */
+function filesUnder(dir, prefix = '') {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...filesUnder(join(dir, entry.name), name));
+    else out.push(name);
+  }
+  return out;
+}
+
+/**
+ * References the HTML makes to anything that is not inside it.
+ *
+ * Only markup is examined: script bodies are stripped first, so a `url(` or a
+ * `<script src=` that happens to appear inside the minified bundle as a string
+ * is not mistaken for a real dependency.
+ */
+function externalRefs(html) {
+  const isInline = (v) => !v || v.startsWith('data:') || v.startsWith('#');
+  const markup = html.replace(/(<script\b[^>]*>)[\s\S]*?<\/script>/gi, '$1');
+  const refs = [];
+  for (const [, tag, attr, value] of markup.matchAll(
+    /<(script|link|img|source|iframe)\b[^>]*?\s(src|href)=["']([^"']*)["']/gi,
+  )) {
+    if (!isInline(value)) refs.push(`<${tag.toLowerCase()} ${attr}="${value}">`);
+  }
+  for (const [, css] of markup.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
+    for (const [, value] of css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) {
+      if (!isInline(value)) refs.push(`url(${value})`);
+    }
+  }
+  return refs;
+}
+
+/**
+ * Offline build only: prove the output really is one self-contained file,
+ * then publish it as `dist/glyph.html`.
+ *
+ * The guard exists because the two builds can diverge silently. A dependency
+ * that fetches its own WASM or spawns a worker, an image referenced from
+ * public/, a webfont — each of them builds and runs fine on the hosted site
+ * while leaving the downloaded copy broken, and nothing about `vite build`
+ * would say so. Two things give it away, both cheap: an asset emitted beside
+ * the HTML, and a markup reference that is not a data: URI. Either fails the
+ * build here rather than shipping a file that opens blank from disk.
+ */
 function publishOfflineFile() {
   return {
     name: 'glyph-publish-offline-file',
     closeBundle() {
-      const src = resolve(import.meta.dirname, OFFLINE_OUT_DIR, 'index.html');
+      const outDir = resolve(import.meta.dirname, OFFLINE_OUT_DIR);
+      const src = join(outDir, 'index.html');
       // The build failed before writing anything; let that error be the one
       // the user sees rather than a copy failure on top of it.
       if (!existsSync(src)) return this.warn(`nothing at ${OFFLINE_OUT_DIR}/index.html to publish`);
+
+      const stray = filesUnder(outDir).filter((f) => f !== 'index.html');
+      if (stray.length) {
+        this.error(
+          `offline build is not self-contained: it emitted ${stray.length} file(s) beside the HTML —\n` +
+            stray.map((f) => `    ${OFFLINE_OUT_DIR}/${f}`).join('\n') +
+            `\n  A downloaded ${OFFLINE_FILE} has no server to fetch these from. Inline them` +
+            ` (inlineBrotliWasm() above does it for the WASM) or keep the dependency out of` +
+            ` the offline build (resolve.alias, as the webfont is).`,
+        );
+      }
+
+      const kb = Math.round(statSync(src).size / 1024);
+      if (kb > OFFLINE_MAX_KB) {
+        this.error(
+          `offline build is ${kb} kB, over the ${OFFLINE_MAX_KB} kB ceiling.\n` +
+            `  Something is being inlined that did not use to be — a webfont, an image, a` +
+            ` second WASM. Find it, or raise OFFLINE_MAX_KB deliberately if the file is` +
+            ` meant to grow.`,
+        );
+      }
+
+      const refs = externalRefs(readFileSync(src, 'utf8'));
+      if (refs.length) {
+        this.error(
+          `offline build is not self-contained: its HTML points outside itself —\n` +
+            refs.map((r) => `    ${r}`).join('\n') +
+            `\n  These resolve against the file's own directory once downloaded, and are not there.`,
+        );
+      }
+
       const destDir = resolve(import.meta.dirname, 'dist');
       mkdirSync(destDir, { recursive: true });
       copyFileSync(src, resolve(destDir, OFFLINE_FILE));
-      const kb = Math.round(statSync(src).size / 1024);
-      this.info(`offline single file → dist/${OFFLINE_FILE} (${kb} kB)`);
+      this.info(`offline single file → dist/${OFFLINE_FILE} (${kb} kB, self-contained)`);
     },
   };
 }
