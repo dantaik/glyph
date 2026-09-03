@@ -4,6 +4,7 @@ import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import SettingsPage from './components/SettingsPage';
 import { FIXTURES_MODE, useReader } from './lib/data';
+import { DEFAULT_CHAIN_ID } from './lib/chains';
 import { GLYPH_ADDRESS } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
@@ -18,11 +19,21 @@ export default function App() {
 
   // The chain lives in the URL, and router.js adopts the one the address
   // names as it reads it — before any of this renders. Left for here is the
-  // other direction: an address that names no chain (a bare `/`, or a link
-  // from before the prefix existed) is rewritten in place to the chain being
-  // read, which is Ethereum until someone picks otherwise.
+  // other direction: an address that names no chain gets one, in place.
+  //
+  // A bare `/` is the front door and opens on Ethereum, whatever was read
+  // last — an address with nothing after the host states no preference, so
+  // it gets the canonical one. (Reaching the feed from inside the app is
+  // navigation, not the front door: it keeps the chain you are reading.)
+  // A chainless deep link — a link from before the prefix existed — keeps
+  // the chain being read instead, which is the only guess available.
   useLayoutEffect(() => {
-    if (params.chain == null) navigate(params, { replace: true });
+    if (params.chain != null) return;
+    const frontDoor = !params.tx && !params.author && !params.scan && !params.settings;
+    navigate(
+      { ...params, chain: frontDoor ? DEFAULT_CHAIN_ID : undefined },
+      { replace: true },
+    );
   }, [params, navigate]);
 
   // The URL names a surface — /scan, /tx/…, /author/…, /settings — and a

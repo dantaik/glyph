@@ -147,7 +147,11 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
 .prose-glyph h3 { font-size: 1.12em; line-height: 1.6;  font-weight: 600; margin: 1.8em 0 0.6em; }
 
 .prose-glyph p { margin: 1.25em 0; overflow-wrap: break-word; }
-.prose-glyph > p:first-of-type { font-size: 1.06em; }   /* editorial opening lift */
+/* Editorial opening lift — an essay's first paragraph carries a little more
+   weight. Not when it holds a photo: what follows the image in that same
+   paragraph is a caption, and a caption reading LARGER than the body is
+   backwards. Such a paragraph stays at the body size. */
+.prose-glyph > p:first-of-type:not(:has(img)) { font-size: 1.06em; }
 
 .prose-glyph a {
   color: var(--color-accent);
