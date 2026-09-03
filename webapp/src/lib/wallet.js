@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { walletChainParams } from './chains';
+import { t } from './i18n';
 
-export const NO_WALLET = '未检测到钱包，请安装 MetaMask 等浏览器钱包。';
+/** Why the write tab shows no connect button, in the reader's language. */
+export const noWalletMessage = () => t('wallet.none');
 
 const EVT = 'cairn:wallet';
 let state = { account: null, chainId: null, isConnecting: false };
@@ -56,7 +58,7 @@ async function init() {
  */
 export async function switchToConfiguredChain(chainId) {
   const eth = window.ethereum;
-  if (!eth) throw new Error(NO_WALLET);
+  if (!eth) throw new Error(noWalletMessage());
   const hex = `0x${chainId.toString(16)}`;
   try {
     await eth.request({
@@ -78,7 +80,7 @@ export async function switchToConfiguredChain(chainId) {
 
 export async function connect() {
   const eth = window.ethereum;
-  if (!eth) throw new Error(NO_WALLET);
+  if (!eth) throw new Error(noWalletMessage());
   emit({ isConnecting: true });
   try {
     const accounts = await eth.request({ method: 'eth_requestAccounts' });

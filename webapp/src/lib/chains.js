@@ -33,7 +33,7 @@ export const CHAINS = {
     // stricter node just makes the sweep shrink its window and carry on.
     logWindow: 9000,
     // THE MOST BLOCKS ONE SCAN READS FROM THE NODE — one page load, or one
-    // 加载更早的文章 click. Blocks already read are free and don't count.
+    // "Load earlier posts" click. Blocks already read are free and don't count.
     // 270,000 blocks ≈ 37 days of Ethereum at 12s a block.
     scanBlocks: 270_000,
     // The block the contract was deployed in (tx 0x5f16…ce9a). No block
@@ -67,7 +67,8 @@ export const CHAINS = {
   },
   11155111: {
     id: 11155111,
-    name: 'Sepolia 测试网',
+    name: 'Sepolia',
+    nameKey: 'chain.sepolia',
     slug: 'sepolia',
     viem: sepolia,
     explorer: 'https://sepolia.etherscan.io',
@@ -83,7 +84,8 @@ export const CHAINS = {
   },
   167013: {
     id: 167013,
-    name: 'Taiko Hoodi 测试网',
+    name: 'Taiko Hoodi',
+    nameKey: 'chain.taikoHoodi',
     slug: 'taiko-hoodi',
     viem: taikoHoodi,
     explorer: 'https://hoodi.taikoscan.io',
@@ -126,8 +128,11 @@ export const scanBlocks = (id) => BigInt(getChain(id).scanBlocks ?? 270_000);
 /** The lowest block a sweep on `id` needs to read (the deployment block). */
 export const deployBlock = (id) => BigInt(getChain(id).deployBlock ?? 0);
 
-/** Human-readable name for `id`, or a generic label for an unknown chain. */
-export const chainName = (id) => CHAINS[Number(id)]?.name ?? `链 ${id}`;
+// The name a chain is SHOWN under lives in format.js, not here: a mainnet
+// is a proper noun, but a testnet's name contains a word ("testnet") that
+// has to be translated, and this module stays free of the dictionaries so
+// that plain Node — the e2e mock node, which needs the slugs and explorers
+// — can load it on its own.
 
 /**
  * The chain's segment in a URL — every route carries one, so an address is

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { chainName } from '../lib/chains';
+import { chainName } from '../lib/format';
 import { useAsync } from '../lib/hooks';
+import { t } from '../lib/i18n';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 
@@ -19,14 +20,14 @@ export default function PostLocator({ view, txHash, eventIndex, navigate }) {
 
   if (hit.error) return <ErrorState error={hit.error} onRetry={hit.retry} />;
   if (hit.loading || hit.value) {
-    return <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">正在查找这笔交易…</div>;
+    return <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">{t('post.locating')}</div>;
   }
-  const names = view.chainIds.map(chainName).join('和');
+  const names = view.chainIds.map(chainName).join(t('common.joinAnd'));
   return (
     <EmptyState
-      title="没有找到这篇文章"
-      body={`在${names}上都没有找到这笔交易的发布记录，或交易哈希有误。`}
-      actionLabel="返回首页"
+      title={t('post.notFound')}
+      body={t('post.notFoundOnChains', { names })}
+      actionLabel={t('common.backToFeed')}
       onAction={() => navigate({})}
     />
   );

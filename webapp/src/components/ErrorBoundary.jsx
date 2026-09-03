@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { t } from '../lib/i18n';
 
 /**
  * Last-resort boundary: the app decodes untrusted on-chain bytes (brotli,
@@ -24,7 +25,7 @@ export default class ErrorBoundary extends Component {
       return (
         <div className="flex min-h-dvh items-center justify-center p-6">
           <div className="max-w-sm py-20 text-center">
-            <h1 className="text-lg text-ink-soft">页面出错了</h1>
+            <h1 className="text-lg text-ink-soft">{t('boundary.title')}</h1>
             <p className="mt-2 break-all text-sm leading-relaxed text-ink-faint">
               {String(this.state.error?.message || this.state.error)}
             </p>
@@ -33,7 +34,7 @@ export default class ErrorBoundary extends Component {
               onClick={() => window.location.reload()}
               className="mt-6 rounded-full border border-edge-strong px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors"
             >
-              重新加载
+              {t('boundary.reload')}
             </button>
           </div>
         </div>

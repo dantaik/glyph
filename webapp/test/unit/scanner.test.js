@@ -188,7 +188,7 @@ describe('scanner.authorRowsAt — a block the chain points at holds a post', ()
     const fetchBlock = async (block) => (behind ? [] : fetcher(chain, A)(block));
     await expect(
       scanner.authorRowsAt({ store, log: silentLog(), author: A, block: 900n, fetchBlock }),
-    ).rejects.toThrow(/尚未同步到区块 900/);
+    ).rejects.toThrow(/glyph:node-behind 900/);
     expect(store.authorCoverage(A)).toEqual([]);
     behind = false;
     const rows = await scanner.authorRowsAt({ store, log: silentLog(), author: A, block: 900n, fetchBlock });

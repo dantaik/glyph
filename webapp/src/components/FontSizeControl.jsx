@@ -1,21 +1,19 @@
+import { useT } from '../lib/i18n';
 import { useFontSize } from '../lib/theme';
 
-const SIZES = [
-  ['s', '小'],
-  ['m', '中'],
-  ['l', '大'],
-];
+const SIZES = ['s', 'm', 'l'];
 
-/** Segmented 小/中/大 pills controlling the article font size */
+/** Segmented small/medium/large pills controlling the article font size */
 export default function FontSizeControl() {
   const { size, setSize } = useFontSize();
+  const t = useT();
   return (
     <div
       role="group"
-      aria-label="正文字号"
+      aria-label={t('fontSize.label')}
       className="inline-flex rounded-full border border-edge p-0.5 gap-0.5"
     >
-      {SIZES.map(([value, label]) => (
+      {SIZES.map((value) => (
         <button
           key={value}
           type="button"
@@ -27,7 +25,7 @@ export default function FontSizeControl() {
               : 'text-ink-faint hover:text-accent'
           }`}
         >
-          {label}
+          {t(`fontSize.${value}`)}
         </button>
       ))}
     </div>

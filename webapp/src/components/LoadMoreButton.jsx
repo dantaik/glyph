@@ -1,3 +1,5 @@
+import { t } from '../lib/i18n';
+
 /**
  * Text control that pages a list towards older posts. Shared by the home
  * feed and the author list so both read the same — a plain underlined line
@@ -9,14 +11,14 @@ export default function LoadMoreButton({
   loading,
   disabled = false,
   hasMore,
-  label = '加载更早的文章',
-  loadingLabel = '正在加载…',
+  label,
+  loadingLabel,
   note,
 }) {
   if (!hasMore) {
     return (
       <div className="mt-8 text-center">
-        <p className="text-xs text-ink-ghost">没有更多文章</p>
+        <p className="text-xs text-ink-ghost">{t('loadMore.noMore')}</p>
       </div>
     );
   }
@@ -28,7 +30,7 @@ export default function LoadMoreButton({
         disabled={loading || disabled}
         className="text-sm text-ink-soft underline-offset-4 transition-colors hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-soft disabled:hover:no-underline"
       >
-        {loading ? loadingLabel : label}
+        {loading ? (loadingLabel ?? t('loadMore.loading')) : (label ?? t('loadMore.label'))}
       </button>
       {note && !loading && <p className="mt-2 text-xs text-ink-ghost">{note}</p>}
     </div>

@@ -13,6 +13,7 @@ import {
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
+import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
 import AddressLabel from './Address';
 import BackButton from './BackButton';
@@ -45,6 +46,9 @@ export default function PostPage({
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  // The tab title is written imperatively, so it needs the language as a
+  // dependency of its own — a re-render alone would not rewrite it.
+  const lang = useLang();
 
   // Object URLs for the resolved images of the *current* post — revoked
   // whenever the post changes or the page unmounts.
@@ -71,7 +75,7 @@ export default function PostPage({
       urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
     } catch (err) {
-      setError(err.message || '加载失败');
+      setError(err.message || t('common.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -91,11 +95,11 @@ export default function PostPage({
 
   // Tab title mirrors the open letter; restore the site title on leave.
   useEffect(() => {
-    document.title = `${fmtTitle(meta.title) || '无标题'} · 雪泥`;
+    document.title = t('post.titleSuffix', { title: fmtTitle(meta.title) || t('common.untitled') });
     return () => {
-      document.title = '雪泥';
+      document.title = t('brand.title');
     };
-  }, [meta.title]);
+  }, [meta.title, lang]);
 
   // The exact time the post was mined: on the row when the feed read it,
   // otherwise one header read (null while resolving → suppressed).
@@ -123,11 +127,11 @@ export default function PostPage({
       <header className="mb-10">
         <div className="article-column text-center">
         <h1 className="text-display font-black sm:text-jumbo">
-          {title || <span className="text-ink-ghost">无标题</span>}
+          {title || <span className="text-ink-ghost">{t('common.untitled')}</span>}
         </h1>
         <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 text-xs text-ink-faint tabular-nums">
           <span className="flex items-center gap-1">
-            <span>作者：</span>
+            <span>{t('post.by')}</span>
             <a
               href={hrefFor({ author: meta.author })}
               onClick={(e) => {
@@ -161,11 +165,11 @@ export default function PostPage({
         <div className="mx-auto max-w-[36em] py-6">
           <div className="flex items-start gap-2.5 text-sm text-danger">
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <p>加载失败：{friendlyError(error)}</p>
+            <p>{t('post.loadFailed', { reason: friendlyError(error) })}</p>
           </div>
           <details className="mt-3">
             <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-accent transition-colors">
-              技术细节
+              {t('common.technicalDetails')}
             </summary>
             <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">
               {error}
@@ -176,7 +180,7 @@ export default function PostPage({
             onClick={load}
             className="mt-4 rounded-full border border-edge-strong px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors"
           >
-            重试
+            {t('common.retry')}
           </button>
         </div>
       )}
@@ -208,7 +212,7 @@ export default function PostPage({
       {loaded && (
         <footer className="mt-14 text-center">
           <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
-            <span>区块 {fmtBlock(meta.block)}</span>
+            <span>{t('post.block', { block: fmtBlock(meta.block) })}</span>
             <span className="select-none" aria-hidden="true">·</span>
             <a
               href={etherscanTxUrl(meta.txHash, reader.chainId)}
@@ -216,23 +220,23 @@ export default function PostPage({
               rel="noopener noreferrer"
               className="hover:text-accent transition-colors"
             >
-              交易
+              {t('post.transaction')}
             </a>
             {fromCache && (
               <>
                 <span className="select-none" aria-hidden="true">·</span>
-                <span>来自本地缓存</span>
+                <span>{t('post.fromCache')}</span>
               </>
             )}
           </p>
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-              {body.tags.map((t) => (
+              {body.tags.map((tag) => (
                 <span
-                  key={t}
+                  key={tag}
                   className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft"
                 >
-                  {t}
+                  {tag}
                 </span>
               ))}
             </div>

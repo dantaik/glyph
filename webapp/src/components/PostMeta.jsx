@@ -7,12 +7,12 @@ import ChainChip from './ChainChip';
  *
  *   [lead] · [chain] · [prefix] · [time]
  *
- * `lead` is e.g. the author link, `prefix` e.g. 第 N 篇. The chain chip
- * names the network the post was read on and links to that network's
- * view — unless the list is already filtered to it (`currentChain`), when
- * it is just a label. The time is exact when the row carries its block's
- * timestamp (`ts`), an estimate from the chain clock — 约-prefixed — until
- * it does.
+ * `lead` is e.g. the author link, `prefix` e.g. the post's ordinal. The
+ * chain chip names the network the post was read on and links to that
+ * network's view — unless the list is already filtered to it
+ * (`currentChain`), when it is just a label. The time is exact when the
+ * row carries its block's timestamp (`ts`), an estimate from the chain
+ * clock — marked approximate — until it does.
  */
 export default function PostMeta({
   block,

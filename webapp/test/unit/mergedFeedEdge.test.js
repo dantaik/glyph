@@ -61,7 +61,7 @@ describe('MergedFeed — edges', () => {
     expect(() => view.feed.fillGap(167000, { from: 1n, to: 2n })).toThrow(/not in this view/);
   });
 
-  it('the note of a fruitless 加载更早 is cleared by one that finds something', async () => {
+  it('the note of a fruitless load-more is cleared by one that finds something', async () => {
     const chain = fakeChain({
       chainId: 1,
       head: 3000,

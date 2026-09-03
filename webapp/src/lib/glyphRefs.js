@@ -1,7 +1,7 @@
 // glyphRefs.js — cross-article references (§8.1 of the spec).
 //
 // In-article reference form — the publish tx hash itself is the target:
-//   [文字](0x<txhash>/<eventIndex>)
+//   [text](0x<txhash>/<eventIndex>)
 // - <txhash> is the publish() transaction of the target post (64 hex);
 // - <eventIndex> is the 0-based ordinal of the Post event inside that
 //   transaction (one tx can publish several posts) — optional, default 0;
@@ -12,7 +12,7 @@
 // by the router — so it carries the chain segment, and the fragment form
 // when the app is running from a downloaded file. The markdown sanitizer
 // allows both, and the reader routes them in-app, so a stale ref lands on
-// the normal 没有找到这篇文章 page.
+// the normal "no such post" page.
 //
 // A ref names a transaction on the chain the article was read from, so both
 // the title lookup and the link are bound to that chain (reader.js builds

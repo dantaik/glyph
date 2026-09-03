@@ -1,8 +1,9 @@
 // settingsFile.js — the reader's preferences as one file, out and back in.
 //
 // Everything the settings page can change — the endpoint lists per chain,
-// the rescan delay, the publish chain, the theme, the article font size,
-// the console log switch — collected into one small JSON document, and
+// the rescan delay, the publish chain, the interface language, the theme,
+// the article font size, the console log switch — collected into one small
+// JSON document, and
 // read back with every value checked before any of it is applied.
 // Applying goes through the same setters the page uses, so a restored
 // file takes effect at once, with no reload, and nothing here knows how
@@ -11,7 +12,8 @@
 // The file names its format (`glyph.settings`): a document in some later,
 // different format is refused rather than half-applied.
 
-import { chainName, defaultRpcs, isKnownChain } from './chains';
+import { defaultRpcs, isKnownChain } from './chains';
+import { chainName } from './format';
 import {
   READ_CHAIN_IDS,
   getPublishChainId,
@@ -22,13 +24,14 @@ import {
   saveRpcUrls,
 } from './config';
 import { getFontSizePref, getThemePref, setFontSizePref, setThemePref } from './theme';
+import { LANG_NAMES, getLang, isLang, setLang, t } from './i18n';
 import * as rpcLog from './rpcLog';
 
 export const SETTINGS_FORMAT = 1;
 
 const isHttpUrl = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
 const sameList = (a, b) => a.length === b.length && a.every((u, i) => u === b[i]);
-const FONT_SIZES = { s: '小', m: '中', l: '大' };
+const FONT_SIZES = ['s', 'm', 'l'];
 
 /** Every preference, as it stands. */
 export function collectSettings() {
@@ -40,6 +43,7 @@ export function collectSettings() {
     rpcs,
     rescanDelayMinutes: getRescanDelayMs() / 60_000,
     publishChain: getPublishChainId(),
+    lang: getLang(),
     theme: getThemePref(),
     fontSize: getFontSizePref(),
     log: rpcLog.isEnabled(),
@@ -66,41 +70,49 @@ export function parseSettingsFile(text) {
   try {
     doc = JSON.parse(text);
   } catch {
-    return { settings, problems: ['不是有效的 JSON 文件。'], summary };
+    return { settings, problems: [t('settingsFile.notJson')], summary };
   }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
-    return { settings, problems: ['文件内容不是一个设置对象。'], summary };
+    return { settings, problems: [t('settingsFile.notObject')], summary };
   }
   const format = doc.glyph?.settings;
   if (format !== SETTINGS_FORMAT) {
     problems.push(
       format == null
-        ? '这不是雪泥的设置文件（缺少 glyph.settings 标记）。'
-        : `设置文件格式版本 ${format} 不受支持（本版本支持 ${SETTINGS_FORMAT}）。`,
+        ? t('settingsFile.notGlyph')
+        : t('settingsFile.badFormat', { format, supported: SETTINGS_FORMAT }),
     );
     return { settings, problems, summary };
   }
 
   if (doc.rpcs != null) {
     if (typeof doc.rpcs !== 'object' || Array.isArray(doc.rpcs)) {
-      problems.push('rpcs 应是按链 ID 分组的节点列表。');
+      problems.push(t('settingsFile.rpcsShape'));
     } else {
       const rpcs = {};
       for (const [key, list] of Object.entries(doc.rpcs)) {
         const id = Number(key);
         if (!isKnownChain(id)) {
-          problems.push(`跳过未知的链 ID ${key}。`);
+          problems.push(t('settingsFile.unknownChain', { id: key }));
           continue;
         }
         if (!Array.isArray(list)) {
-          problems.push(`${chainName(id)} 的节点列表应是数组。`);
+          problems.push(t('settingsFile.chainListShape', { chain: chainName(id) }));
           continue;
         }
         const good = list.filter(isHttpUrl).map((u) => u.trim());
-        if (good.length < list.length) problems.push(`${chainName(id)}：忽略 ${list.length - good.length} 个不是 http(s) 地址的节点。`);
+        if (good.length < list.length) {
+          problems.push(
+            t('settingsFile.droppedEndpoints', { chain: chainName(id), count: list.length - good.length }),
+          );
+        }
         rpcs[id] = good;
         const custom = good.length > 0 && !sameList(good, defaultRpcs(id));
-        summary.push(custom ? `${chainName(id)}：${good.length} 个自定义节点` : `${chainName(id)}：默认节点`);
+        summary.push(
+          custom
+            ? t('settingsFile.customEndpoints', { chain: chainName(id), count: good.length })
+            : t('settingsFile.defaultEndpoints', { chain: chainName(id) }),
+        );
       }
       if (Object.keys(rpcs).length) settings.rpcs = rpcs;
     }
@@ -109,49 +121,63 @@ export function parseSettingsFile(text) {
     const n = Number(doc.rescanDelayMinutes);
     if (Number.isFinite(n) && n >= 0) {
       settings.rescanDelayMinutes = n;
-      summary.push(`扫描延迟：${n} 分钟`);
+      summary.push(t('settingsFile.rescanDelay', { minutes: n }));
     } else {
-      problems.push('rescanDelayMinutes 应是不小于 0 的数字。');
+      problems.push(t('settingsFile.rescanShape'));
     }
   }
   if ('publishChain' in doc) {
     const v = doc.publishChain;
     if (v === null) {
       settings.publishChain = null;
-      summary.push('发布到：跟随钱包所在的网络');
+      summary.push(t('settingsFile.publishFollowsWallet'));
     } else if (isKnownChain(v)) {
       settings.publishChain = Number(v);
-      summary.push(`发布到：${chainName(v)}`);
+      summary.push(t('settingsFile.publishChain', { chain: chainName(v) }));
     } else {
-      problems.push(`publishChain ${v} 不是已知的链。`);
+      problems.push(t('settingsFile.publishShape', { value: v }));
+    }
+  }
+  if (doc.lang != null) {
+    if (isLang(doc.lang)) {
+      settings.lang = doc.lang;
+      summary.push(t('settingsFile.lang', { lang: LANG_NAMES[doc.lang] }));
+    } else {
+      problems.push(t('settingsFile.langShape'));
     }
   }
   if ('theme' in doc) {
     const v = doc.theme;
     if (v === null || v === 'light' || v === 'dark') {
       settings.theme = v;
-      summary.push(`主题：${v === 'dark' ? '深色' : v === 'light' ? '浅色' : '跟随系统'}`);
+      const name =
+        v === 'dark'
+          ? t('settingsFile.themeDark')
+          : v === 'light'
+            ? t('settingsFile.themeLight')
+            : t('settingsFile.themeSystem');
+      summary.push(t('settingsFile.theme', { theme: name }));
     } else {
-      problems.push('theme 应是 light、dark 或 null（跟随系统）。');
+      problems.push(t('settingsFile.themeShape'));
     }
   }
   if (doc.fontSize != null) {
-    if (doc.fontSize in FONT_SIZES) {
+    if (FONT_SIZES.includes(doc.fontSize)) {
       settings.fontSize = doc.fontSize;
-      summary.push(`正文字号：${FONT_SIZES[doc.fontSize]}`);
+      summary.push(t('settingsFile.fontSize', { size: t(`fontSize.${doc.fontSize}`) }));
     } else {
-      problems.push('fontSize 应是 s、m 或 l。');
+      problems.push(t('settingsFile.fontSizeShape'));
     }
   }
   if (doc.log != null) {
     if (typeof doc.log === 'boolean') {
       settings.log = doc.log;
-      summary.push(`控制台日志：${doc.log ? '开' : '关'}`);
+      summary.push(t('settingsFile.log', { state: doc.log ? t('settingsFile.on') : t('settingsFile.off') }));
     } else {
-      problems.push('log 应是 true 或 false。');
+      problems.push(t('settingsFile.logShape'));
     }
   }
-  if (summary.length === 0 && problems.length === 0) problems.push('文件里没有可应用的设置。');
+  if (summary.length === 0 && problems.length === 0) problems.push(t('settingsFile.nothing'));
   return { settings, problems, summary };
 }
 
@@ -167,6 +193,7 @@ export function applySettings(settings) {
   }
   if (settings.rescanDelayMinutes != null) saveRescanDelay(settings.rescanDelayMinutes);
   if ('publishChain' in settings) savePublishChainId(settings.publishChain);
+  if (settings.lang != null) setLang(settings.lang);
   if ('theme' in settings) setThemePref(settings.theme);
   if (settings.fontSize != null) setFontSizePref(settings.fontSize);
   if (settings.log != null) rpcLog.setEnabled(settings.log);

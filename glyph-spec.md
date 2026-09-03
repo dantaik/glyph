@@ -1,128 +1,129 @@
-# 雪泥 (Glyph) — 完全存在以太坊上的写作系统
+# Glyph — a writing system that lives entirely on Ethereum
 
-> 技术方案与参考实现 · 2026-06
+> Technical design and reference implementation · 2026-06
 >
-> 一个把全部内容（文字与图片）存在 Ethereum L1 calldata 上的多作者博客，
-> 零链下依赖，按"比作者活得更久、孩子几十年后仍能读"来设计。
-> 产品名：**雪泥**（取自"雪泥鸿爪"）；项目代号 **Glyph**。
+> A multi-author blog that keeps all of its content — text and images — in
+> Ethereum L1 calldata. No off-chain dependencies, designed to outlive its
+> authors and still be readable by their children decades from now.
+> Product name: **Glyph** (in Chinese, **雪泥**, from the idiom 雪泥鸿爪 —
+> the prints a wild goose leaves in the snow).
 
 ---
 
-## 目录
+## Table of contents
 
-1. [核心原则](#1-核心原则)
-2. [整体架构](#2-整体架构)
-3. [成本](#3-成本)
-4. [智能合约 `Blog.sol`](#4-智能合约-blogsol)（合约名 `Glyph`）
-5. [Payload 编码 (`payload.js`)](#5-payload-编码-payloadjs)
-6. [发布流水线 `publish.js`](#6-发布流水线-publishjs)
-7. [读取器 `blogReader.js`](#7-读取器-blogreaderjs)
-8. [Markdown 子集与渲染](#8-markdown-子集与渲染)
-9. [永久性与自托管](#9-永久性与自托管)
-10. [设计决策记录](#10-设计决策记录)
-11. [附录：常量、依赖、部署](#11-附录常量依赖部署)
-
----
-
-## 1. 核心原则
-
-- **只信以太坊。** 文字、标题、标签、图片字节全部进 calldata，没有 IPFS / Arweave / 任何服务器。
-- **一个合约，任意多作者。** 合约**不可升级、无所有者**；任何 `msg.sender` 都是它自己的作者，
-  彼此的发布流互不干扰。作者身份就是钱包地址，无需注册、无需许可。
-- **存纯 Markdown（子集）。** 开放、人类可读、任何编辑器永远打得开。
-- **正文用 brotli q11 压缩**，无自定义字典；解码端零额外数据。
-- **图片：q60 WebP，每张单独发一笔纯 calldata 交易**，把 32 字节 txhash 写进 Markdown（`eth:0x...`）。
-- **每位作者 O(1) 取最新 + 反向区块链表**：读取永远只查单个区块，绝不扫块范围。
-- **标题、标签、正文分层放置**：
-  - 标题 = `bytes32`（独立 calldata 参数，进 event 让"标题列表"查询零字节解压成本）
-  - 正文 + 标签 = brotli 压缩的 **Markdown 文档（带可选 YAML front-matter 标签头）**，**只放在 publish() 交易的 calldata 里**，不进 event。
-  - 读取器先 `getLogs` 拿一组标题（无 body），点击具体一篇时再 `getTransactionByHash` 拿 body。
-- **首页（无地址）= 最近 N 篇跨作者**：用有界的客户端扫描（见 §7），这是全篇唯一一处刻意的范围扫描，仅用于"无地址时的发现"，单作者路径仍是 O(1)。
-- **永久性 = 链上锚定 + 自留备份兜底**（见 §9），**加浏览器 IndexedDB 本地永久缓存**（见 §7）。
+1. [Core principles](#1-core-principles)
+2. [Architecture](#2-architecture)
+3. [Cost](#3-cost)
+4. [The contract, `Blog.sol`](#4-the-contract-blogsol) (contract name `Glyph`)
+5. [Payload encoding (`payload.js`)](#5-payload-encoding-payloadjs)
+6. [The publish pipeline, `publish.js`](#6-the-publish-pipeline-publishjs)
+7. [The reader, `blogReader.js`](#7-the-reader-blogreaderjs)
+8. [The Markdown subset, and rendering](#8-the-markdown-subset-and-rendering)
+9. [Permanence and self-hosting](#9-permanence-and-self-hosting)
+10. [Design decision record](#10-design-decision-record)
+11. [Appendix: constants, dependencies, deployment](#11-appendix-constants-dependencies-deployment)
 
 ---
 
-## 2. 整体架构
+## 1. Core principles
+
+- **Trust Ethereum and nothing else.** Text, titles, tags and image bytes all go into calldata. No IPFS, no Arweave, no server of any kind.
+- **One contract, any number of authors.** The contract is **non-upgradeable and ownerless**; every `msg.sender` is its own author, and one author's stream never touches another's. Authorship is the wallet address — no registration, no permission.
+- **Store plain Markdown (a subset).** Open, human-readable, and openable in any editor forever.
+- **Compress the body with brotli q11**, no custom dictionary; the decoder needs no side data.
+- **Images: WebP at q60, each one its own plain-calldata transaction**, with the 32-byte tx hash written into the Markdown (`eth:0x...`).
+- **O(1) "latest post" per author, plus a reverse block-linked list**: a read only ever queries a single block, never a block range.
+- **Title, tags and body live at different layers**:
+  - Title = `bytes32` (its own calldata argument, and in the event, so a "list of titles" query costs nothing to decompress)
+  - Body + tags = a brotli-compressed **Markdown document (with an optional YAML front-matter block of tags)**, kept **only in the publish() transaction's calldata**, never in the event.
+  - The reader calls `getLogs` for a batch of titles (no bodies), then `getTransactionByHash` for a body when one is opened.
+- **The home feed (no address) = the most recent N posts across authors**: a bounded client-side scan (see §7). This is the one deliberate range scan in the whole design, used only for discovery when no address is given; the single-author path stays O(1).
+- **Permanence = an on-chain anchor plus your own backup as a fallback** (see §9), **plus a permanent local cache in the browser's IndexedDB** (see §7).
+
+---
+
+## 2. Architecture
 
 ```
-作者侧 (publish.js)                              链上 (Ethereum L1)
-─────────────────                              ──────────────────
-草稿 = { title, tags[], markdown, files[] }     每张图 = 一笔纯 calldata 交易
-  │                                              to=self, data=WebP字节  → txhash
+Author side (publish.js)                        On chain (Ethereum L1)
+────────────────────────                        ──────────────────────
+draft = { title, tags[], markdown, files[] }    each image = one plain-calldata tx
+  │                                               to=self, data=WebP bytes  → txhash
   ▼
-1. 每张图 → WebP q60 → calldata 自转账 → txhash
-2. 把 upload:KEY 改写成 eth:0x<txhash>
-3. payload = brotli( [可选 ---\ntags: a, b\n---] + markdown utf8 )
-4. title32 = utf8(title) 右补零到 32 bytes
-5. publish(title32, payload)                   Glyph 合约（共享，无所有者）:
-      │                                          emit Post(msg.sender, index, prevBlock, title32)
-      ▼                                          state[msg.sender] = {latestBlock=now, count+=1}
-                                                 *payload bytes 留在 tx calldata 里，event 不带*
-读取侧 (blogReader.js)
-─────────────────────
-A. 标题列表（无 body）
-  1. eth_call latestBlock(author)    ← O(1) 拿头指针
-  2. eth_getLogs(单个区块, author=…) ← 拿到标题 + index + prevBlock
-  3. 顺着 prevBlock 回走，渲染标题列表（不解压 body）
+1. each image → WebP q60 → calldata self-send → txhash
+2. rewrite upload:KEY into eth:0x<txhash>
+3. payload = brotli( [optional ---\ntags: a, b\n---] + markdown utf8 )
+4. title32 = utf8(title) right-padded with zeros to 32 bytes
+5. publish(title32, payload)                    the Glyph contract (shared, ownerless):
+      │                                           emit Post(msg.sender, index, prevBlock, title32)
+      ▼                                           state[msg.sender] = {latestBlock=now, count+=1}
+                                                  *payload bytes stay in the tx calldata; the event carries none*
+Reader side (blogReader.js)
+───────────────────────────
+A. the title list (no bodies)
+  1. eth_call latestBlock(author)     ← O(1) head pointer
+  2. eth_getLogs(one block, author=…) ← title + index + prevBlock
+  3. walk back along prevBlock, rendering titles (no body decompressed)
 
-B. 单篇打开
+B. opening one post
   4. eth_getTransactionByHash(log.txHash).input
-  5. decodeFunctionData → 取 payload bytes
-  6. brotli 解压 → { tags, markdown }
-  7. 把 eth:0x<hash> 图片引用 → eth_getTransactionByHash(hash).input → Blob
-  8. 渲染 Markdown 子集
+  5. decodeFunctionData → take the payload bytes
+  6. brotli decompress → { tags, markdown }
+  7. resolve eth:0x<hash> image refs → eth_getTransactionByHash(hash).input → Blob
+  8. render the Markdown subset
 ```
 
-**三类数据，三种存法：**
+**Three kinds of data, three places to keep them:**
 
-| 内容 | 编码 | 上链方式 | 在哪 |
+| Content | Encoding | How it goes on chain | Where it lives |
 |---|---|---|---|
-| 标题 | UTF-8 → 右补零 32 字节 | publish() bytes32 参数 + event 非索引字段 | event log data |
-| 正文 + 标签 | brotli q11 of Markdown(+front-matter) | publish() bytes 参数 | publish 交易 calldata |
-| 图片 | WebP q60 | 独立的纯 calldata 自转账 | 交易历史，按 txhash 引用 |
+| Title | UTF-8 → right-padded to 32 bytes | publish() bytes32 argument + a non-indexed event field | event log data |
+| Body + tags | brotli q11 of Markdown (+ front-matter) | publish() bytes argument | the publish transaction's calldata |
+| Images | WebP q60 | a separate plain-calldata self-send | transaction history, referenced by txhash |
 
-> **为什么 body 不进 event？** `eth_getLogs` 一次会把 log.data 全部拉回客户端。要让"展示一页 20 个标题"查询便宜，body 必须不在 event 里——这是 v2 的关键架构变更。把 body 放在 publish 交易 calldata 里（合约不读），既省 ~+20% LOG 数据 gas，又让标题列表查询带宽固定。
+> **Why isn't the body in the event?** One `eth_getLogs` pulls all of `log.data` back to the client. For "show a page of 20 titles" to be cheap, the body must not be in the event — this was the key architectural change in v2. Putting the body in the publish transaction's calldata (which the contract never reads) both saves the ~20% extra gas that LOG data costs and gives the title-list query a fixed bandwidth.
 
-**作者发现是带外的（out-of-band）。** 前端从 URL `?author=0x…` 取作者地址；合约不维护任何"作者目录"，保持极简。**无地址访问首页**时，前端退而用一次有界的最近区块扫描列出全网最新 N 篇（best-effort，见 §7），不改合约。
+**Author discovery is out-of-band.** The front end takes the author's address from the URL (`?author=0x…`); the contract keeps no "author directory" at all, and stays minimal. **When the home page is opened with no address**, the front end falls back to one bounded scan of recent blocks to list the newest N posts network-wide (best-effort, see §7) — without changing the contract.
 
 ---
 
-## 3. 成本
+## 3. Cost
 
-口径：纯 calldata 按 **EIP-7623 地板价** 计：`tokens = 零字节 + 4×非零字节`，地板成本 `= 10 gas/token`，即**非零字节 40 gas、零字节 10 gas**。压缩后的数据几乎全是非零字节。
+Basis: plain calldata is priced at the **EIP-7623 floor**: `tokens = zero bytes + 4 × non-zero bytes`, floor cost `= 10 gas/token`, i.e. **40 gas per non-zero byte, 10 per zero byte**. Compressed data is almost entirely non-zero bytes.
 
-**通用公式**
+**The general formulas**
 ```
-单笔纯 calldata 交易:   gas ≈ 21,000 + 40 × 字节数
-一篇文章交易(v2):       gas ≈ 21,000
-                            + 40 × (4 + 32 + payload字节)   ← 选择子 + title + payload
-                            + 64 × 10                       ← ABI offset/length（多为零字节）
-                            + ~1,893                        ← LOG：signature + author 两个 topic，96B 数据（EIP-2929）
-                            + 200                           ← 温 SLOAD + 温 SSTORE（打包槽，EIP-2929）
-                            + (首篇 +~24,000)               ← 冷 SLOAD + 冷槽初始化
+one plain-calldata tx:      gas ≈ 21,000 + 40 × bytes
+one article tx (v2):        gas ≈ 21,000
+                                + 40 × (4 + 32 + payload bytes)  ← selector + title + payload
+                                + 64 × 10                        ← ABI offset/length (mostly zero bytes)
+                                + ~1,893                         ← LOG: signature + author topics, 96B of data (EIP-2929)
+                                + 200                            ← warm SLOAD + warm SSTORE (packed slot, EIP-2929)
+                                + (first post +~24,000)          ← cold SLOAD + cold slot initialisation
 ```
 
-**正文（一篇 ~1000 中文字，含 2 个标签）**
-brotli 后约 1,400–1,600 字节，整篇 publish 交易约 **~85,000 gas**（相比 v1 在 event 里塞 body 省 ~15%）。
-当前 ~0.23 gwei、ETH≈$1,690 下:**≈ $0.033/篇,1000 篇 ≈ $33**。
+**Body (one post of ~1,000 Chinese characters, with 2 tags)**
+About 1,400–1,600 bytes after brotli; the whole publish transaction is around **~85,000 gas** (about 15% less than v1, which put the body in the event).
+At ~0.23 gwei and ETH ≈ $1,690: **≈ $0.033 per post, ≈ $33 for a thousand**.
 
-**图片（以本仓库样图为例,1310×772）**——实测各档:
+**Images (measured on this repository's sample image, 1310×772)** — by encoding:
 
-| 版本 | 字节 | gas | ≈USD@0.23gwei |
+| Version | Bytes | Gas | ≈USD @ 0.23 gwei |
 |---|---|---|---|
-| 原始 PNG | 135,979 | 5.42M | $2.11 |
+| Original PNG | 135,979 | 5.42M | $2.11 |
 | WebP q82 | 71,466 | 2.87M | $1.12 |
-| **WebP q60（本方案）** | **43,264** | **1.75M** | **$0.68** |
+| **WebP q60 (what this design uses)** | **43,264** | **1.75M** | **$0.68** |
 | WebP q40 | 33,404 | 1.35M | $0.53 |
-| 缩略图 q60 @400px | 9,270 | 0.39M | $0.15 |
+| Thumbnail q60 @400px | 9,270 | 0.39M | $0.15 |
 
-**发布时机是最大的成本杠杆**（差 100 倍）。把图片排在 gas 低谷上链。
+**When you publish is the biggest lever on cost** (a factor of 100). Schedule images for a gas trough.
 
-> 前端实时成本估算（`price.js`）：实时拉 `eth_gasPrice`（节点）+ CoinGecko 公共 API 的 ETH/USD（60s 缓存），按 brotli ≈ 0.45× 原始大小估 payload，给出 "≈$X.XX 正文 + $Y.YY/张图" 实时面板。CoinGecko 是唯一的链下 HTTP 依赖；被墙 / 限流 / 离线时降级为 `ethUsd=null`，只显示 ETH。
+> Live cost estimate in the front end (`price.js`): it pulls `eth_gasPrice` from the node and ETH/USD from CoinGecko's public API (cached 60s), estimates the payload at brotli ≈ 0.45× the raw size, and shows a live "≈$X.XX body + $Y.YY per image" panel. CoinGecko is the one off-chain HTTP dependency; when it is blocked, rate-limited or offline the panel degrades to `ethUsd=null` and shows ETH only.
 
 ---
 
-## 4. 智能合约 `Blog.sol`
+## 4. The contract, `Blog.sol`
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -165,37 +166,37 @@ contract Blog {
 }
 ```
 
-**关键点**
+**The points that matter**
 
-- **无所有者、无构造参数。** 任何地址都能 `publish()`，部署者无任何特权。
-- **`payload` 不进合约逻辑，只待在 tx calldata。** 读取器用 `eth_getTransactionByHash(log.transactionHash).input` 拿回来再 `decodeFunctionData` 解出 `(bytes32, bytes)`。让 event 数据极小——标题列表查询永远只下载 ~96 字节/篇。
-- **`author` indexed** 让读取器用 `eth_getLogs({ args: { author } })` 在单个区块里精确捞到该作者的日志。单篇 +375 gas。
-- **打包槽**：`uint96 + uint48 = 144 bit < 256`，整个 `AuthorState` 占一个槽，每次 publish 一个温 SSTORE。首篇付一次冷槽费（~22k gas）。
+- **No owner, no constructor arguments.** Any address can `publish()`, and the deployer has no privilege of any kind.
+- **`payload` never enters contract logic; it only sits in the tx calldata.** The reader gets it back with `eth_getTransactionByHash(log.transactionHash).input` and then `decodeFunctionData` to recover `(bytes32, bytes)`. This keeps the event data tiny — a title-list query only ever downloads ~96 bytes per post.
+- **`author` is indexed**, so the reader can use `eth_getLogs({ args: { author } })` to pick that author's logs precisely out of a single block. It costs +375 gas per post.
+- **A packed slot**: `uint96 + uint48 = 144 bits < 256`, so the whole `AuthorState` occupies one slot and each publish is one warm SSTORE. The first post pays the cold-slot fee once (~22k gas).
 
 ---
 
-## 5. Payload 编码 (`payload.js`)
+## 5. Payload encoding (`payload.js`)
 
-payload 解压后就是一份**人类可读的 Markdown 文档**，标签放在可选的 **YAML 风格 front-matter** 里：
+Decompressed, the payload is simply **a human-readable Markdown document**, with the tags in an optional **YAML-style front-matter** block:
 
 ```
 ---
-tags: 家庭, 旅行, 山
+tags: family, travel, mountains
 ---
 
-# 周末爬山
-正文...
+# A weekend in the hills
+The body…
 ```
 
-**没有标签时，payload 就是纯 Markdown**——不套任何外壳，最大化"任何编辑器、几十年后都能直接打开"。最终 publish 用的 payload = `brotli(q11)(utf8(text))`。
+**With no tags, the payload is pure Markdown** — no wrapper at all, maximising "any editor, decades later, opens it directly". The payload finally published is `brotli(q11)(utf8(text))`.
 
-**为什么用 front-matter 而不是自定义二进制？**
-- 它是 15 年来稳定的通用约定（Jekyll / Hugo / Obsidian / 各种静态站点生成器都认），不依赖本 app。
-- 解压后人类直接可读，符合核心原则。
-- front-matter 本身就是向前兼容机制：将来加新键，旧读取器忽略不认识的键即可——无需版本字节。
-- tags 与正文同流 brotli，共享字典学习（`travel` 既在 tag 又在正文时压得更紧）。
+**Why front-matter rather than a custom binary format?**
+- It has been a stable, universal convention for 15 years (Jekyll, Hugo, Obsidian and every static-site generator understand it), and does not depend on this app.
+- Decompressed, it is directly readable by a person — which is the core principle.
+- Front-matter is itself the extensibility mechanism: new keys can be added later and older readers simply ignore what they do not recognise. No version byte needed.
+- Tags and body share one brotli stream, and so share its learned dictionary (`travel` compresses tighter when it appears both as a tag and in the body).
 
-解析很保守：仅当首行恰为 `---`、存在闭合 `---`、且中间每行都是 `key: value` 时才当作 front-matter；否则整体按纯 Markdown 处理（避免把正文开头的 `---` 分隔线误判）。
+The parser is deliberately conservative: front-matter is only recognised when the first line is exactly `---`, a closing `---` exists, and every line between them is `key: value`; otherwise the whole thing is treated as pure Markdown (so a `---` rule at the top of a body is not mistaken for a header).
 
 ```js
 import { getBrotli } from './brotli';
@@ -219,13 +220,13 @@ export async function decodePayload(compressed) {
 }
 ```
 
-**标题编码（`title.js`）**：UTF-8 字节右补零到 32。读取时左截零字节再 `TextDecoder` 解码。`titleByteLength()` 让 UI 显示"X / 32 字节"——ASCII 字符 1 字节、中文字符 3 字节、表情 4 字节，**编辑器须按字节限长，不是字符**。
+**Title encoding (`title.js`)**: the UTF-8 bytes right-padded with zeros to 32. Reading back, trailing zero bytes are trimmed and the rest goes through `TextDecoder`. `titleByteLength()` lets the UI show "X / 32 bytes" — an ASCII character is 1 byte, a Chinese character 3, an emoji 4, so **the editor must limit by bytes, not characters**.
 
 ---
 
-## 6. 发布流水线 `publish.js`
+## 6. The publish pipeline, `publish.js`
 
-浏览器模块。作者身份 = 当前连接钱包地址；合约不做任何身份校验。
+A browser module. Authorship is the connected wallet's address; the contract performs no identity check at all.
 
 ```js
 import { createWalletClient, custom, toHex } from "viem";
@@ -241,7 +242,7 @@ const [account] = await wallet.getAddresses();
 
 // 1. Image: downscale to <=1600px long edge, encode WebP q60, return bytes.
 async function processImage(file, { maxEdge = 1600, quality = 0.6, maxBytes = 200_000 } = {}) {
-  /* ... 见仓库代码 ... */
+  /* ... see the repository for the real thing ... */
 }
 
 // 2. Store image bytes as the calldata of a plain self-tx; return its 32-byte tx hash.
@@ -252,7 +253,7 @@ async function storeImage(bytes) {
 }
 
 // 3. Replace `upload:KEY` refs with `eth:0x<txhash>` after uploading.
-async function embedImages(markdown, files) { /* ... 用正则替换图片引用 ... */ }
+async function embedImages(markdown, files) { /* ... regex-replace the image refs ... */ }
 
 // 4. Encode payload + title, publish().
 export async function publishPost({ title, tags = [], markdown, files = {} }) {
@@ -267,11 +268,11 @@ export async function publishPost({ title, tags = [], markdown, files = {} }) {
 
 ---
 
-## 7. 读取器 `blogReader.js`
+## 7. The reader, `blogReader.js`
 
-每次读取都需要作者地址（前端从 URL 取：`/author/0x…` 作者列表，`/tx/0x…/<事件序号>` 单篇——一笔交易可能含多个 Post 事件）。**两段式加载**：标题列表无 body，点击打开时才拉 body。
+Every read needs an author address, which the front end takes from the URL: `/author/0x…` for an author's list, `/tx/0x…/<event index>` for a single post (one transaction may hold several Post events). **Loading is in two stages**: the title list carries no bodies, and a body is only fetched when a post is opened.
 
-**本地缓存**：所有正文和图片通过 IndexedDB 永久缓存（`glyph-cache`）。内容不可变（链上 calldata），所以缓存永不过期。命中缓存则零网络请求。
+**Local cache**: every body and image is cached permanently in IndexedDB (`glyph-cache`). The content is immutable (it is on-chain calldata), so the cache never expires. A cache hit costs zero network requests.
 
 ```js
 import {
@@ -333,25 +334,26 @@ export async function loadPostBody(txHash) {
 }
 ```
 
-**渲染一篇**：
+**Rendering one post**:
 ```js
 const titles = await loadTitleList(author, 20);
 // user clicks titles[k]
 const body = await loadPostBody(titles[k].txHash);
 const md   = await resolveImages(body.markdown);  // eth:0x... -> blob:...
 container.innerHTML = renderMarkdown(md);
-// 显示 body.tags 作为标签
+// show body.tags as the tags
 ```
 
-> 读 N 条标题是 N 次串行单区块查询，每次只下载几百字节 log。N=20 ~0.5–1s；缓存命中时正文即时显示。
-> 点击某篇 → 一次 `getTransactionByHash` → 一次 brotli → 渲染。首访后所有内容缓存到 IndexedDB，后续访问零 RPC。
+> Reading N titles is N serial single-block queries, each downloading a few hundred bytes of log. N=20 takes ~0.5–1s; on a cache hit the body appears instantly.
+> Clicking a post → one `getTransactionByHash` → one brotli decompress → render. After the first visit everything is cached in IndexedDB and later visits make no RPC calls at all.
 
-**首页（无地址）跨作者最新 N 篇** —— 全篇唯一一处刻意的范围扫描，**仅用于无地址发现**，单作者路径不受影响：
+**The home feed (no address): the newest N across authors** — the one deliberate range scan in the whole design, used **only for address-less discovery**; the single-author path is unaffected:
 
 ```js
-// 没有全局头指针，所以跨作者发现必须扫描。有界、尽力而为：
-// 从链头往回，每次扫 windowSize 个区块（迁就公共 RPC 的范围上限），
-// 最多 maxWindows 个窗口，或集满 n 篇为止；空区段直接跳过。
+// There is no global head pointer, so cross-author discovery has to scan.
+// Bounded and best-effort: walk back from the chain head, windowSize blocks
+// at a time (to suit public RPC range limits), for at most maxWindows
+// windows or until n posts are collected; empty stretches are skipped.
 export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows = 30 } = {}) {
   const head = await client.getBlockNumber();
   let toBlock = head;
@@ -360,7 +362,7 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
     const fromBlock = toBlock >= BigInt(windowSize) ? toBlock - BigInt(windowSize) + 1n : 0n;
     const logs = await client.getLogs({ address: GLYPH, event: POST_EVENT, fromBlock, toBlock });
     logs.sort((a, b) => a.blockNumber !== b.blockNumber
-      ? Number(b.blockNumber - a.blockNumber) : b.logIndex - a.logIndex); // 最新在前
+      ? Number(b.blockNumber - a.blockNumber) : b.logIndex - a.logIndex); // newest first
     for (const log of logs) { out.push(toMeta(log, log.blockNumber)); if (out.length >= n) break; }
     if (fromBlock === 0n) break;
     toBlock = fromBlock - 1n;
@@ -371,124 +373,128 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 
 ---
 
-## 8. Markdown 子集与渲染
+## 8. The Markdown subset, and rendering
 
-存的是 Markdown，但只用一个**小而安全的子集**——缩的是功能集，不是字符（不要 minify，brotli 已把空白压到几乎为零，minify 会毁掉"任何人都能直接读"这一核心价值）。
+What is stored is Markdown, but only a **small, safe subset** — what is cut down is the feature set, not the characters. (Do not minify: brotli already squeezes whitespace to almost nothing, and minifying would destroy the core value that anyone can read the stored text directly.)
 
-**支持**：标题 `# ## ###` · `**粗体**` `*斜体*` · 链接 `[文字](url)`（含文章间引用 `[文字](0x<txhash>/<n>)`，见 §8.1）· 图片 `![alt](eth:0x<txhash>)` · 列表 `-` 与 `1.` · 引用 `>` · 行内 / 围栏代码 · 段落（空行分隔）。
+**Supported**: headings `# ## ###` · `**bold**` `*italic*` · links `[text](url)` (including cross-article references `[text](0x<txhash>/<n>)`, see §8.1) · images `![alt](eth:0x<txhash>)` · lists, `-` and `1.` · blockquotes `>` · inline and fenced code · paragraphs separated by blank lines.
 
-**砍掉**：裸 HTML（顺带消除 XSS）、表格、脚注、引用式链接、定义列表。
+**Cut**: raw HTML (which also removes XSS), tables, footnotes, reference-style links, definition lists.
 
-**渲染顺序**：`loadTitleList` → 用户点击 → `loadPostBody`（cache-first）→ `resolveGlyphRefs`（0x… → /tx/ 路径，空文字时取对方标题）→ `resolveImages`（eth: → blob）→ 受限解析器渲染 → 净化。
+**Render order**: `loadTitleList` → the user clicks → `loadPostBody` (cache-first) → `resolveGlyphRefs` (0x… → a /tx/ path, taking the target's title when the link text is empty) → `resolveImages` (eth: → blob) → the restricted parser renders → sanitize.
 
-### 8.1 文章间引用
+### 8.1 Cross-article references
 
-在正文里引用另一篇文章，链接目标直接写目标文章的发布交易哈希：
+To reference another article from a body, the link target is written as the target article's publish transaction hash:
 
 ```markdown
-[显示文字](0x<交易哈希>/<事件序号>)
+[link text](0x<transaction hash>/<event index>)
 ```
 
-- **交易哈希**：目标文章的 `publish()` 交易，64 位 hex。
-- **事件序号**：该交易内 `Post` 事件的 0-based 序号（一笔交易可以发布多篇）；可省略——`[文字](0x<交易哈希>)` 与 `[文字](0x<交易哈希>/0)` 完全等价。
-- **文字留空**：`[](0x…/0)` 在阅读时自动解析目标文章的标题作为链接文字；解析不到则显示交易短哈希。
-- **渲染**：引用被重写为站内规范路径 `/tx/<hash>/<n>`，点击在应用内跳转；目标无效时落到「没有找到这篇文章」页。
-- 例：`[外婆的香樟木箱](0x41663fee6dd678632e23c8365076b466603b0d0694925e13b0d0d2007bec7844)`（等同于带 `/0`）
+- **Transaction hash**: the target article's `publish()` transaction, 64 hex characters.
+- **Event index**: the 0-based ordinal of the `Post` event inside that transaction (one transaction can publish several posts). It may be omitted — `[text](0x<hash>)` and `[text](0x<hash>/0)` are exactly equivalent.
+- **Empty link text**: `[](0x…/0)` resolves the target article's title at read time and uses it as the link text; when that lookup fails, the short transaction hash is shown instead.
+- **Rendering**: a reference is rewritten to the app's own canonical path, `/tx/<hash>/<n>`, and clicking it navigates within the app; an invalid target lands on the "no such post" page.
+- Example: `[Grandmother's camphorwood chest](0x41663fee6dd678632e23c8365076b466603b0d0694925e13b0d0d2007bec7844)` (equivalent to the same with `/0`).
 
 ---
 
-## 9. 永久性与自托管
+## 9. Permanence and self-hosting
 
-- **calldata 在密码学意义上永久锚定以太坊**——它是规范链的一部分，可永远用区块哈希验证完整性。
-- **正在演进的是"谁还存着可取回的副本"**：
-  - **EIP-4444（历史过期）**：目前所有执行客户端已支持**部分历史过期**，可丢弃 Merge（2022-09）之前的区块数据；**完整的滚动历史过期仍在开发中**。
-  - 滚动过期上线后，普通全节点可能丢弃约 1 年前的历史，届时取旧 calldata 要走**归档节点 / Portal Network / ERA 文件**。
-  - 数据本身不会消失——由归档节点与去中心化数据提供方保存——只是不保证随便哪台节点都能秒取。
-- **三层备份策略**：
-  1. **IndexedDB 本地缓存**：所有已访问正文和图片永久缓存在浏览器中，零网络延迟。
-  2. **自留备份**：你自己留一份原图与原稿。需要时对着链上 txhash/区块哈希一验即可。
-  3. **链上锚定**：字节锚定以太坊 + 你手握可验证副本。
-- **若要每台全节点都保留**：可用 **SSTORE2**（把字节当合约代码存进**状态**），代价约 5× calldata，且受合约 24KB 上限（EIP-170）。结论：**calldata + 本地缓存 + 自留备份**更务实。
+- **Calldata is cryptographically anchored to Ethereum forever** — it is part of the canonical chain, and its integrity can always be verified against the block hashes.
+- **What is evolving is who still keeps a retrievable copy**:
+  - **EIP-4444 (history expiry)**: every execution client now supports **partial history expiry** and may drop block data from before the Merge (2022-09); **full rolling history expiry is still in development**.
+  - Once rolling expiry ships, an ordinary full node may drop history older than roughly a year, and fetching old calldata will then mean going to an **archive node, the Portal Network, or ERA files**.
+  - The data itself does not disappear — archive nodes and decentralised data providers keep it — but no arbitrary node is guaranteed to serve it instantly.
+- **A three-layer backup strategy**:
+  1. **The IndexedDB local cache**: every body and image you have visited is cached permanently in the browser, at zero network latency.
+  2. **Your own backup**: keep the original images and the original drafts yourself. When you need to, verify them against the on-chain txhash / block hash.
+  3. **The on-chain anchor**: the bytes are anchored to Ethereum, and you hold a copy you can verify.
+- **If you want every full node to keep it**: **SSTORE2** (storing the bytes as contract code, in **state**) would do it, at roughly 5× the cost of calldata and under the 24KB contract limit (EIP-170). The conclusion: **calldata + local cache + your own backup** is the more practical answer.
 
 ---
 
-## 10. 设计决策记录
+## 10. Design decision record
 
-| 决策 | 选择 | 理由 |
+| Decision | Choice | Why |
 |---|---|---|
-| 存储介质 | Ethereum L1 calldata | 只信以太坊，零链下信任 |
-| 合约形态 | **共享、无所有者、不可升级** | 一份合约支持任意多博主 |
-| 作者身份 | `msg.sender` | 无需注册；钱包地址即身份 |
-| 内容格式 | Markdown 子集 + 标签 + 标题 | app 无关、几十年后任意编辑器可读 |
-| 标题 | `bytes32`（独立 calldata 参数） | UTF-8 右补零；UI 按字节限长；进 event 让"标题列表"查询零解压 |
-| 标签 | 嵌入 Markdown front-matter（YAML 风格 `tags:`） | 通用约定、人类可读、与正文共享 brotli 字典；front-matter 自带向前兼容 |
-| 正文压缩 | brotli q11，无字典 | 压缩流自描述，解码端零依赖 |
-| 正文 / 标签 位置 | **publish 交易 calldata（不进 event）** | 让标题列表查询带宽固定；省 ~+20% LOG 字节成本 |
-| Payload schema | 可选 YAML front-matter + Markdown 正文 | 无标签即纯 Markdown；任何编辑器几十年后可读 |
-| 图片编码 | WebP q60 | 尺寸/画质平衡，~$0.68/张@当前 gas |
-| 图片上链 | 每张独立 calldata 自转账，txhash 引用 | 正文交易精简；图片与作者解耦 |
-| 取最新 | `latestBlock(author)` 头指针 (O(1)) | 不扫块；每位作者独立头指针 |
-| 取前 N | 事件 `prevBlock` 反向链表 | 每步单区块查询，秒回 |
-| `author` indexed | 是 | 多作者下读取按 author 过滤的必备 topic |
-| 存储打包 | `(uint96 latestBlock, uint48 count)` 一槽 | 每篇 publish 仅 1 个 SSTORE |
-| 作者发现 | 带外（前端 `?author=0x…`）；无地址时客户端有界扫描最近 K 区块 | 保持合约极简；首页发现不改链上结构（best-effort，非 O(1)） |
-| 节点配置 | `/settings` 页面，每条链一组**有序**节点，localStorage 覆盖 env 默认 | 按顺序使用，失败回退下一个；失败节点短暂搁置，避免每次请求都重试 |
-| 多链 | 以太坊主网 + Taiko 主网（CREATE2 同址），默认一起读：首页 / 作者页按区块时间合并，URL 首段（`/taiko`）可只看一条；文章 URL 一律带链 | 同一份合约、同一本刊物；每条链各自扫描与缓存，合并层按「时间前沿」决定先补扫哪条链，发布链在「写」tab 单独选 |
-| getLogs 窗口 | 每条链一个默认值，遇到节点范围上限自动折半重试 | 公共节点上限从 25 到 10,000 不等；自动适配而不是报错 |
-| 请求日志 | 每次节点请求 / 缓存命中各一行控制台日志 | 跳过了哪些区块、回退到了哪个节点，肉眼可查 |
-| ETH 价格源 | CoinGecko 公共 API（离线降级 ETH-only） | 简单自动；唯一链下 HTTP 依赖，失败不致命 |
-| 编辑器 | CodeMirror 源码编辑 + 实时预览 | Markdown 语法高亮 + 边写边看；预览复用渲染器 |
-| 永久性兜底 | 链上锚定 + IndexedDB 缓存 + 自留备份 | 三层冗余；应对未来滚动历史过期 |
-| 本地缓存 | IndexedDB，永不过期 | 内容不可变；缓存命中零 RPC；万篇仅 ~20 MB |
-| 扫描覆盖 | localStorage 记录**多段**已扫区块范围（而非单一 frontier） | 往前翻只补未读区间；已扫过的段落永不重扫 |
-| 请求去重 | 会话内按 (author, index) / (txHash, 事件序号) 索引 | 同一篇文章一次会话内最多向节点请求一次，无论从哪个页面进入 |
+| Storage medium | Ethereum L1 calldata | Trust Ethereum, trust nothing off-chain |
+| Contract shape | **shared, ownerless, non-upgradeable** | One contract serves any number of writers |
+| Authorship | `msg.sender` | No registration; the wallet address is the identity |
+| Content format | a Markdown subset + tags + title | App-independent, readable in any editor decades from now |
+| Title | `bytes32` (its own calldata argument) | UTF-8 right-padded with zeros; the UI limits by bytes; putting it in the event makes a title-list query decompression-free |
+| Tags | embedded in Markdown front-matter (YAML-style `tags:`) | A universal convention, human-readable, sharing the body's brotli dictionary; front-matter brings its own forward compatibility |
+| Body compression | brotli q11, no dictionary | The stream is self-describing; the decoder needs nothing extra |
+| Where body / tags live | **the publish transaction's calldata, not the event** | Gives the title-list query a fixed bandwidth, and saves the ~20% extra that LOG bytes cost |
+| Payload schema | optional YAML front-matter + a Markdown body | With no tags it is pure Markdown; readable in any editor decades from now |
+| Image encoding | WebP q60 | The balance of size and quality, ~$0.68 an image at current gas |
+| Images on chain | one plain-calldata self-send each, referenced by txhash | Keeps the article transaction small; decouples images from the author |
+| Fetching the latest | the `latestBlock(author)` head pointer (O(1)) | No block scanning; each author has their own head pointer |
+| Fetching the previous N | the reverse linked list through the event's `prevBlock` | Each step is a single-block query, answered instantly |
+| `author` indexed | yes | The topic a multi-author read needs to filter by author |
+| Storage packing | `(uint96 latestBlock, uint48 count)` in one slot | One SSTORE per published post |
+| Author discovery | out-of-band (front end `?author=0x…`); a bounded client-side scan of recent blocks when no address is given | Keeps the contract minimal; discovery on the home page changes nothing on chain (best-effort, not O(1)) |
+| Endpoint configuration | the `/settings` page, an **ordered** set of endpoints per chain, localStorage overriding the env defaults | Used in order, falling back to the next on failure; a failed endpoint is set aside briefly rather than retried on every request |
+| Multiple chains | Ethereum mainnet + Taiko mainnet (the same CREATE2 address), read together by default: the feed and author pages merge by block time, and the URL's first segment (`/taiko`) narrows to one chain; an article URL always names its chain | One contract, one journal; each chain scans and caches on its own, the merge layer decides which chain to deepen by the "time frontier", and the publish chain is picked separately in the write tab |
+| getLogs window | a default per chain, halved and retried automatically when a node refuses the range | Public nodes cap ranges anywhere from 25 to 10,000; adapt rather than fail |
+| Request logging | one console line per node request and per cache hit | Which blocks were skipped, which endpoint was fallen back to — visible at a glance |
+| ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
+| Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
+| Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| Local cache | IndexedDB, never expiring | The content is immutable; a cache hit costs no RPC; ten thousand posts is ~20 MB |
+| Scan coverage | localStorage records **a set of ranges** already scanned, rather than one frontier | Paging back only fills unread gaps; a range already scanned is never scanned again |
+| Request de-duplication | indexed within a session by (author, index) / (txHash, event index) | One post is requested from the node at most once per session, whichever page it is reached from |
+| Interface language | English by default, switchable to Chinese; the choice is stored in `localStorage` (`glyph.lang.v1`) and applied without a reload | The interface is a presentation layer over on-chain content; a post stays in the language it was written in |
 
 ---
 
-## 11. 附录：常量、依赖、部署
+## 11. Appendix: constants, dependencies, deployment
 
-**协议常量（截至 2026-06）**
-- **EIP-7623（Pectra）** calldata 地板价：`tokens = 零字节 + 4×非零字节`，地板 `10 gas/token` → 非零 40、零 10。
-- **EIP-7825（Fusaka, 2025-12）** 单笔交易 gas 上限：`2²⁴ = 16,777,216`。→ 一笔最多约 `(16,777,216 − 21,000) / 40 ≈ 418,905` 字节 ≈ **~409 KB** 图。
-- **交易池体积上限（非共识规则）** geth `txMaxSize = 4 × 32 KiB = 131,072` 字节，超出即以 `oversized data` 拒收。公共节点都跑这个默认值，因此**实际上限是 ~128 KiB / 笔**——远早于上面的 gas 上限触发，上面的 ~409 KB 只是理论值。前端以此为准（`publish.js` 的 `MAX_TX_BYTES` / `MAX_CALLDATA_BYTES`）：图片压到该预算以内，正文在上传任何图片之前先压一遍量大小。
-- **EIP-170** 合约代码上限 24,576 字节（仅在用 SSTORE2 时相关）。
+**Protocol constants (as of 2026-06)**
+- **EIP-7623 (Pectra)** calldata floor pricing: `tokens = zero bytes + 4 × non-zero bytes`, floor `10 gas/token` → 40 for non-zero, 10 for zero.
+- **EIP-7825 (Fusaka, 2025-12)** per-transaction gas cap: `2²⁴ = 16,777,216`. → at most about `(16,777,216 − 21,000) / 40 ≈ 418,905` bytes ≈ **~409 KB** of image in one transaction.
+- **Transaction-pool size limit (not a consensus rule)**: geth's `txMaxSize = 4 × 32 KiB = 131,072` bytes; anything larger is rejected as `oversized data`. Public nodes all run that default, so **the practical ceiling is ~128 KiB per transaction** — reached long before the gas cap above, which makes the ~409 KB figure theoretical. The front end works to the practical limit (`MAX_TX_BYTES` / `MAX_CALLDATA_BYTES` in `publish.js`): images are compressed to fit that budget, and the body is measured once before any image is uploaded.
+- **EIP-170** contract code limit, 24,576 bytes (relevant only when using SSTORE2).
 
-**依赖**
+**Dependencies**
 ```bash
 npm i viem brotli-wasm
 ```
 
-**部署（Foundry）**
+**Deployment (Foundry)**
 ```bash
 forge create src/Blog.sol:Glyph \
   --rpc-url $ETH_RPC --private-key $PK \
   --broadcast --verify --etherscan-api-key $ETHERSCAN_KEY
-# 部署者无任何特权。同一份合约可由社区里任何钱包部署、被所有博主共用。
+# The deployer holds no privilege. Anyone's wallet can deploy this contract,
+# and every writer shares the one deployment.
 ```
 
-**前端配置**
+**Front-end configuration**
 
-合约地址由 CREATE2 决定、所有链相同，因此作为常量内置于 `webapp/src/lib/config.js`
-（`DEFAULT_GLYPH_ADDRESS`），默认无需配置。下列变量由 Vite 在**构建时**内联，仅在
-需要指向自己部署的那份合约时才用得上：
+The contract address is determined by CREATE2 and is the same on every chain, so it is
+built in as a constant in `webapp/src/lib/config.js` (`DEFAULT_GLYPH_ADDRESS`) and needs no
+configuration. The variables below are inlined by Vite **at build time**, and are only
+useful when pointing the app at your own deployment:
 
 ```bash
-# webapp/.env.local（可选）
-VITE_GLYPH_ADDRESS=0x...          # 覆盖内置合约地址
-VITE_RPC_URL=https://...          # RPC 默认（可在 UI 设置里覆盖）
+# webapp/.env.local (optional)
+VITE_GLYPH_ADDRESS=0x...          # override the built-in contract address
+VITE_RPC_URL=https://...          # the default RPC (overridable in the UI settings)
 VITE_CHAIN_ID=1                   # 1=mainnet, 11155111=sepolia
 ```
 
-阅读时访问 `https://你的站点/?author=0x作者地址` 看某作者标题列表；**无作者参数 = 全网最新 N 篇（扫描最近区块）**。
-写作时连接钱包；钱包地址即作者身份；标题最多 32 字节，标签随意。
+To read, visit `https://your-site/?author=0xAUTHOR_ADDRESS` for that author's title list;
+**with no author parameter you get the newest N posts network-wide (a scan of recent blocks)**.
+To write, connect a wallet; the wallet address is the authorship; the title is at most 32 bytes, and the tags are free-form.
 
-**自托管备份清单**
-1. 保留每篇文章的原始 Markdown（含 frontmatter）与每张原图。
-2. 记录每张图的 `txhash`、每篇文章的发布交易哈希与区块号。
-3. 长期可选：运行一个归档节点，或定期导出相关区块的 ERA 文件。
-4. 任何时候都能对着链上哈希验证你手里的副本未被篡改。
-5. **IndexedDB 缓存自动完成**：正文和图片在首次访问时自动存入浏览器数据库，后续访问零网络请求。
+**Self-hosted backup checklist**
+1. Keep the original Markdown of every post (front-matter included) and every original image.
+2. Record each image's `txhash`, and each post's publish transaction hash and block number.
+3. Optional, for the long term: run an archive node, or export ERA files for the relevant blocks periodically.
+4. At any time you can verify the copy in your hands against the on-chain hashes.
+5. **The IndexedDB cache does this automatically**: bodies and images are stored in the browser database on first visit, and later visits make no network requests.
 
 ---
 
-*本文件本身就是一份纯 Markdown——和它描述的系统一样，任何编辑器、几十年后都能打开。*
+*This file is itself plain Markdown — like the system it describes, any editor will open it decades from now.*

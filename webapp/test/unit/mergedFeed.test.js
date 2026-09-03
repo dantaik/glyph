@@ -42,7 +42,7 @@ describe('MergedFeed over the two demo chains', () => {
     expect(titles(snap.rows.slice(15))).toEqual(['']);
   });
 
-  it('加载更早的文章 deepens the chain at the frontier until everything is complete', async () => {
+  it('loading earlier posts deepens the chain at the frontier until everything is complete', async () => {
     const view = createView([worldReader(1), worldReader(167000)]);
     await view.feed.refresh();
     await settle(view.feed);
@@ -56,7 +56,7 @@ describe('MergedFeed over the two demo chains', () => {
     // Everything known is newer than the new frontier; Taiko's oldest letter
     // is still below its coverage and not on the page at all yet.
     expect(titles(snap.rows.slice(snap.frontier.after + 1))).toEqual([]);
-    expect(titles(snap.rows)).not.toContain('试试 Taiko');
+    expect(titles(snap.rows)).not.toContain('Trying Taiko');
     void taikoLogs;
 
     await view.feed.loadMore();
@@ -154,18 +154,28 @@ describe('MergedFeed over the two demo chains', () => {
     await view.feed.refresh();
     let snap = await settle(view.feed);
     expect(snap.chains[0].coverage).toEqual([[800n, 1200n], [2600n, 2999n]]);
-    expect(titles(snap.rows)).toEqual(['冬至前的一封信', '山间来信', '桂花开的时候']);
+    expect(titles(snap.rows)).toEqual([
+      'A letter before the solstice',
+      'A letter from the hills',
+      'When the osmanthus opens',
+    ]);
     expect(snap.gaps).toEqual([{ chainId: 1, after: 1, from: 1201n, to: 2599n }]);
 
     await view.feed.fillGap(1, snap.gaps[0]); // one budget's worth: 2200..2599
     snap = await settle(view.feed);
     expect(snap.chains[0].coverage).toEqual([[800n, 1200n], [2200n, 2999n]]);
     expect(snap.shown).toBe(5); // widened by the two letters the fill found
-    expect(titles(snap.rows)).toEqual(['冬至前的一封信', '山间来信', '海边的冬天', '春天的院子', '桂花开的时候']);
+    expect(titles(snap.rows)).toEqual([
+      'A letter before the solstice',
+      'A letter from the hills',
+      'Winter by the sea',
+      'The yard in spring',
+      'When the osmanthus opens',
+    ]);
     expect(snap.gaps).toEqual([{ chainId: 1, after: 3, from: 1201n, to: 2199n }]);
   });
 
-  it('notes a 加载更早 that read blocks on a chain and found nothing', async () => {
+  it('notes a load-more that read blocks on a chain and found nothing', async () => {
     const chain = fakeChain({ chainId: 1, head: 3000, posts: [{ author: AUTHORS[0], index: 0, block: 2600 }] });
     chain.io.scanBlocks = 400n;
     chain.io.floor = 0n;
@@ -214,12 +224,12 @@ describe('createView', () => {
   it('finds a post on whichever chain holds it', async () => {
     const view = createView([worldReader(1), worldReader(167000)]);
     const taiko = worlds().get(167000);
-    const post = taiko.posts.find((p) => p.title === '鼓声');
+    const post = taiko.posts.find((p) => p.title === 'The drums');
     const hit = await view.findPostAnywhere(post.txHash, 0);
     expect(hit.chainId).toBe(167000);
-    expect(hit.meta.title).toBe('鼓声');
+    expect(hit.meta.title).toBe('The drums');
     expect(await view.findPostAnywhere(`0x${'ee'.repeat(32)}`, 0)).toBeNull();
-    expect((await view.loadPostBody({ chainId: 167000, txHash: post.txHash })).body.markdown).toContain('鼓楼');
+    expect((await view.loadPostBody({ chainId: 167000, txHash: post.txHash })).body.markdown).toContain('drum tower');
   });
 
   it('a total is null until every chain has answered', async () => {

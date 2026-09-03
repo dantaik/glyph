@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
-import { chainName } from '../lib/chains';
 import { useAsync } from '../lib/hooks';
-import { friendlyError } from '../lib/format';
+import { chainName, friendlyError } from '../lib/format';
+import { t } from '../lib/i18n';
 import { useMergedAuthorList } from '../lib/mergedAuthorList';
 import { hrefFor } from '../lib/router';
 import { rowKey } from '../lib/timeline';
@@ -19,7 +19,7 @@ import { ListSkeleton } from './Skeleton';
  * Author page: address header, post counts, title list, load-more, and the
  * empty/error/skeleton states. An author has a separate list on every
  * chain; the view merges the walks by time (mergedAuthorList.js), each row
- * naming its chain and its 第 N 篇 on that chain. The walks are owned by
+ * naming its chain and its ordinal on that chain. The walks are owned by
  * the readers — they keep going and keep their rows if the page is left
  * mid-way — and render block by block as they go.
  */
@@ -42,7 +42,7 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
   const subtitle = (() => {
     const c = counts.value;
     if (!c || c.total == null) return single ? undefined : undefined;
-    const total = `共 ${Number(c.total)} 篇`;
+    const total = t('author.total', { count: Number(c.total) });
     if (single) return total;
     const per = chains.map((ch) => `${chainName(ch.chainId)} ${Number(c.byChain[ch.chainId] ?? 0n)}`).join(' · ');
     return `${total} · ${per}`;
@@ -64,11 +64,12 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
       <ListHeader
         title={
           ens.value ? (
-            `${ens.value} 的文章`
+            `${t('author.postsByPrefix')}${ens.value}${t('author.postsBySuffix')}`
           ) : (
             <span className="inline-flex items-center gap-1.5">
+              {t('author.postsByPrefix') && <span>{t('author.postsByPrefix')}</span>}
               <AddressLabel address={author} size={18} tailClassName="text-lg" />
-              <span>的文章</span>
+              {t('author.postsBySuffix') && <span>{t('author.postsBySuffix')}</span>}
             </span>
           )
         }
@@ -76,7 +77,8 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
         subtitle={
           single ? (
             <>
-              {subtitle ? `${subtitle} · ` : ''}只看{chainName(chains[0].chainId)}
+              {subtitle ? `${subtitle} · ` : ''}
+              {t('footer.onlyChain', { chain: chainName(chains[0].chainId) })}
               <span className="select-none" aria-hidden="true"> · </span>
               <a
                 href={hrefFor({ author, chain: null })}
@@ -86,7 +88,7 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
                 }}
                 className="hover:text-accent transition-colors"
               >
-                查看全部
+                {t('feed.viewAll')}
               </a>
             </>
           ) : (
@@ -106,14 +108,14 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
         <ErrorState error={chains[0].error} onRetry={() => controller.retry()} />
       )}
 
-      {empty && <EmptyState title="该地址没发表过文章" />}
+      {empty && <EmptyState title={t('author.empty')} />}
 
       {rows.length > 0 && (
         <ul>
           {frontier?.after === -1 && marker()}
-          {rows.map((t, i) => (
-            <Fragment key={rowKey(t)}>
-              <ArticleListItem post={t} navigate={navigate} currentChain={currentChain} showIndex loadBody={view.loadPostBody} />
+          {rows.map((row, i) => (
+            <Fragment key={rowKey(row)}>
+              <ArticleListItem post={row} navigate={navigate} currentChain={currentChain} showIndex loadBody={view.loadPostBody} />
               {frontier?.after === i && marker()}
             </Fragment>
           ))}
@@ -128,14 +130,14 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
             .filter((c) => c.error)
             .map((c) => (
               <p key={c.chainId}>
-                {chainName(c.chainId)} 读取失败：{friendlyError(c.error)}
+                {t('feed.readFailed', { chain: chainName(c.chainId), reason: friendlyError(c.error) })}
                 <span className="select-none" aria-hidden="true"> · </span>
                 <button
                   type="button"
                   onClick={() => controller.retry(c.chainId)}
                   className="underline-offset-4 hover:underline"
                 >
-                  重试
+                  {t('common.retry')}
                 </button>
               </p>
             ))}
@@ -162,7 +164,10 @@ function ChainProgress({ running, className = '' }) {
       {running.map((c) => (
         <ScanProgress
           key={c.chainId}
-          label={`${chainName(c.chainId)}：${c.job === 'more' ? '正在扫描更早的文章…' : '正在读取文章列表…'}`}
+          label={t('common.labelled', {
+            label: chainName(c.chainId),
+            value: c.job === 'more' ? t('author.jobMore') : t('author.jobRefresh'),
+          })}
           progress={
             c.progress
               ? {

@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import { CHAINS } from '../lib/chains';
 import { READ_CHAIN_IDS } from '../lib/config';
 import { getReader } from '../lib/data';
 import { lowest, highest, blockCount } from '../lib/segments';
-import { fmtBlock } from '../lib/format';
+import { chainName, fmtBlock } from '../lib/format';
+import { t } from '../lib/i18n';
 import { hrefFor } from '../lib/router';
 import AddressLabel from './Address';
 import BackButton from './BackButton';
@@ -27,23 +27,15 @@ export default function ScanPage({ navigate }) {
         <BackButton onClick={() => navigate({})} />
       </div>
 
-      <ListHeader title="扫描范围" subtitle="本机缓存的区块覆盖范围" />
+      <ListHeader title={t('scan.title')} subtitle={t('scan.subtitle')} />
 
-      <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">
-        为了在公共 RPC 上增量读取链上文章，浏览器会在本地记录已经扫描过的区块范围，刷新后只拉取新出现的区块，不再重复请求。
-        记录的是多段范围而不是一整段：先扫过 1–100、后来扫过 200–300，再往前翻时只会补上中间的 101–199。
-        每条链各自记录，互不影响；两条链同时扫描，离开页面后正在进行的扫描也会在后台继续完成并缓存结果。
-        全局流最多缓存 300 篇、每位作者最多缓存最近 200 篇标题；缓存被裁剪时对应的范围也会一并收回，避免「以为扫过」而漏掉文章。
-      </p>
+      <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">{t('scan.intro')}</p>
 
       {READ_CHAIN_IDS.map((id) => (
         <ChainScan key={id} chainId={id} navigate={navigate} />
       ))}
 
-      <p className="text-xs leading-relaxed text-ink-ghost">
-        记录保存在本机浏览器（localStorage），按链分开，只用于避免重复的链上请求；清除浏览器数据后会自动重新扫描。
-        同一篇文章在一次会话里只会向节点请求一次，正文与图片缓存另存于浏览器 IndexedDB（同样按链区分）。
-      </p>
+      <p className="text-xs leading-relaxed text-ink-ghost">{t('scan.outro')}</p>
     </div>
   );
 }
@@ -61,22 +53,24 @@ function ChainScan({ chainId, navigate }) {
   const authors = reader.store.readAuthorScanEntries();
   const segments = feed.coverage;
   const cached = reader.store.allPosts().length;
-  const chain = CHAINS[chainId];
 
   return (
     <section className="mb-12">
       <SectionHeader
-        label={`${chain?.name ?? `链 ${chainId}`} · ${chainId}`}
+        label={t('settings.chainLabel', { chain: chainName(chainId), id: chainId })}
         right={
-          feed.job ? <span className="animate-pulse text-xs text-ink-ghost">后台扫描中</span> : undefined
+          feed.job ? (
+            <span className="animate-pulse text-xs text-ink-ghost">{t('scan.backgroundScanning')}</span>
+          ) : undefined
         }
       />
       <p className="mb-4 text-xs tabular-nums text-ink-ghost">
-        每次扫描（打开首页、点一次「加载更早的文章」）最多向节点读取 {fmtBlock(feed.scanBlocks)} 个区块
-        {feed.floor > 0n && <>；合约部署于区块 {fmtBlock(feed.floor)}，不会读取更早的区块</>}。
+        {t('scan.budget', { blocks: fmtBlock(feed.scanBlocks) })}
+        {feed.floor > 0n && t('scan.floor', { block: fmtBlock(feed.floor) })}
+        {t('common.period')}
       </p>
 
-      <h3 className="mb-2 text-xs tracking-label text-ink-faint">全局扫描（首页流）</h3>
+      <h3 className="mb-2 text-xs tracking-label text-ink-faint">{t('scan.globalHeading')}</h3>
       {segments.length > 0 ? (
         <>
           <ul className="mb-2 space-y-1">
@@ -85,25 +79,33 @@ function ChainScan({ chainId, navigate }) {
               .slice(0, MAX_SHOWN)
               .map(([from, to]) => (
                 <li key={`${from}-${to}`} className="text-sm tabular-nums text-ink-soft">
-                  区块 {fmtBlock(from)} 至 {fmtBlock(to)}
-                  <span className="text-ink-ghost"> · {fmtBlock(to - from + 1n)} 个区块</span>
+                  {t('scan.range', { from: fmtBlock(from), to: fmtBlock(to) })}
+                  <span className="text-ink-ghost">{t('scan.rangeBlocks', { blocks: fmtBlock(to - from + 1n) })}</span>
                 </li>
               ))}
           </ul>
           {segments.length > MAX_SHOWN && (
             <p className="mb-2 text-xs text-ink-ghost">
-              …另有 {segments.length - MAX_SHOWN} 段更早的范围
+              {t('scan.moreRanges', { count: segments.length - MAX_SHOWN })}
             </p>
           )}
           <p className="mb-6 text-xs tabular-nums text-ink-ghost">
-            {segments.length} 段 · 共 {fmtBlock(blockCount(segments))} 个区块 · 缓存 {cached} 篇
-            {feed.head != null && <> · 已同步至区块 {fmtBlock(feed.head)}</>}
+            {t('scan.summary', {
+              segments: segments.length,
+              blocks: fmtBlock(blockCount(segments)),
+              cached,
+            })}
+            {feed.head != null && t('scan.syncedTo', { block: fmtBlock(feed.head) })}
             {feed.job && feed.progress && (
               <>
                 {' · '}
                 <span className="animate-pulse">
-                  正在扫描区块 {fmtBlock(feed.progress.from)} 至 {fmtBlock(feed.progress.to)}
-                  ，本次已读 {fmtBlock(feed.progress.fetched)} / 最多 {fmtBlock(feed.scanBlocks)}
+                  {t('scan.scanningNow', {
+                    from: fmtBlock(feed.progress.from),
+                    to: fmtBlock(feed.progress.to),
+                    fetched: fmtBlock(feed.progress.fetched),
+                    budget: fmtBlock(feed.scanBlocks),
+                  })}
                 </span>
               </>
             )}
@@ -111,11 +113,11 @@ function ChainScan({ chainId, navigate }) {
         </>
       ) : (
         <p className="mb-6 text-sm text-ink-ghost">
-          {feed.job ? '正在进行第一次扫描…' : '还没有扫描记录——打开首页后自动记录。'}
+          {feed.job ? t('scan.firstScan') : t('scan.noRanges')}
         </p>
       )}
 
-      <h3 className="mb-2 text-xs tracking-label text-ink-faint">作者扫描</h3>
+      <h3 className="mb-2 text-xs tracking-label text-ink-faint">{t('scan.authorHeading')}</h3>
       {authors.length > 0 ? (
         <ul className="divide-y divide-edge">
           {authors.map((a) => (
@@ -136,22 +138,25 @@ function ChainScan({ chainId, navigate }) {
               </a>
               {a.segments.length > 0 ? (
                 <span className="text-sm tabular-nums text-ink-faint">
-                  区块 {fmtBlock(lowest(a.segments))} 至 {fmtBlock(highest(a.segments))}
+                  {t('scan.authorRange', {
+                    from: fmtBlock(lowest(a.segments)),
+                    to: fmtBlock(highest(a.segments)),
+                  })}
                   <span className="text-ink-ghost">
-                    {' · '}
-                    {a.segments.length} 段 · {a.count} 篇
+                    {t('scan.authorSummary', { segments: a.segments.length, count: a.count })}
                   </span>
                 </span>
               ) : (
                 <span className="text-sm text-ink-ghost">
-                  未记录范围{a.count > 0 ? ` · 缓存 ${a.count} 篇` : ''}
+                  {t('scan.authorNoRange')}
+                  {a.count > 0 ? t('scan.authorCached', { count: a.count }) : ''}
                 </span>
               )}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink-ghost">还没有作者记录——打开某位作者的文章页后自动记录。</p>
+        <p className="text-sm text-ink-ghost">{t('scan.noAuthors')}</p>
       )}
     </section>
   );

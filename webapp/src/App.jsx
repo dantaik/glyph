@@ -6,6 +6,7 @@ import SettingsPage from './components/SettingsPage';
 import ChainIcon from './components/ChainIcon';
 import { FIXTURES_MODE } from './lib/data';
 import { chainName, fmtBlock } from './lib/format';
+import { t, useLang } from './lib/i18n';
 import { lowest, highest } from './lib/segments';
 import { hrefFor, useUrlState } from './lib/router';
 import { getAllChainsView } from './lib/view';
@@ -13,12 +14,18 @@ import { getAllChainsView } from './lib/view';
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
   const [params, navigate] = useUrlState();
+  // The root subscribes to the interface language so that switching it
+  // re-renders the whole tree — nothing below is memoised, and the phrases
+  // are read at render time (i18n.js), so this is the only subscription
+  // the change needs.
+  useLang();
 
   // The URL names a surface — /scan, /tx/…, /author/…, /settings — and a
   // link to one of them IS the instruction to show it, whichever tab was
-  // picked last. Without this, following 扫描范围 in the footer while the
-  // 写 tab is open moves the URL to /scan and keeps rendering the editor.
-  // Picking 写 is the opposite instruction, so it clears the URL surface.
+  // picked last. Without this, following the scanned-ranges link in the
+  // footer while the write tab is open moves the URL to /scan and keeps
+  // rendering the editor. Picking "write" is the opposite instruction, so
+  // it clears the URL surface.
   const urlSurface = Boolean(params.settings || params.scan || params.tx || params.author);
   const writing = tab === 'write' && !urlSurface;
 
@@ -33,8 +40,8 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header
-        // 设置 is neither reading nor writing, so neither tab is current
-        // while it is open. /tx, /author and /scan still are 读.
+        // Settings is neither reading nor writing, so neither tab is
+        // current while it is open. /tx, /author and /scan still are.
         tab={params.settings ? null : writing ? 'write' : 'read'}
         onTabChange={handleTabChange}
         onOpenSettings={() => navigate({ settings: '1' })}
@@ -51,7 +58,7 @@ export default function App() {
       <Footer navigate={navigate} />
       {FIXTURES_MODE && (
         <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
-          演示数据
+          {t('app.fixtures')}
         </div>
       )}
     </div>
@@ -99,7 +106,7 @@ function Footer({ navigate }) {
 const scanSpan = (segments) =>
   segments.length
     ? ` ${fmtBlock(lowest(segments))} - ${fmtBlock(highest(segments))}` +
-      (segments.length > 1 ? ` · ${segments.length} 段` : '')
+      (segments.length > 1 ? ` · ${t('footer.segments', { count: segments.length })}` : '')
     : '';
 
 /** One chain's line: its name (→ its view) and its scan range (→ /scan). */
@@ -107,15 +114,20 @@ function ChainLine({ chainId, span, scanning, go }) {
   const name = chainName(chainId);
   return (
     <li className="flex flex-wrap items-center justify-center gap-2" data-chain-line={chainId}>
-      <a href={hrefFor({ chain: chainId })} onClick={go({ chain: chainId })} title={`只看${name}`} className={FOOT_LINK}>
+      <a
+        href={hrefFor({ chain: chainId })}
+        onClick={go({ chain: chainId })}
+        title={t('footer.onlyChain', { chain: name })}
+        className={FOOT_LINK}
+      >
         <ChainIcon chainId={chainId} size={12} className="shrink-0" />
         {name}
       </a>
       <span className="select-none" aria-hidden="true">·</span>
-      <a href={hrefFor({ scan: '1' })} onClick={go({ scan: '1' })} title="查看扫描范围" className={FOOT_LINK}>
-        已扫描区块
+      <a href={hrefFor({ scan: '1' })} onClick={go({ scan: '1' })} title={t('footer.scanRanges')} className={FOOT_LINK}>
+        {t('footer.scanned')}
         {span}
-        {scanning && <span className="animate-pulse"> · 扫描中</span>}
+        {scanning && <span className="animate-pulse"> · {t('footer.scanning')}</span>}
       </a>
     </li>
   );

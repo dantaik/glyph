@@ -10,6 +10,7 @@ import {
   saveRescanDelay,
   saveRpcUrls,
 } from '../../src/lib/config';
+import { getLang, setLang } from '../../src/lib/i18n';
 import * as rpcLog from '../../src/lib/rpcLog';
 import { applySettings, collectSettings, parseSettingsFile, serializeSettings, settingsFileName } from '../../src/lib/settingsFile';
 import { getFontSizePref, getThemePref, setFontSizePref, setThemePref } from '../../src/lib/theme';
@@ -19,6 +20,7 @@ const doc = (body) => JSON.stringify({ glyph: { settings: 1 }, ...body });
 describe('settingsFile', () => {
   beforeEach(() => {
     localStorage.clear();
+    setLang('en');
     setThemePref(null);
     setFontSizePref('m');
   });
@@ -29,6 +31,7 @@ describe('settingsFile', () => {
       rpcs: { 1: defaultRpcs(1), 167000: defaultRpcs(167000) },
       rescanDelayMinutes: 1,
       publishChain: null,
+      lang: 'en',
       theme: null,
       fontSize: 'm',
       log: true,
@@ -40,26 +43,33 @@ describe('settingsFile', () => {
     saveRpcUrls(167000, ['https://taiko.example/rpc', 'https://taiko2.example']);
     saveRescanDelay(5);
     savePublishChainId(167000);
+    setLang('zh');
     setThemePref('dark');
     setFontSizePref('l');
     rpcLog.setEnabled(false);
     const text = serializeSettings();
 
     localStorage.clear();
+    setLang('en');
     setThemePref(null);
     setFontSizePref('m');
     const { settings, problems, summary } = parseSettingsFile(text);
     expect(problems).toEqual([]);
+    // Read back in English — the language the reader is in now, not the one
+    // the file was written in.
     expect(summary).toEqual([
-      'Ethereum：默认节点',
-      'Taiko：2 个自定义节点',
-      '扫描延迟：5 分钟',
-      '发布到：Taiko',
-      '主题：深色',
-      '正文字号：大',
-      '控制台日志：关',
+      'Ethereum: default endpoints',
+      'Taiko: 2 custom endpoints',
+      'Rescan delay: 5 minutes',
+      'Publish to: Taiko',
+      'Language: 中文',
+      'Theme: dark',
+      'Body text size: L',
+      'Console log: off',
     ]);
     applySettings(settings);
+    expect(getLang()).toBe('zh');
+    expect(document.documentElement.lang).toBe('zh-CN');
     expect(getRpcUrls(167000)).toEqual(['https://taiko.example/rpc', 'https://taiko2.example']);
     expect(hasCustomRpcs(1)).toBe(false);
     expect(getRescanDelayMs()).toBe(300_000);
@@ -72,11 +82,11 @@ describe('settingsFile', () => {
   });
 
   it('refuses a file that is not ours, or of another format', () => {
-    expect(parseSettingsFile('nonsense').problems).toEqual(['不是有效的 JSON 文件。']);
-    expect(parseSettingsFile('[1,2]').problems).toEqual(['文件内容不是一个设置对象。']);
-    expect(parseSettingsFile('{"theme":"dark"}').problems[0]).toMatch(/缺少 glyph.settings/);
+    expect(parseSettingsFile('nonsense').problems).toEqual(['Not a valid JSON file.']);
+    expect(parseSettingsFile('[1,2]').problems).toEqual(['The file does not contain a settings object.']);
+    expect(parseSettingsFile('{"theme":"dark"}').problems[0]).toMatch(/glyph.settings marker is missing/);
     const later = parseSettingsFile(JSON.stringify({ glyph: { settings: 2 }, theme: 'dark' }));
-    expect(later.problems[0]).toMatch(/版本 2 不受支持/);
+    expect(later.problems[0]).toMatch(/version 2 is not supported/);
     expect(later.settings).toEqual({});
     expect(later.summary).toEqual([]);
   });
@@ -87,6 +97,7 @@ describe('settingsFile', () => {
         rpcs: { 1: ['https://a.example', 'ftp://b.example', 42], 999: ['https://x.example'], 167000: 'nope' },
         rescanDelayMinutes: -1,
         publishChain: 5,
+        lang: 'fr',
         theme: 'blue',
         fontSize: 'xl',
         log: 'yes',
@@ -94,23 +105,24 @@ describe('settingsFile', () => {
       }),
     );
     expect(settings).toEqual({ rpcs: { 1: ['https://a.example'] } });
-    expect(summary).toEqual(['Ethereum：1 个自定义节点']);
+    expect(summary).toEqual(['Ethereum: 1 custom endpoints']);
     expect(problems).toEqual([
-      'Ethereum：忽略 2 个不是 http(s) 地址的节点。',
-      '跳过未知的链 ID 999。',
-      'Taiko 的节点列表应是数组。',
-      'rescanDelayMinutes 应是不小于 0 的数字。',
-      'publishChain 5 不是已知的链。',
-      'theme 应是 light、dark 或 null（跟随系统）。',
-      'fontSize 应是 s、m 或 l。',
-      'log 应是 true 或 false。',
+      'Ethereum: ignoring 2 entries that are not http(s) URLs.',
+      'Skipping unknown chain ID 999.',
+      'Taiko’s endpoint list should be an array.',
+      'rescanDelayMinutes should be a number no smaller than 0.',
+      'publishChain 5 is not a known chain.',
+      'lang should be en or zh.',
+      'theme should be light, dark or null (follow the system).',
+      'fontSize should be s, m or l.',
+      'log should be true or false.',
     ]);
   });
 
   it('a list equal to the defaults is applied as "not customized"', () => {
     saveRpcUrls(1, ['https://custom.example']);
     const { settings, summary } = parseSettingsFile(doc({ rpcs: { 1: defaultRpcs(1) } }));
-    expect(summary).toEqual(['Ethereum：默认节点']);
+    expect(summary).toEqual(['Ethereum: default endpoints']);
     applySettings(settings);
     expect(hasCustomRpcs(1)).toBe(false);
     expect(getRpcUrls(1)).toEqual(defaultRpcs(1));
@@ -120,7 +132,7 @@ describe('settingsFile', () => {
     setThemePref('dark');
     savePublishChainId(1);
     const { settings, summary } = parseSettingsFile(doc({ theme: null, publishChain: null }));
-    expect(summary).toEqual(['发布到：跟随钱包所在的网络', '主题：跟随系统']);
+    expect(summary).toEqual(['Publish to: whichever network the wallet is on', 'Theme: follow the system']);
     applySettings(settings);
     expect(getThemePref()).toBeNull();
     expect(document.documentElement.classList.contains('dark')).toBe(false); // jsdom has no dark preference
@@ -128,6 +140,8 @@ describe('settingsFile', () => {
   });
 
   it('a file with nothing to apply says so', () => {
-    expect(parseSettingsFile(doc({ exportedAt: 'whenever' })).problems).toEqual(['文件里没有可应用的设置。']);
+    expect(parseSettingsFile(doc({ exportedAt: 'whenever' })).problems).toEqual([
+      'The file holds no settings that can be applied.',
+    ]);
   });
 });

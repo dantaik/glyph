@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../lib/i18n';
 import { Check, AlertCircle, Close, Plus } from './Icons';
 
 /**
@@ -107,9 +108,7 @@ export default function ImageUploader({
       )}
 
       {Object.keys(files).length > 0 && (
-        <p className="mt-2 text-2xs text-ink-ghost">
-          图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。
-        </p>
+        <p className="mt-2 text-2xs text-ink-ghost">{t('image.hint')}</p>
       )}
 
       <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -118,8 +117,8 @@ export default function ImageUploader({
             key={key}
             role="button"
             tabIndex={0}
-            aria-label={`复制引用 ${key}`}
-            title="点击复制引用"
+            aria-label={t('image.copyRef', { key })}
+            title={t('image.copyRefTitle')}
             onClick={() => copyRef(key)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -137,7 +136,7 @@ export default function ImageUploader({
             {copiedKey === key && (
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-ink/50">
                 <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-medium text-ink">
-                  已复制引用
+                  {t('image.copied')}
                 </span>
               </span>
             )}
@@ -147,7 +146,7 @@ export default function ImageUploader({
                 e.stopPropagation();
                 removeFile(key);
               }}
-              aria-label={`移除图片 ${key}`}
+              aria-label={t('image.remove', { key })}
               className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full
                            bg-paper-raised/90 text-ink-faint hover:text-danger shadow-sm
                            opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"
@@ -156,7 +155,7 @@ export default function ImageUploader({
             </button>
             <span className="block text-2xs text-ink-faint mt-0.5 truncate">
               {key} · {(file.size / 1024).toFixed(0)}KB
-              {!used.has(key) && <span className="text-ink-ghost"> · 未引用</span>}
+              {!used.has(key) && <span className="text-ink-ghost">{t('image.unreferenced')}</span>}
             </span>
           </div>
         ))}
@@ -166,8 +165,8 @@ export default function ImageUploader({
         <div
           role="button"
           tabIndex={0}
-          aria-label="上传图片"
-          title="上传图片"
+          aria-label={t('image.upload')}
+          title={t('image.upload')}
           onClick={() => fileInputRef.current?.click()}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -199,7 +198,7 @@ export default function ImageUploader({
             <Plus size={36} className="text-ink-ghost group-hover:text-accent transition-colors" />
           </div>
           <span className="block text-2xs text-ink-ghost mt-0.5 text-center">
-            拖入图片或点击上传，最大长边 1600px
+            {t('image.dropHint')}
           </span>
           <input
             ref={fileInputRef}

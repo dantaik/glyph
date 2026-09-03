@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { chainName } from '../lib/chains';
 import { READ_CHAIN_IDS, savePublishChainId } from '../lib/config';
+import { chainName } from '../lib/format';
 import { useUrlState } from '../lib/router';
-import { NO_WALLET, switchToConfiguredChain, useWallet } from '../lib/wallet';
+import { useT } from '../lib/i18n';
+import { switchToConfiguredChain, useWallet } from '../lib/wallet';
 import AddressLabel from './Address';
 import ChainIcon from './ChainIcon';
 import SectionHeader from './SectionHeader';
 import { BTN_PILL, SEGMENT_GROUP, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 
 /**
- * 钱包与网络 — the write tab's own wallet corner: who is writing, and to
- * which chain. None of it belongs in the header: reading needs no wallet,
+ * Wallet and network — the write tab's own wallet corner: who is writing,
+ * and to which chain. None of it belongs in the header: reading needs no wallet,
  * and the chain a post goes to is a decision made when writing it, not a
  * mode the whole app is in.
  *
@@ -21,6 +22,7 @@ import { BTN_PILL, SEGMENT_GROUP, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
  * publish button stays off until the two agree.
  */
 export default function WalletPanel({ chainId, picked, disabled = false }) {
+  const t = useT();
   const { account, chainId: walletChainId, isConnecting, connect } = useWallet();
   const [, navigate] = useUrlState();
   const [error, setError] = useState(null);
@@ -33,7 +35,7 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
     try {
       await connect();
     } catch (err) {
-      if (err?.code !== 4001) setError(err?.message || '连接失败');
+      if (err?.code !== 4001) setError(err?.message || t('wallet.connectFailed'));
     }
   };
 
@@ -43,7 +45,7 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
     try {
       await switchToConfiguredChain(chainId);
     } catch (err) {
-      setError(err?.code === 4001 ? '已取消' : '切换失败，请在钱包中手动切换');
+      setError(err?.code === 4001 ? t('wallet.cancelled') : t('wallet.switchFailed'));
     } finally {
       setSwitching(false);
     }
@@ -52,7 +54,7 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
   return (
     <section className="mb-10" data-wallet-panel="">
       <SectionHeader
-        label="钱包与网络"
+        label={t('wallet.heading')}
         right={
           account ? (
             <button
@@ -60,7 +62,7 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
               onClick={() => navigate({ author: account })}
               className="text-xs text-ink-faint hover:text-accent transition-colors"
             >
-              查看我的文章
+              {t('wallet.myPosts')}
             </button>
           ) : undefined
         }
@@ -70,18 +72,18 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
           {account ? (
             <span className="inline-flex items-center gap-2 text-sm text-ink-soft" title={account}>
               <AddressLabel address={account} size={16} tailClassName="text-xs" />
-              <span className="text-xs text-ink-faint">已连接</span>
+              <span className="text-xs text-ink-faint">{t('wallet.connected')}</span>
             </span>
           ) : hasProvider ? (
             <button type="button" onClick={handleConnect} disabled={isConnecting} className={BTN_PILL}>
-              {isConnecting ? '连接中…' : '连接钱包'}
+              {isConnecting ? t('wallet.connecting') : t('wallet.connect')}
             </button>
           ) : (
-            <span className="max-w-md text-xs leading-relaxed text-ink-faint">{NO_WALLET}</span>
+            <span className="max-w-md text-xs leading-relaxed text-ink-faint">{t('wallet.none')}</span>
           )}
 
-          <div role="group" aria-label="发布到" className="inline-flex items-center gap-2">
-            <span className="text-xs text-ink-faint">发布到</span>
+          <div role="group" aria-label={t('wallet.publishTo')} className="inline-flex items-center gap-2">
+            <span className="text-xs text-ink-faint">{t('wallet.publishTo')}</span>
             <div className={SEGMENT_GROUP}>
               {READ_CHAIN_IDS.map((id) => (
                 <button
@@ -102,24 +104,28 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
 
         {mismatch ? (
           <p role="alert" className="mt-3 text-xs leading-relaxed text-danger">
-            钱包在{chainName(walletChainId)}（ID {walletChainId}），发布目标是{chainName(chainId)}。
+            {t('wallet.mismatch', {
+              walletChain: chainName(walletChainId),
+              walletChainId,
+              targetChain: chainName(chainId),
+            })}
             <button
               type="button"
               onClick={handleSwitch}
               disabled={switching}
               className="ml-2 font-medium underline underline-offset-2 hover:text-accent disabled:opacity-50"
             >
-              {switching ? '切换中…' : '切换钱包网络'}
+              {switching ? t('wallet.switching') : t('wallet.switch')}
             </button>
           </p>
         ) : account && walletChainId != null ? (
           <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            钱包已在{chainName(chainId)}上{picked ? '' : '；发布目标跟随钱包所在的网络'}。
+            {picked
+              ? t('wallet.onTarget', { chain: chainName(chainId) })
+              : t('wallet.followingWallet', { chain: chainName(chainId) })}
           </p>
         ) : !account ? (
-          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            发布时会请求连接钱包；文章会永久写入所选网络上的合约。
-          </p>
+          <p className="mt-3 text-xs leading-relaxed text-ink-faint">{t('wallet.willConnect')}</p>
         ) : null}
         {error && (
           <p role="alert" className="mt-2 text-xs text-danger">

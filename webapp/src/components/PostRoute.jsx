@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAsync } from '../lib/hooks';
+import { t } from '../lib/i18n';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PostPage from './PostPage';
@@ -16,16 +17,16 @@ export default function PostRoute({ reader, txHash, eventIndex, navigate }) {
   if (meta.loading) {
     return (
       <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
-        加载中…
+        {t('common.loading')}
       </div>
     );
   }
   if (meta.value === null) {
     return (
       <EmptyState
-        title="没有找到这篇文章"
-        body="这笔交易里没有发布记录，或交易哈希有误。"
-        actionLabel="返回首页"
+        title={t('post.notFound')}
+        body={t('post.notFoundBody')}
+        actionLabel={t('common.backToFeed')}
         onAction={() => navigate({})}
       />
     );

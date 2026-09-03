@@ -47,7 +47,7 @@ describe('MergedAuthorList — edges', () => {
     expect(snap.frontier).toMatchObject({ after: -1, leaders: [{ chainId: 167000, state: 'error' }] });
   });
 
-  it('加载更早 on a chain that failed before it had rows asks it again rather than walking', async () => {
+  it('load-more on a chain that failed before it had rows asks it again rather than walking', async () => {
     const taiko = { on: true };
     const view = createView([worldReader(1), worldReader(167000, { tweak: failLatest(taiko) })]);
     const list = view.authorList(A0);
