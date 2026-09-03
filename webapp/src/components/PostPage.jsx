@@ -81,9 +81,9 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
 
   // Tab title mirrors the open letter; restore the site title on leave.
   useEffect(() => {
-    document.title = `${fmtTitle(meta.title) || '无标题'} · 留声`;
+    document.title = `${fmtTitle(meta.title) || '无标题'} · 雪泥`;
     return () => {
-      document.title = '留声';
+      document.title = '雪泥';
     };
   }, [meta.title]);
 

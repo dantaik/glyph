@@ -56,9 +56,7 @@ export default function HomeFeed({ navigate, onStartWriting }) {
     <div>
       <section className="mb-9 text-center">
         <h1 className="text-2xl font-bold leading-snug tracking-wide text-ink sm:text-display">
-          人过留名，雁过留声。
-          <br />
-          人海亿万，唯留字者不朽。
+          人海亿万，唯文字不朽。
         </h1>
       </section>
 

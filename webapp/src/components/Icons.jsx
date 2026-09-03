@@ -105,7 +105,7 @@ export function ExternalLink({ size, ...rest }) {
 }
 
 /**
- * 雁过留声 — a V formation of wild geese with echo arcs trailing the lead
+ * 雪泥 — a V formation of wild geese with echo arcs trailing the lead
  * bird. Empty-state placeholder: similar in spirit to the hand-drawn
  * line illustrations other writing products use, but unique to the brand.
  */
@@ -118,7 +118,7 @@ export function GeeseMark({ size, ...rest }) {
       viewBox="0 0 200 100"
       {...rest}
     >
-      {/* 留声 — echo arcs left behind by the lead goose */}
+      {/* 雪泥 — echo arcs left behind by the lead goose */}
       <path d="M112 10 A10 10 0 0 0 112 30" />
       <path d="M102 4 A16 16 0 0 0 102 36" />
       {/* lead goose */}
