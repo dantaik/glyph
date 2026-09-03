@@ -3,10 +3,12 @@ import { useFeed } from '../lib/feed';
 import { useAsync } from '../lib/hooks';
 import { fmtBlock, friendlyError } from '../lib/format';
 import EmptyState from './EmptyState';
+import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import { FeedSkeleton } from './Skeleton';
 
 const EXCERPT_CHARS = 80;
 
@@ -58,14 +60,7 @@ export default function HomeFeed({ reader, navigate, onStartWriting }) {
           <ScanStatus kind={job} progress={progress} scanBlocks={scanBlocks} />
         </>
       ) : error && rows.length === 0 ? (
-        <EmptyState
-          tone="danger"
-          title="加载失败"
-          body={friendlyError(error)}
-          detail={error}
-          actionLabel="重试"
-          onAction={() => reader.feed.retry()}
-        />
+        <ErrorState error={error} onRetry={() => reader.feed.retry()} />
       ) : rows.length === 0 && done ? (
         <EmptyState
           title="此刻还没有文章"
@@ -198,26 +193,5 @@ function GapMarker({ gap, active, busy, progress, scanBlocks, onFill }) {
         </>
       )}
     </li>
-  );
-}
-
-function FeedSkeleton() {
-  return (
-    <div aria-hidden="true">
-      <div className="border-b border-edge pb-8">
-        <div className="h-7 w-3/5 animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-4 h-4 w-full animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-2 h-4 w-4/5 animate-pulse rounded bg-paper-sunken" />
-        <div className="mt-4 h-3 w-2/5 animate-pulse rounded bg-paper-sunken" />
-      </div>
-      <ul className="divide-y divide-edge">
-        {[0, 1, 2, 3].map((k) => (
-          <li key={k} className="py-5">
-            <div className="h-5 w-2/3 animate-pulse rounded bg-paper-sunken" />
-            <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-paper-sunken" />
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }

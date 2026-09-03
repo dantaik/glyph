@@ -14,7 +14,8 @@ import {
   useRpcVersion,
 } from '../lib/config';
 import { shortAddr } from '../lib/format';
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Plus, Trash } from './Icons';
+import { Check, ChevronDown, ChevronUp, Plus, Trash } from './Icons';
+import BackButton from './BackButton';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
 
@@ -91,14 +92,7 @@ export default function SettingsPage({ navigate }) {
   return (
     <div>
       <div className="mb-8">
-        <button
-          type="button"
-          onClick={() => navigate({})}
-          className="-ml-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors"
-        >
-          <ArrowLeft size={16} />
-          返回
-        </button>
+        <BackButton onClick={() => navigate({})} />
       </div>
 
       <ListHeader

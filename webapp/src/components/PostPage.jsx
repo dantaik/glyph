@@ -11,14 +11,11 @@ import {
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
-import { ArrowLeft, AlertCircle } from './Icons';
+import { AlertCircle } from './Icons';
+import BackButton from './BackButton';
 import FontSizeControl from './FontSizeControl';
 import PostNav from './PostNav';
-
-const SKELETON_GROUPS = [
-  ['w-full', 'w-11/12', 'w-full', 'w-3/5'],
-  ['w-full', 'w-10/12', 'w-full', 'w-2/3'],
-];
+import { ArticleSkeleton } from './Skeleton';
 
 /**
  * Single post view — a letter set on the page.
@@ -101,14 +98,7 @@ export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, 
   return (
     <article>
       <div className="mb-8 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="-ml-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors"
-        >
-          <ArrowLeft size={16} />
-          返回
-        </button>
+        <BackButton onClick={onBack} />
         <FontSizeControl />
       </div>
 
@@ -145,20 +135,7 @@ export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, 
         </div>
       </header>
 
-      {loading && (
-        <div className="mx-auto max-w-[36em] space-y-9" aria-hidden="true">
-          {SKELETON_GROUPS.map((widths, g) => (
-            <div key={g} className="space-y-4">
-              {widths.map((w, i) => (
-                <div
-                  key={i}
-                  className={`h-4 animate-pulse rounded bg-paper-sunken ${w}`}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+      {loading && <ArticleSkeleton />}
 
       {error && !loading && (
         <div className="mx-auto max-w-[36em] py-6">

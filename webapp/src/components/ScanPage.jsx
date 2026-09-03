@@ -4,7 +4,7 @@ import { useActiveChainId } from '../lib/config';
 import { getReader } from '../lib/data';
 import { lowest, highest, blockCount } from '../lib/segments';
 import { fmtBlock, shortAddr } from '../lib/format';
-import { ArrowLeft } from './Icons';
+import BackButton from './BackButton';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
 
@@ -27,15 +27,8 @@ export default function ScanPage({ navigate }) {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => navigate({})}
-          className="-ml-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-ink-soft hover:text-accent hover:bg-paper-sunken transition-colors"
-        >
-          <ArrowLeft size={16} />
-          返回
-        </button>
+      <div className="mb-8">
+        <BackButton onClick={() => navigate({})} />
       </div>
 
       <ListHeader title="扫描范围" subtitle="本机缓存的区块覆盖范围" />

@@ -2,10 +2,12 @@ import { useAuthorList } from '../lib/authorList';
 import { useAsync } from '../lib/hooks';
 import { friendlyError, shortAddr } from '../lib/format';
 import EmptyState from './EmptyState';
+import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
 import FeaturedPost from './FeaturedPost';
 import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
+import { ListSkeleton } from './Skeleton';
 
 /**
  * Author page: address header, post count, title list with relative times,
@@ -13,7 +15,7 @@ import LoadMoreButton from './LoadMoreButton';
  * reader's author-list controller — a walk that keeps going and keeps its
  * rows if the page is left mid-way — rendered block by block as it goes.
  */
-export default function AuthorTitleList({ reader, author, navigate }) {
+export default function AuthorPage({ reader, author, navigate }) {
   const controller = reader.authorList(author);
   const list = useAuthorList(controller);
   const count = useAsync(() => reader.count(author), [reader, author]);
@@ -36,14 +38,7 @@ export default function AuthorTitleList({ reader, author, navigate }) {
       {loading && <ListSkeleton />}
 
       {error && titles.length === 0 && !loading && (
-        <EmptyState
-          tone="danger"
-          title="加载失败"
-          body={friendlyError(error)}
-          detail={error}
-          actionLabel="重试"
-          onAction={() => controller.retry()}
-        />
+        <ErrorState error={error} onRetry={() => controller.retry()} />
       )}
 
       {empty && <EmptyState title="该地址没发表过文章" />}
@@ -84,19 +79,5 @@ export default function AuthorTitleList({ reader, author, navigate }) {
         />
       )}
     </div>
-  );
-}
-
-function ListSkeleton() {
-  return (
-    <ul className="divide-y divide-edge" aria-hidden="true">
-      {[0, 1, 2, 3, 4].map((k) => (
-        <li key={k} className="flex items-baseline gap-4 py-4">
-          <span className="h-3 w-8 animate-pulse rounded bg-paper-sunken" />
-          <span className="h-5 max-w-[60%] flex-1 animate-pulse rounded bg-paper-sunken" />
-          <span className="ml-auto h-3 w-16 animate-pulse rounded bg-paper-sunken" />
-        </li>
-      ))}
-    </ul>
   );
 }

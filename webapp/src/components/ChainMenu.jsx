@@ -14,13 +14,13 @@ import { Check, ChevronDown } from './Icons';
  * ones (a testnet from VITE_CHAIN_ID), so the menu never hides where you are.
  */
 export default function ChainMenu() {
-  const CHAIN_ID = useActiveChainId();
+  const chainId = useActiveChainId();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
-  const ids = SELECTABLE_CHAIN_IDS.includes(CHAIN_ID)
+  const ids = SELECTABLE_CHAIN_IDS.includes(chainId)
     ? SELECTABLE_CHAIN_IDS
-    : [...SELECTABLE_CHAIN_IDS, CHAIN_ID];
-  const current = CHAINS[CHAIN_ID];
+    : [...SELECTABLE_CHAIN_IDS, chainId];
+  const current = CHAINS[chainId];
 
   useEffect(() => {
     if (!open) return undefined;
@@ -47,7 +47,7 @@ export default function ChainMenu() {
         className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs text-ink-soft hover:bg-paper-sunken hover:text-accent transition-colors"
       >
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-        <span className="hidden min-[380px]:inline">{current?.name ?? `链 ${CHAIN_ID}`}</span>
+        <span className="hidden min-[380px]:inline">{current?.name ?? `链 ${chainId}`}</span>
         <ChevronDown size={14} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
       </button>
 
@@ -58,7 +58,7 @@ export default function ChainMenu() {
         >
           {ids.map((id) => {
             const chain = CHAINS[id];
-            const active = id === CHAIN_ID;
+            const active = id === chainId;
             return (
               <button
                 key={id}
