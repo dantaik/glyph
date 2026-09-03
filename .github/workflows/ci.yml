@@ -23,3 +23,13 @@ jobs:
       # Both passes: the offline pass asserts the single file is self-contained
       # and under its size ceiling (see vite.config.js).
       - run: npm run build
+      # Browser tests over the built app and a mock JSON-RPC node for both
+      # chains (test/e2e/rpcServer.mjs); the offline file is opened from disk.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: webapp/playwright-report
+          retention-days: 7

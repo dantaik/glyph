@@ -125,6 +125,14 @@ const short = (s) => `${String(s).slice(0, 10)}…`;
 const shortAddr = (a) => `${String(a).slice(0, 8)}…`;
 
 /**
+ * An address as an argument to the node. viem checks the EIP-55 checksum
+ * of a mixed-case address and refuses one that fails it — which is what an
+ * address typed or pasted into a URL in the wrong case looks like. All
+ * lowercase is the same address and passes, so that is what goes out.
+ */
+const addrArg = (a) => String(a).toLowerCase();
+
+/**
  * The real chain I/O for `chainId`. `log` is the chain's rpcLog.scoped().
  */
 export function createChainIO(chainId, log) {
@@ -276,7 +284,7 @@ export function createChainIO(chainId, log) {
             address: GLYPH_ADDRESS,
             abi,
             functionName: 'latestBlock',
-            args: [author],
+            args: [addrArg(author)],
           }),
         (head) => `block ${log.b(head)}`,
       );
@@ -292,7 +300,7 @@ export function createChainIO(chainId, log) {
             address: GLYPH_ADDRESS,
             abi,
             functionName: 'count',
-            args: [author],
+            args: [addrArg(author)],
           }),
         (c) => `${c} posts`,
       );
@@ -368,7 +376,7 @@ export function createChainIO(chainId, log) {
       const name = await log.fromNode(
         'ens_getName',
         shortAddr(address),
-        () => client().getEnsName({ address }),
+        () => client().getEnsName({ address: addrArg(address) }),
         (v) => v ?? 'no name',
       );
       return name ?? null;

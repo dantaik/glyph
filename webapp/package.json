@@ -9,7 +9,9 @@
     "build:offline": "vite build --mode offline",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.3.0",

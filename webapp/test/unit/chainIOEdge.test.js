@@ -16,6 +16,14 @@ vi.mock('../../src/lib/clients', () => ({
     async getBlock({ blockNumber }) {
       return { number: blockNumber, timestamp: 1n };
     },
+    async readContract({ functionName, args }) {
+      fake.calls.push([functionName, ...args]);
+      return 0n;
+    },
+    async getEnsName({ address }) {
+      fake.calls.push(['ens', address]);
+      return null;
+    },
   }),
 }));
 
@@ -70,5 +78,24 @@ describe('chainIO.postsInRange — what the node refuses', () => {
     expect(err.message).toMatch(/429/);
     expect(err.rangeTooLarge).toBeUndefined();
     expect(fake.calls).toHaveLength(3); // the call and two retries
+  });
+});
+
+describe('chainIO — addresses as arguments', () => {
+  beforeEach(() => {
+    fake.calls = [];
+  });
+
+  it('hands the node lowercase addresses, so a wrongly-cased one is not refused as a bad checksum', async () => {
+    const io = createChainIO(1, silentLog());
+    const mixed = '0x8a1f3b52C9e44E1a9b1f0d2C7a44E0b1D2e3F4a5'; // not the EIP-55 casing of these bytes
+    await io.latestBlock(mixed);
+    await io.count(mixed);
+    await io.ensName(mixed);
+    expect(fake.calls).toEqual([
+      ['latestBlock', mixed.toLowerCase()],
+      ['count', mixed.toLowerCase()],
+      ['ens', mixed.toLowerCase()],
+    ]);
   });
 });
