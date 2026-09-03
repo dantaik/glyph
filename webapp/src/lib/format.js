@@ -5,14 +5,13 @@
 // relative times are merge-aware 12s-slot estimates, always 约-prefixed.
 
 import { CHAIN_ID } from './config';
+import { getChain } from './chains';
 
 /** First post-merge block — fixed 12s slots only apply from here on. */
 const MERGE_BLOCK = 15537394n;
 
 const SECONDS_PER_SLOT = 12;
 
-const ETHERSCAN_BASE =
-  CHAIN_ID === 11155111 ? 'https://sepolia.etherscan.io' : 'https://etherscan.io';
 
 const REL_FMT = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
 
@@ -104,13 +103,6 @@ export function excerpt(md, max = 80) {
   return `${chars.slice(0, max).join('').trimEnd()}…`;
 }
 
-const CHAIN_NAMES = {
-  1: '以太坊',
-  11155111: 'Sepolia 测试网',
-  167000: 'Taiko 主网',
-  167013: 'Taiko Hoodi 测试网',
-};
-
 /** Turn a raw provider error into a short, human-friendly hint. */
 export function friendlyError(message) {
   const m = String(message || '');
@@ -129,17 +121,17 @@ export function friendlyError(message) {
   return '节点暂时不可用，请稍后重试。';
 }
 
-/** Human-readable chain name for the configured chain id. */
+/** Human-readable chain name for a chain id (defaults to the active one). */
 export function chainName(chainId = CHAIN_ID) {
-  return CHAIN_NAMES[chainId] || `链 ${chainId}`;
+  return getChain(chainId).name || `链 ${chainId}`;
 }
 
-/** Etherscan transaction URL (sepolia subdomain when CHAIN_ID 11155111). */
-export function etherscanTxUrl(txHash) {
-  return `${ETHERSCAN_BASE}/tx/${txHash}`;
+/** Block-explorer transaction URL for the active chain (Etherscan/Taikoscan). */
+export function etherscanTxUrl(txHash, chainId = CHAIN_ID) {
+  return `${getChain(chainId).explorer}/tx/${txHash}`;
 }
 
-/** Etherscan address URL (sepolia subdomain when CHAIN_ID 11155111). */
-export function etherscanAddrUrl(address) {
-  return `${ETHERSCAN_BASE}/address/${address}`;
+/** Block-explorer address URL for the active chain. */
+export function etherscanAddrUrl(address, chainId = CHAIN_ID) {
+  return `${getChain(chainId).explorer}/address/${address}`;
 }

@@ -432,11 +432,16 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 | `author` indexed | 是 | 多作者下读取按 author 过滤的必备 topic |
 | 存储打包 | `(uint96 latestBlock, uint48 count)` 一槽 | 每篇 publish 仅 1 个 SSTORE |
 | 作者发现 | 带外（前端 `?author=0x…`）；无地址时客户端有界扫描最近 K 区块 | 保持合约极简；首页发现不改链上结构（best-effort，非 O(1)） |
-| 节点配置 | UI 设置弹窗，localStorage 覆盖 env 默认 | 用户随时切换公共 / 自建 RPC，无需重新部署 |
+| 节点配置 | `/settings` 页面，每条链一组**有序**节点，localStorage 覆盖 env 默认 | 按顺序使用，失败回退下一个；失败节点短暂搁置，避免每次请求都重试 |
+| 多链 | 以太坊主网 + Taiko 主网（CREATE2 同址），页首下拉切换 | 同一份合约、同一套前端；扫描缓存按链隔离 |
+| getLogs 窗口 | 每条链一个默认值，遇到节点范围上限自动折半重试 | 公共节点上限从 25 到 10,000 不等；自动适配而不是报错 |
+| 请求日志 | 每次节点请求 / 缓存命中各一行控制台日志 | 跳过了哪些区块、回退到了哪个节点，肉眼可查 |
 | ETH 价格源 | CoinGecko 公共 API（离线降级 ETH-only） | 简单自动；唯一链下 HTTP 依赖，失败不致命 |
 | 编辑器 | CodeMirror 源码编辑 + 实时预览 | Markdown 语法高亮 + 边写边看；预览复用渲染器 |
 | 永久性兜底 | 链上锚定 + IndexedDB 缓存 + 自留备份 | 三层冗余；应对未来滚动历史过期 |
 | 本地缓存 | IndexedDB，永不过期 | 内容不可变；缓存命中零 RPC；万篇仅 ~20 MB |
+| 扫描覆盖 | localStorage 记录**多段**已扫区块范围（而非单一 frontier） | 往前翻只补未读区间；已扫过的段落永不重扫 |
+| 请求去重 | 会话内按 (author, index) / (txHash, 事件序号) 索引 | 同一篇文章一次会话内最多向节点请求一次，无论从哪个页面进入 |
 
 ---
 
@@ -445,6 +450,7 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 **协议常量（截至 2026-06）**
 - **EIP-7623（Pectra）** calldata 地板价：`tokens = 零字节 + 4×非零字节`，地板 `10 gas/token` → 非零 40、零 10。
 - **EIP-7825（Fusaka, 2025-12）** 单笔交易 gas 上限：`2²⁴ = 16,777,216`。→ 一笔最多约 `(16,777,216 − 21,000) / 40 ≈ 418,905` 字节 ≈ **~409 KB** 图。
+- **交易池体积上限（非共识规则）** geth `txMaxSize = 4 × 32 KiB = 131,072` 字节，超出即以 `oversized data` 拒收。公共节点都跑这个默认值，因此**实际上限是 ~128 KiB / 笔**——远早于上面的 gas 上限触发，上面的 ~409 KB 只是理论值。前端以此为准（`publish.js` 的 `MAX_TX_BYTES` / `MAX_CALLDATA_BYTES`）：图片压到该预算以内，正文在上传任何图片之前先压一遍量大小。
 - **EIP-170** 合约代码上限 24,576 字节（仅在用 SSTORE2 时相关）。
 
 **依赖**

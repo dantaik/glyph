@@ -2,31 +2,39 @@ import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
-import Settings from './components/Settings';
+import SettingsPage from './components/SettingsPage';
 import { FIXTURES_MODE } from './lib/data';
 import { GLYPH_ADDRESS, CHAIN_ID } from './lib/config';
 import { useWallet, switchToConfiguredChain } from './lib/wallet';
 import { etherscanAddrUrl, shortAddr, chainName, fmtBlock } from './lib/format';
-import { readFeedScan } from './lib/blogReader';
+import { readFeedScan } from './lib/scanStore';
+import { lowest, highest } from './lib/segments';
 import { useUrlState } from './lib/router';
 
 const CONTRACT_CONFIGURED = GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
 
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const { chainId: walletChainId } = useWallet();
-  const [, navigate] = useUrlState();
+  const [params, navigate] = useUrlState();
   const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState(null);
-  // Persisted home-feed scan range (head + frontier), shown in the footer.
+  // Covered home-feed block ranges, summarized in the footer.
   const [feedScan, setFeedScan] = useState(readFeedScan);
   useEffect(() => {
     const sync = () => setFeedScan(readFeedScan());
     window.addEventListener('glyph:feedscan', sync);
     return () => window.removeEventListener('glyph:feedscan', sync);
   }, []);
+
+  // Coverage is a set of ranges; the footer shows the outer span plus how
+  // many separate ranges make it up.
+  const segments = feedScan?.segments ?? [];
+  const scanSpan = segments.length
+    ? ` ${fmtBlock(lowest(segments))} 至 ${fmtBlock(highest(segments))}` +
+      (segments.length > 1 ? ` · ${segments.length} 段` : '')
+    : '';
 
   const handleSwitchChain = async () => {
     setSwitchError(null);
@@ -45,7 +53,7 @@ export default function App() {
       <Header
         tab={tab}
         onTabChange={setTab}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => navigate({ settings: '1' })}
       />
       {chainMismatch && (
         <div
@@ -64,7 +72,9 @@ export default function App() {
         </div>
       )}
       <main className="flex-1 w-full mx-auto max-w-5xl px-5 sm:px-6 pt-8 pb-16">
-        {tab === 'read' ? (
+        {params.settings ? (
+          <SettingsPage navigate={navigate} />
+        ) : tab === 'read' ? (
           <Reader onStartWriting={() => setTab('write')} />
         ) : (
           <Publisher />
@@ -95,14 +105,11 @@ export default function App() {
               className="inline-block text-2xs tabular-nums text-ink-faint hover:text-accent transition-colors"
             >
               扫描范围
-              {feedScan?.head != null && feedScan?.frontier != null
-                ? ` ${fmtBlock(feedScan.frontier)} 至 ${fmtBlock(feedScan.head)}`
-                : ''}
+              {scanSpan}
             </a>
           </p>
         )}
       </footer>
-      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {FIXTURES_MODE && (
         <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
           演示数据

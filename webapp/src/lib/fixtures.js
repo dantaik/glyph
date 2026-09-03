@@ -281,6 +281,13 @@ export function makeFixtures(mode) {
       return rows;
     },
 
+    async loadMoreAcrossAuthors(oldestShown, n) {
+      await delay();
+      if (!oldestShown) return { rows: [], done: feed.length === 0 };
+      const older = feed.filter((p) => p.block < BigInt(oldestShown.block));
+      return { rows: older.slice(0, n).map((p) => ({ ...p })), done: older.length <= n };
+    },
+
     async loadPostBody(txHash) {
       await delay();
       const body = bodyByTx.get(txHash);

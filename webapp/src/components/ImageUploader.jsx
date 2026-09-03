@@ -34,7 +34,17 @@ async function copyToClipboard(text) {
  * Dropzone + thumbnail grid for draft images. The parent owns the `files`
  * map ({ key: File }); this component only renders and mutates via onChange.
  */
-export default function ImageUploader({ files, uploadRefs, onChange, disabled, previewUrls }) {
+export default function ImageUploader({
+  files,
+  uploadRefs,
+  usedKeys = [],
+  onChange,
+  disabled,
+  previewUrls,
+}) {
+  // Attachments the body doesn't display are never uploaded, so say so on
+  // the thumbnail instead of dropping them from the cost panel silently.
+  const used = new Set(usedKeys);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
   const fileInputRef = useRef(null);
@@ -98,7 +108,7 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled, p
 
       {Object.keys(files).length > 0 && (
         <p className="mt-2 text-2xs text-ink-ghost">
-          图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文
+          图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。
         </p>
       )}
 
@@ -146,6 +156,7 @@ export default function ImageUploader({ files, uploadRefs, onChange, disabled, p
             </button>
             <span className="block text-2xs text-ink-faint mt-0.5 truncate">
               {key} · {(file.size / 1024).toFixed(0)}KB
+              {!used.has(key) && <span className="text-ink-ghost"> · 未引用</span>}
             </span>
           </div>
         ))}

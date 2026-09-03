@@ -10,6 +10,7 @@
 import * as reader from './blogReader';
 import { GLYPH_ADDRESS, getCacheTtlMs } from './config';
 import { makeTtlCache } from './ttlCache';
+import * as rpcLog from './rpcLog';
 
 function detectFixturesMode() {
   try {
@@ -27,18 +28,27 @@ export const FIXTURES_MODE = import.meta.env.DEV ? detectFixturesMode() : null;
 // --- Chain helpers layered on top of the blogReader surface ---
 
 function getAuthorCountReal(author) {
-  return reader.client.readContract({
-    address: GLYPH_ADDRESS,
-    abi: reader.abi,
-    functionName: 'count',
-    args: [author],
-  });
+  return rpcLog.fromNode(
+    'count()',
+    `author ${String(author).slice(0, 8)}…`,
+    () =>
+      reader.client.readContract({
+        address: GLYPH_ADDRESS,
+        abi: reader.abi,
+        functionName: 'count',
+        args: [author],
+      }),
+    (c) => `${c} posts`,
+  );
 }
 
 function getChainClockReal() {
-  return reader.client
-    .getBlock({ blockTag: 'latest' })
-    .then((b) => ({ block: b.number, ts: Number(b.timestamp) }));
+  return rpcLog.fromNode(
+    'eth_getBlockByNumber',
+    'latest · chain clock',
+    () => reader.client.getBlock({ blockTag: 'latest' }),
+    (b) => `block ${rpcLog.b(b.number)}`,
+  ).then((b) => ({ block: b.number, ts: Number(b.timestamp) }));
 }
 
 // --- Implementation object — fixtures replace it wholesale in DEV ---
@@ -48,6 +58,7 @@ let impl = {
   loadMoreTitles: reader.loadMoreTitles,
   findTitleMeta: reader.findTitleMeta,
   loadRecentAcrossAuthors: reader.loadRecentAcrossAuthors,
+  loadMoreAcrossAuthors: reader.loadMoreAcrossAuthors,
   findMetaByTx: reader.findMetaByTx,
   loadPostBody: reader.loadPostBody,
   resolveImages: reader.resolveImages,
@@ -98,6 +109,11 @@ export const loadRecentAcrossAuthors = (n, opts) =>
   ttlCache(`recent:${n}:${opts?.windowSize ?? ''}:${opts?.maxWindows ?? ''}`, () =>
     impl.loadRecentAcrossAuthors(n, opts),
   );
+// Deliberately NOT TTL-cached: a click that comes up empty is meant to be
+// clicked again, and each repeat sweeps further back. Ranges already read
+// are skipped by the scan store, so repeating costs nothing anyway.
+export const loadMoreAcrossAuthors = (oldestShown, n, opts) =>
+  impl.loadMoreAcrossAuthors(oldestShown, n, opts);
 export const findMetaByTx = (txHash, eventIndex = 0) =>
   ttlCache(txMetaKey(txHash, eventIndex), async () =>
     cacheMetaBoth(await impl.findMetaByTx(txHash, eventIndex)),
