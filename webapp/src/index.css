@@ -33,7 +33,7 @@
   /* --- Fonts --- */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  --font-serif: "Noto Serif SC Variable", "Noto Serif SC", "Source Han Serif SC",
+  --font-serif: "Source Han Serif SC", "思源宋体", "Noto Serif SC",
     "Songti SC", "SimSun", serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Source Code Pro", monospace;
 
@@ -125,7 +125,7 @@ html[data-fontsize='l'] { --article-size: 1.21875rem; }
   margin-inline: auto;
 }
 
-/* Body prose is the UI sans — serif belongs to headings only. */
+/* Body prose inherits the article's serif face; code stays mono. */
 .prose-glyph {
   font-size: var(--article-size);
   line-height: 1.95;

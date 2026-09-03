@@ -1,13 +1,11 @@
-import { Fragment, useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import Header from './components/Header';
 import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import SettingsPage from './components/SettingsPage';
 import ChainIcon from './components/ChainIcon';
-import { ExternalLink } from './components/Icons';
 import { FIXTURES_MODE } from './lib/data';
-import { GLYPH_ADDRESS } from './lib/config';
-import { etherscanAddrUrl, chainName, fmtBlock } from './lib/format';
+import { chainName, fmtBlock } from './lib/format';
 import { lowest, highest } from './lib/segments';
 import { IS_OFFLINE_BUILD, OFFLINE_FILE } from './lib/offline';
 import { hrefFor, useUrlState } from './lib/router';
@@ -83,37 +81,19 @@ function Footer({ navigate }) {
 
   return (
     <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
-      <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
-        {feed.chains.map((c, i) => (
-          <Fragment key={c.chainId}>
-            {i > 0 && <span className="select-none" aria-hidden="true">·</span>}
-            <a
-              href={etherscanAddrUrl(GLYPH_ADDRESS, c.chainId)}
-              target="_blank"
-              rel="noreferrer"
-              title={`在${chainName(c.chainId)}的区块浏览器查看合约`}
-              className={`${FOOT_LINK} text-2xs`}
-            >
-              {chainName(c.chainId)}
-              <ExternalLink size={10} aria-hidden="true" />
-            </a>
-          </Fragment>
-        ))}
-        {/* The whole app as one file, for when this domain is gone. */}
-        {!IS_OFFLINE_BUILD && (
-          <>
-            <span className="select-none" aria-hidden="true">·</span>
-            <a
-              href={`/${OFFLINE_FILE}`}
-              download={OFFLINE_FILE}
-              title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
-              className={`${FOOT_LINK} text-2xs`}
-            >
-              离线版
-            </a>
-          </>
-        )}
-      </p>
+      {/* The whole app as one file, for when this domain is gone. */}
+      {!IS_OFFLINE_BUILD && (
+        <p className="flex flex-wrap items-center justify-center gap-2 text-xs text-ink-faint tabular-nums">
+          <a
+            href={`/${OFFLINE_FILE}`}
+            download={OFFLINE_FILE}
+            title="把整个应用存成一个 HTML 文件，存到本地后双击即可阅读"
+            className={`${FOOT_LINK} text-2xs`}
+          >
+            离线版
+          </a>
+        </p>
+      )}
       <ul className="mt-2 space-y-1 text-2xs text-ink-faint tabular-nums">
         {feed.chains.map((c) => (
           <ChainLine key={c.chainId} chainId={c.chainId} span={scanSpan(c.coverage)} scanning={c.job != null} go={go} />
@@ -132,7 +112,7 @@ function Footer({ navigate }) {
  */
 const scanSpan = (segments) =>
   segments.length
-    ? ` ${fmtBlock(lowest(segments))} 至 ${fmtBlock(highest(segments))}` +
+    ? ` ${fmtBlock(lowest(segments))} - ${fmtBlock(highest(segments))}` +
       (segments.length > 1 ? ` · ${segments.length} 段` : '')
     : '';
 
@@ -147,7 +127,7 @@ function ChainLine({ chainId, span, scanning, go }) {
       </a>
       <span className="select-none" aria-hidden="true">·</span>
       <a href={hrefFor({ scan: '1' })} onClick={go({ scan: '1' })} title="查看扫描范围" className={FOOT_LINK}>
-        扫描范围
+        已扫描区块
         {span}
         {scanning && <span className="animate-pulse"> · 扫描中</span>}
       </a>

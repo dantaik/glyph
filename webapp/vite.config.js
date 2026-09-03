@@ -181,15 +181,15 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: offline
         ? {
-            // ~10 MB of CJK woff2 subsets, fetched per-glyph-range at runtime —
-            // neither inlinable at a sane size nor reachable from disk. The
-            // --font-serif stack falls back to 苹方/宋体/思源宋体.
-            '@fontsource-variable/noto-serif-sc': resolve(
-              import.meta.dirname,
-              'src/offline/no-webfont.css',
-            ),
+            // The hosted app serves the 10 MB 思源宋体 WOFF2 from public/fonts;
+            // a downloaded single file can't (no server, and inlining would
+            // more than double it). The --font-serif stack falls back to
+            // 苹方/宋体/思源宋体 on the local system instead.
+            'glyph-serif-font': resolve(import.meta.dirname, 'src/offline/no-webfont.css'),
           }
-        : {},
+        : {
+            'glyph-serif-font': resolve(import.meta.dirname, 'src/serifFont.css'),
+          },
     },
     define: {
       // Lets the app hide the download link inside the downloaded copy.
