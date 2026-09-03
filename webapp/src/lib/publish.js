@@ -10,13 +10,11 @@
 // Requires a browser wallet (window.ethereum).
 
 import { createWalletClient, custom, toHex } from 'viem';
-import { mainnet, sepolia } from 'viem/chains';
-import { GLYPH_ADDRESS, CHAIN_ID } from './config';
-import { abi } from './blogReader';
+import { GLYPH_ADDRESS } from './config';
+import { getChain } from './chains';
+import { abi } from './abi';
 import { encodeTitle } from './title';
 import { encodePayload } from './payload';
-
-const chain = CHAIN_ID === 11155111 ? sepolia : mainnet;
 
 /**
  * Per-transaction byte ceiling. NOT a consensus rule: geth's transaction
@@ -37,11 +35,19 @@ export const MAX_CALLDATA_BYTES = MAX_TX_BYTES - 1_024;
 
 const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
 
-async function getWallet() {
+/**
+ * The wallet client for `chainId`. The chain object matters: viem checks
+ * the wallet is on it before sending, so the chain being read (which the
+ * mismatch banner asks the wallet to switch to) is the one to sign on.
+ */
+async function getWallet(chainId) {
   if (!window.ethereum) {
     throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
   }
-  const wallet = createWalletClient({ chain, transport: custom(window.ethereum) });
+  const wallet = createWalletClient({
+    chain: getChain(chainId).viem,
+    transport: custom(window.ethereum),
+  });
   const [account] = await wallet.getAddresses();
   return { wallet, account };
 }
@@ -146,14 +152,14 @@ export function usedImageKeys(markdown, files) {
 
 /**
  * Replace `upload:KEY` refs in markdown with `eth:0x<txhash>` after uploading
- * the images the body shows (see usedImageKeys — the rest are left alone).
- * Optional `onProgress(key, i, total)` fires before each image upload
- * (i is 1-based) so the UI can show per-image progress.
+ * the images the body shows (see usedImageKeys — the rest are left alone)
+ * on `chainId`. Optional `onProgress(key, i, total)` fires before each
+ * image upload (i is 1-based) so the UI can show per-image progress.
  */
-export async function embedImages(markdown, files, { quality = 0.6, onProgress } = {}) {
+export async function embedImages(markdown, files, { chainId, quality = 0.6, onProgress } = {}) {
   const used = usedImageKeys(markdown, files);
   if (used.length === 0) return markdown; // nothing to pay for
-  const { wallet, account } = await getWallet();
+  const { wallet, account } = await getWallet(chainId);
   let out = markdown;
   let i = 0;
   for (const key of used) {
@@ -195,12 +201,12 @@ export async function measurePayload({ tags = [], markdown, files = {} }) {
 }
 
 /**
- * Publish a post.
- * @param {{ title: string, tags?: string[], markdown: string }} draft
+ * Publish a post on `chainId`.
+ * @param {{ chainId: number, title: string, tags?: string[], markdown: string }} draft
  * @returns {Promise<`0x${string}`>} tx hash of the publish call
  */
-export async function publishPost({ title, tags = [], markdown }) {
-  const { wallet, account } = await getWallet();
+export async function publishPost({ chainId, title, tags = [], markdown }) {
+  const { wallet, account } = await getWallet(chainId);
   const payload = await encodePayload({ tags, markdown });
   const titleHex = encodeTitle(title);
   return wallet.writeContract({

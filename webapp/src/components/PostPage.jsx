@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { loadPostBody, resolveImages, getChainClock, resolveEnsName } from '../lib/data';
+import { useAsync } from '../lib/hooks';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
   fmtBlock,
@@ -22,20 +22,20 @@ const SKELETON_GROUPS = [
 
 /**
  * Single post view — a letter set on the page.
- * Props: { meta: { author, index, block, title, txHash, eventIndex },
+ * Props: { reader, meta: { author, index, block, title, txHash, eventIndex },
  *          onBack, neighbors: { prev, next } (undefined=resolving,
  *          null=absent), onNavigate(neighborMeta), onOpenAuthor() }
  *
- * Fetches the body (tags + markdown) from the publish() tx calldata, then
- * resolves any eth:<txhash> image refs to blob URLs before rendering.
+ * Fetches the body (tags + markdown) from the publish() tx calldata through
+ * the reader of the chain being shown, then resolves any eth:<txhash> image
+ * refs to blob URLs before rendering.
  */
-export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAuthor }) {
+export default function PostPage({ reader, meta, onBack, neighbors, onNavigate, onOpenAuthor }) {
   const [body, setBody] = useState(null); // { tags, markdown }
   const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [relTime, setRelTime] = useState(null);
 
   // Object URLs for the resolved images of the *current* post — revoked
   // whenever the post changes or the page unmounts.
@@ -53,11 +53,11 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
     setHtml(null);
     setFromCache(false);
     try {
-      const res = await loadPostBody(meta.txHash);
+      const res = await reader.loadPostBody(meta.txHash);
       const b = res.body;
       setBody(b);
       setFromCache(res.fromCache);
-      const { markdown: resolved, urls } = await resolveImages(b.markdown);
+      const { markdown: resolved, urls } = await reader.resolveImages(b.markdown);
       urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
     } catch (err) {
@@ -65,7 +65,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
     } finally {
       setLoading(false);
     }
-  }, [meta.txHash]);
+  }, [reader, meta.txHash]);
 
   useEffect(() => {
     load();
@@ -88,31 +88,12 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
   }, [meta.title]);
 
   // Estimated wall-clock time from the chain clock (null → suppressed).
-  useEffect(() => {
-    let cancelled = false;
-    setRelTime(null);
-    getChainClock()
-      .then((clock) => {
-        if (!cancelled) {
-          setRelTime(fmtRelTime(estimateBlockTime(clock, meta.block)));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [meta.block]);
+  const clock = useAsync(() => reader.clock(), [reader]);
+  const relTime = clock.value ? fmtRelTime(estimateBlockTime(clock.value, meta.block)) : null;
 
   // Author display: ENS name when the address has one, else the address.
-  const [ensName, setEnsName] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    setEnsName(null);
-    resolveEnsName(meta.author).then((name) => !cancelled && setEnsName(name));
-    return () => {
-      cancelled = true;
-    };
-  }, [meta.author]);
+  const ens = useAsync(() => reader.ensName(meta.author), [reader, meta.author]);
+  const ensName = ens.value ?? null;
 
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
@@ -216,7 +197,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
             <span>区块 {fmtBlock(meta.block)}</span>
             <span className="select-none" aria-hidden="true">·</span>
             <a
-              href={etherscanTxUrl(meta.txHash)}
+              href={etherscanTxUrl(meta.txHash, reader.chainId)}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-accent transition-colors"

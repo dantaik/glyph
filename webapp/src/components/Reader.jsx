@@ -1,15 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  loadTitleList,
-  loadMoreTitles,
-  findTitleMeta,
-  findMetaByTx,
-  getAuthorCount,
-  getChainClock,
-  FIXTURES_MODE,
-} from '../lib/data';
+import { useState, useEffect, useRef } from 'react';
+import { useReader } from '../lib/data';
+import { useAsync } from '../lib/hooks';
 import { friendlyError } from '../lib/format';
-import { GLYPH_ADDRESS } from '../lib/config';
+import { CONTRACT_CONFIGURED } from '../lib/config';
 import { useUrlState, ADDRESS_RE } from '../lib/router';
 import EmptyState from './EmptyState';
 import PostPage from './PostPage';
@@ -17,101 +10,28 @@ import HomeFeed from './HomeFeed';
 import AuthorTitleList from './AuthorTitleList';
 import ScanPage from './ScanPage';
 
-const PAGE_SIZE = 20;
-
+/**
+ * The reading surfaces, picked by URL: `/` the home feed, `/author/<addr>`
+ * one author's list, `/tx/<hash>/<n>` one post, `/scan` the local scan
+ * status. Every surface reads through the reader of the chain being shown;
+ * switching chains swaps the reader in place.
+ */
 export default function Reader({ onStartWriting }) {
   const [params, navigate] = useUrlState();
+  const reader = useReader();
   const author = params.author && ADDRESS_RE.test(params.author) ? params.author : null;
   const tx = params.tx;
   const txEvent = params.txEvent != null ? Number(params.txEvent) : 0;
+  const isConfigured = CONTRACT_CONFIGURED || Boolean(reader.io.ephemeral);
 
-  // /tx/<hash> deep link: undefined = resolving, null = not found, meta.
-  const [txMeta, setTxMeta] = useState(undefined);
-  const [txError, setTxError] = useState(null);
-  const [txTick, setTxTick] = useState(0);
+  // A transaction belongs to one chain: switching chains while a post is
+  // open goes back to the home feed of the new chain.
+  const shownChain = useRef(reader.chainId);
   useEffect(() => {
-    if (!tx) {
-      setTxMeta(undefined);
-      setTxError(null);
-      return undefined;
-    }
-    let cancelled = false;
-    setTxMeta(undefined);
-    setTxError(null);
-    findMetaByTx(tx, txEvent)
-      .then((m) => !cancelled && setTxMeta(m ?? null))
-      .catch((err) => !cancelled && setTxError(err?.message || '加载失败'));
-    return () => {
-      cancelled = true;
-    };
-  }, [tx, txEvent, txTick]);
-
-  // The author/index the open post belongs to — from the resolved tx meta.
-  const postAuthor = txMeta && txMeta !== null ? txMeta.author : null;
-  const postIdx = txMeta && txMeta !== null ? Number(txMeta.index) : undefined;
-  const postIdxValid = postIdx != null && Number.isSafeInteger(postIdx) && postIdx >= 0;
-
-  const [titles, setTitles] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState(null);
-  // undefined = resolving, null = unavailable, bigint = known.
-  const [authorCount, setAuthorCount] = useState(undefined);
-  const [clock, setClock] = useState(null);
-  // Neighbors of the open post: undefined = resolving, null = absent, meta = exists.
-  const [neighbors, setNeighbors] = useState({ prev: undefined, next: undefined });
-  const [listTick, setListTick] = useState(0);
-  const neighborCache = useRef(new Map());
-
-  const isConfigured =
-    Boolean(FIXTURES_MODE) || GLYPH_ADDRESS !== '0xYourGlyphContractAddress';
-
-  // Load title list when author changes.
-  useEffect(() => {
-    setTitles([]);
-    setError(null);
-    setHasMore(true);
-    if (!isConfigured || !author) return undefined;
-    let cancelled = false;
-    setLoading(true);
-    loadTitleList(author, PAGE_SIZE)
-      .then((rows) => {
-        if (cancelled) return;
-        setTitles(rows);
-        setHasMore(rows.length >= PAGE_SIZE);
-      })
-      .catch((err) => !cancelled && setError(err.message || '加载失败'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [author, isConfigured, listTick]);
-
-  // Chain clock for 约-relative times; silently degrade to block numbers.
-  useEffect(() => {
-    if (!isConfigured || !author) return undefined;
-    let cancelled = false;
-    getChainClock()
-      .then((c) => !cancelled && setClock(c))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [author, isConfigured]);
-
-  // 共 N 篇 — total post count for the author header.
-  useEffect(() => {
-    setAuthorCount(undefined);
-    if (!isConfigured || !author) return undefined;
-    let cancelled = false;
-    getAuthorCount(author)
-      .then((c) => !cancelled && setAuthorCount(c))
-      .catch(() => !cancelled && setAuthorCount(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [author, isConfigured]);
+    if (shownChain.current === reader.chainId) return;
+    shownChain.current = reader.chainId;
+    if (tx) navigate({}, { replace: true });
+  }, [reader.chainId, tx, navigate]);
 
   // Legacy ?author= query links converge onto the /author/<addr> path
   // (replace, so history stays clean).
@@ -126,69 +46,6 @@ export default function Reader({ onStartWriting }) {
     if (!tx || params.txEvent != null) return;
     navigate({ tx, txEvent: 0 }, { replace: true });
   }, [tx, params.txEvent, navigate]);
-
-
-  // Neighbors for the open post: seed synchronously from the titles cache,
-  // resolve misses via findTitleMeta in parallel; j<0 → null immediately;
-  // when authorCount is known, j>=authorCount → null without RPC.
-  useEffect(() => {
-    if (!postAuthor || !postIdxValid) {
-      setNeighbors({ prev: undefined, next: undefined });
-      return undefined;
-    }
-    let cancelled = false;
-
-    const seed = (j) => {
-      if (j < 0) return null;
-      if (authorCount != null && j >= Number(authorCount)) return null;
-      const hit = titles.find((t) => Number(t.index) === j);
-      if (hit) return hit;
-      const key = `${postAuthor}:${j}`;
-      return neighborCache.current.has(key) ? neighborCache.current.get(key) : undefined;
-    };
-
-    const resolve = (j, side) => {
-      findTitleMeta(postAuthor, j)
-        .then((m) => {
-          neighborCache.current.set(`${postAuthor}:${j}`, m ?? null);
-          if (!cancelled) setNeighbors((cur) => ({ ...cur, [side]: m ?? null }));
-        })
-        .catch(() => {
-          if (!cancelled) setNeighbors((cur) => ({ ...cur, [side]: null }));
-        });
-    };
-
-    const prev = seed(postIdx - 1);
-    const next = seed(postIdx + 1);
-    setNeighbors({ prev, next });
-    if (prev === undefined) resolve(postIdx - 1, 'prev');
-    if (next === undefined) resolve(postIdx + 1, 'next');
-
-    return () => {
-      cancelled = true;
-    };
-  }, [postAuthor, postIdx, postIdxValid, titles, authorCount]);
-
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !author) return;
-    setLoadingMore(true);
-    try {
-      const oldest = titles[titles.length - 1];
-      if (!oldest || BigInt(oldest.index) === 0n) {
-        setHasMore(false);
-        return;
-      }
-      const more = await loadMoreTitles(author, oldest, PAGE_SIZE);
-      setTitles((cur) => [...cur, ...more]);
-      setHasMore(more.length >= PAGE_SIZE);
-    } catch (err) {
-      setError(err.message || '加载更多失败');
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [author, titles, loadingMore, hasMore]);
-
-  // --- Empty / error states ---
 
   if (!isConfigured) {
     return (
@@ -207,74 +64,106 @@ export default function Reader({ onStartWriting }) {
     );
   }
 
-  // --- /scan — local scan-range status page ---
-
-  if (params.scan) {
-    return <ScanPage navigate={navigate} />;
-  }
-
-  // --- /tx/<hash> deep link view ---
+  if (params.scan) return <ScanPage navigate={navigate} />;
 
   if (tx) {
-    if (txError) {
-      return (
-        <EmptyState
-          tone="danger"
-          title="加载失败"
-          body={friendlyError(txError)}
-          detail={txError}
-          actionLabel="重试"
-          onAction={() => setTxTick((t) => t + 1)}
-        />
-      );
-    }
-    if (txMeta === undefined) {
-      return (
-        <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
-          加载中…
-        </div>
-      );
-    }
-    if (txMeta === null) {
-      return (
-        <EmptyState
-          title="没有找到这篇文章"
-          body="这笔交易里没有发布记录，或交易哈希有误。"
-          actionLabel="返回首页"
-          onAction={() => navigate({})}
-        />
-      );
-    }
-    return (
-      <PostPage
-        meta={txMeta}
-        onBack={() => navigate({ author: txMeta.author })}
-        neighbors={neighbors}
-        onNavigate={(m) => navigate({ tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
-        onOpenAuthor={() => navigate({ author: txMeta.author })}
-      />
-    );
+    return <TxRoute reader={reader} txHash={tx} eventIndex={txEvent} navigate={navigate} />;
   }
 
   if (!author) {
-    return <HomeFeed navigate={navigate} onStartWriting={onStartWriting} />;
+    return <HomeFeed reader={reader} navigate={navigate} onStartWriting={onStartWriting} />;
   }
 
-  // --- Title list view ---
+  return <AuthorTitleList reader={reader} author={author} navigate={navigate} />;
+}
 
+/** `/tx/<hash>/<n>`: resolve the post's metadata, then show it. */
+function TxRoute({ reader, txHash, eventIndex, navigate }) {
+  const meta = useAsync(() => reader.findMetaByTx(txHash, eventIndex), [reader, txHash, eventIndex]);
+  const neighbors = useNeighbors(reader, meta.value ?? null);
+
+  if (meta.error) {
+    return (
+      <EmptyState
+        tone="danger"
+        title="加载失败"
+        body={friendlyError(meta.error)}
+        detail={meta.error}
+        actionLabel="重试"
+        onAction={meta.retry}
+      />
+    );
+  }
+  if (meta.loading) {
+    return (
+      <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
+        加载中…
+      </div>
+    );
+  }
+  if (meta.value === null) {
+    return (
+      <EmptyState
+        title="没有找到这篇文章"
+        body="这笔交易里没有发布记录，或交易哈希有误。"
+        actionLabel="返回首页"
+        onAction={() => navigate({})}
+      />
+    );
+  }
+  const post = meta.value;
   return (
-    <AuthorTitleList
-      author={author}
-      titles={titles}
-      loading={loading}
-      loadingMore={loadingMore}
-      hasMore={hasMore}
-      error={error}
-      authorCount={authorCount}
-      clock={clock}
-      onLoadMore={loadMore}
-      onRetry={() => setListTick((t) => t + 1)}
-      navigate={navigate}
+    <PostPage
+      reader={reader}
+      meta={post}
+      onBack={() => navigate({ author: post.author })}
+      neighbors={neighbors}
+      onNavigate={(m) => navigate({ tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
+      onOpenAuthor={() => navigate({ author: post.author })}
     />
   );
+}
+
+/**
+ * Neighbors of the open post: seeded synchronously from what the session
+ * has already read, misses resolved through the reader in parallel.
+ * j<0 → null immediately; when the author's count is known, j>=count →
+ * null without RPC. `undefined` = resolving, `null` = absent.
+ */
+function useNeighbors(reader, meta) {
+  const author = meta?.author ?? null;
+  const idx = meta ? Number(meta.index) : null;
+  const valid = idx != null && Number.isSafeInteger(idx) && idx >= 0;
+  const count = useAsync(author ? () => reader.count(author) : null, [reader, author]);
+  const total = count.value != null ? Number(count.value) : null;
+  const [neighbors, setNeighbors] = useState({ prev: undefined, next: undefined });
+
+  useEffect(() => {
+    if (!author || !valid) {
+      setNeighbors({ prev: undefined, next: undefined });
+      return undefined;
+    }
+    let cancelled = false;
+    const seed = (j) => {
+      if (j < 0) return null;
+      if (total != null && j >= total) return null;
+      return reader.store.knownPost(author, BigInt(j)) ?? undefined;
+    };
+    const resolve = (j, side) => {
+      reader.findTitleMeta(author, j).then(
+        (m) => !cancelled && setNeighbors((cur) => ({ ...cur, [side]: m ?? null })),
+        () => !cancelled && setNeighbors((cur) => ({ ...cur, [side]: null })),
+      );
+    };
+    const prev = seed(idx - 1);
+    const next = seed(idx + 1);
+    setNeighbors({ prev, next });
+    if (prev === undefined) resolve(idx - 1, 'prev');
+    if (next === undefined) resolve(idx + 1, 'next');
+    return () => {
+      cancelled = true;
+    };
+  }, [reader, author, idx, valid, total]);
+
+  return neighbors;
 }

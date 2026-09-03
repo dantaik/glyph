@@ -6,10 +6,9 @@ import {
   measurePayload,
   MAX_CALLDATA_BYTES,
 } from '../lib/publish';
-import { client } from '../lib/blogReader';
-import { getAuthorCount } from '../lib/data';
+import { getClient } from '../lib/clients';
+import { useReader } from '../lib/data';
 import { useWallet } from '../lib/wallet';
-import { CHAIN_ID } from '../lib/config';
 import { etherscanTxUrl } from '../lib/format';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
@@ -54,7 +53,10 @@ export default function Publisher() {
   const [isFirstPost, setIsFirstPost] = useState(true);
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
   const { account, chainId: walletChainId, connect } = useWallet();
-  const chainMismatch = walletChainId != null && walletChainId !== CHAIN_ID;
+  // Publish on the chain being read — the one the header shows.
+  const reader = useReader();
+  const chainId = reader.chainId;
+  const chainMismatch = walletChainId != null && walletChainId !== chainId;
 
   // Stable preview URLs for uploaded files — shared by the dropzone
   // thumbnails and the editor's live preview pane.
@@ -97,19 +99,20 @@ export default function Publisher() {
       return undefined;
     }
     let cancelled = false;
-    getAuthorCount(account)
+    reader
+      .count(account)
       .then((c) => !cancelled && setIsFirstPost(c === 0n))
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [account]);
+  }, [account, reader]);
 
   // Poll gas + ETH price every 30s.
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
-      const m = await getMarketState(client);
+      const m = await getMarketState(getClient(chainId));
       if (!cancelled) setMarket(m);
     };
     refresh();
@@ -118,7 +121,7 @@ export default function Publisher() {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [chainId]);
 
   // --- Cost estimate ---
   // Rough approximation — actual brotli output may differ a little either way.
@@ -241,6 +244,7 @@ export default function Publisher() {
       if (usedKeys.length > 0) {
         setStatusMsg('正在上传图片到链上…');
         finalMd = await embedImages(markdown, files, {
+          chainId,
           onProgress: (key, i, total) =>
             setStatusMsg(`正在上传图片（${i}/${total}）：${key}`),
         });
@@ -250,6 +254,7 @@ export default function Publisher() {
       setStatus('signing');
       setStatusMsg('请在钱包中确认…');
       const hash = await publishPost({
+        chainId,
         title: title.trim(),
         tags,
         markdown: finalMd,
@@ -376,7 +381,7 @@ export default function Publisher() {
 
       <SectionHeader label="预估成本" />
       <div className="mb-6">
-        <CostPanel estimate={costEstimate} market={market} chainId={CHAIN_ID} />
+        <CostPanel estimate={costEstimate} market={market} chainId={chainId} />
       </div>
 
       <div className="pt-6">
@@ -431,7 +436,7 @@ export default function Publisher() {
               <Check size={16} className="shrink-0" />
               <span className="font-medium">已发布到链上</span>
               <a
-                href={etherscanTxUrl(txHash)}
+                href={etherscanTxUrl(txHash, chainId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 font-mono text-xs underline underline-offset-2 hover:text-accent transition-colors"

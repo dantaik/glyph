@@ -11,13 +11,17 @@ in Ethereum L1 calldata. Solidity contract + Vite/React 19 webapp. See
 
 - `contracts/src/Blog.sol` — the Glyph contract (shared, non-upgradeable, no owner)
 - `contracts/script/Deploy.s.sol` — Foundry deploy script
-- `webapp/src/lib/` — blogReader (chain I/O), scanner (traversal rules), scanStore
-  (what has been read: session + localStorage), segments (block-range algebra),
-  payload (brotli), publish, cache (IndexedDB), wallet, price, fixtures (DEV demo data)
+- `webapp/src/lib/` — chains (registry: RPCs, deployBlock, scanBlocks), config (active
+  chain, reactive), clients (one viem client per chain), chainIO (chain reads for one
+  chain), scanner (traversal rules), scanStore (what has been read, one store per chain:
+  session + localStorage), segments (block-range algebra), feed / authorList
+  (background scan jobs with progressive results), reader (per-chain facade: data.js
+  hands them out), payload (brotli), publish, cache (IndexedDB, chain-scoped), wallet,
+  price, fixtures (DEV: an in-memory chain behind the same I/O surface)
 - `webapp/src/components/` — Reader/Publisher UI
 - `glyph-spec.md` — full technical spec
 
 **Workflows:**
 
 - Contracts: `cd contracts && forge install foundry-rs/forge-std && forge build`
-- Webapp: `cd webapp && npm install && npm run dev` (DEV demo: `?fixtures=1`)
+- Webapp: `cd webapp && npm install && npm run dev` (DEV demo: `?fixtures=1`; add `&window=700` to watch the feed fill window by window)

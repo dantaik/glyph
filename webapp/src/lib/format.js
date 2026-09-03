@@ -2,16 +2,15 @@
 //
 // Deterministic string/date math shared by the feed, reader list, post
 // page and footer. Block numbers stay the on-chain source of truth;
-// relative times are merge-aware 12s-slot estimates, always 约-prefixed.
+// relative times are estimates from the chain clock's measured block
+// time, always 约-prefixed.
 
-import { CHAIN_ID } from './config';
 import { getChain } from './chains';
 
-/** First post-merge block — fixed 12s slots only apply from here on. */
-const MERGE_BLOCK = 15537394n;
+export { chainName } from './chains';
 
-const SECONDS_PER_SLOT = 12;
-
+/** Assumed when a clock carries no measured pace. */
+const FALLBACK_SECONDS_PER_BLOCK = 12;
 
 const REL_FMT = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
 
@@ -54,15 +53,14 @@ export function fmtTitle(title) {
 
 /**
  * Estimate a block's wall-clock time from a recent chain clock
- * `{ block: bigint, ts: seconds }`. Returns a Date, or null for
- * pre-merge blocks / missing clock (callers show the block number).
+ * `{ block: bigint, ts: seconds, secondsPerBlock }`. Returns a Date, or
+ * null without a clock (callers show the block number).
  */
 export function estimateBlockTime(clock, block) {
-  if (!clock || clock.block === undefined || clock.ts === undefined) return null;
+  if (!clock || clock.block == null || clock.ts == null) return null;
   if (block === null || block === undefined) return null;
-  const target = BigInt(block);
-  if (target < MERGE_BLOCK) return null;
-  const drift = Number(target - BigInt(clock.block)) * SECONDS_PER_SLOT;
+  const pace = clock.secondsPerBlock ?? FALLBACK_SECONDS_PER_BLOCK;
+  const drift = Number(BigInt(block) - BigInt(clock.block)) * pace;
   return new Date((Number(clock.ts) + drift) * 1000);
 }
 
@@ -121,17 +119,12 @@ export function friendlyError(message) {
   return '节点暂时不可用，请稍后重试。';
 }
 
-/** Human-readable chain name for a chain id (defaults to the active one). */
-export function chainName(chainId = CHAIN_ID) {
-  return getChain(chainId).name || `链 ${chainId}`;
-}
-
-/** Block-explorer transaction URL for the active chain (Etherscan/Taikoscan). */
-export function etherscanTxUrl(txHash, chainId = CHAIN_ID) {
+/** Block-explorer transaction URL on `chainId` (Etherscan/Taikoscan). */
+export function etherscanTxUrl(txHash, chainId) {
   return `${getChain(chainId).explorer}/tx/${txHash}`;
 }
 
-/** Block-explorer address URL for the active chain. */
-export function etherscanAddrUrl(address, chainId = CHAIN_ID) {
+/** Block-explorer address URL on `chainId`. */
+export function etherscanAddrUrl(address, chainId) {
   return `${getChain(chainId).explorer}/address/${address}`;
 }

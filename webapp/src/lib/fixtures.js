@@ -1,16 +1,23 @@
-// fixtures.js — deterministic in-memory demo dataset for DEV QA
-// (`?fixtures=1` full data, `?fixtures=empty` empty states).
+// fixtures.js — an in-memory chain for DEV QA (`?fixtures=1` full data,
+// `?fixtures=empty` empty states).
 //
-// Mirrors the exact surface + return shapes of the data.js facade
-// (bigint index/block/prevBlock, decoded title strings, {tags, markdown}
-// bodies) so components can't tell it apart from the chain. Only ever
-// loaded behind the literal `import.meta.env.DEV` guard in data.js, so
-// production builds never bundle it. Browser-only fixture code: the JS
-// clock and Math.random/setTimeout are fine here.
+// Stands in for chainIO.js with the same surface — block heights and hashes
+// in, post metadata and bodies out — so the REAL reader, scanner and scan
+// store run on top of it: the demo exercises the same sweeps, the same
+// coverage bookkeeping and the same window-by-window rendering as the
+// chain does. Only ever loaded behind the literal `import.meta.env.DEV`
+// guard in data.js, so production builds never bundle it. Browser-only
+// fixture code: the JS clock and Math.random/setTimeout are fine here.
+//
+// The chain is HEAD blocks tall. `?window=700` shrinks the getLogs window
+// so a sweep takes several round trips — the way to watch posts arrive one
+// window at a time; `?fixtures=1&window=700&log=1` shows it in the console.
 
 const DELAY_MIN_MS = 350;
 const DELAY_SPAN_MS = 250;
-const CLOCK_BLOCK = 22_541_000n;
+/** The demo chain's head — a 3,000-block chain, ~12s a block. */
+const HEAD = 3000n;
+const SECONDS_PER_BLOCK = 12;
 
 const AUTHORS = [
   '0x8a1f3b52C9e44E1a9b1f0d2C7a44E0b1D2e3F4a5',
@@ -177,18 +184,18 @@ const BODY_A2_0 = `搬家前最后一次用老屋的灶台，蒸了一笼白馒�
 // QA hooks: AUTHORS[0] has contiguous indexes 0..4 (prev/next at i=2); index 2 is the
 // long article; titles include a 27-byte CJK one, a trailing-U+FFFD one, an empty one.
 const SEED = [
-  [0, 4n, 22_540_870n, '冬至前的一封信', ['家信'], BODY_A0_4],
-  [1, 3n, 22_540_660n, '山间来信', ['山居'], BODY_A1_3],
-  [2, 2n, 22_540_480n, '海边的冬天', ['海'], BODY_A2_2],
-  [0, 3n, 22_540_330n, '春天的院子', ['院子', '春天'], BODY_A0_3],
-  [1, 2n, 22_540_120n, '记忆里的那条回家的小�', ['旧事'], BODY_A1_2],
-  [0, 2n, 22_539_980n, '关于外婆的香樟木箱', ['家信', '冬天'], LONG_ARTICLE],
-  [2, 1n, 22_539_810n, '写给十年后的自己', ['自留'], BODY_A2_1],
-  [1, 1n, 22_539_640n, '夜航船', [], BODY_A1_1],
-  [0, 1n, 22_539_420n, '给小满的第一封信', ['家信'], BODY_A0_1],
-  [2, 0n, 22_539_260n, '灶台与炊烟', ['吃食'], BODY_A2_0],
-  [1, 0n, 22_539_100n, '桂花开的时候', ['秋天'], BODY_A1_0],
-  [0, 0n, 22_538_900n, '', [], BODY_A0_0],
+  [0, 4n, 2870n, '冬至前的一封信', ['家信'], BODY_A0_4],
+  [1, 3n, 2660n, '山间来信', ['山居'], BODY_A1_3],
+  [2, 2n, 2480n, '海边的冬天', ['海'], BODY_A2_2],
+  [0, 3n, 2330n, '春天的院子', ['院子', '春天'], BODY_A0_3],
+  [1, 2n, 2120n, '记忆里的那条回家的小�', ['旧事'], BODY_A1_2],
+  [0, 2n, 1980n, '关于外婆的香樟木箱', ['家信', '冬天'], LONG_ARTICLE],
+  [2, 1n, 1810n, '写给十年后的自己', ['自留'], BODY_A2_1],
+  [1, 1n, 1640n, '夜航船', [], BODY_A1_1],
+  [0, 1n, 1420n, '给小满的第一封信', ['家信'], BODY_A0_1],
+  [2, 0n, 1260n, '灶台与炊烟', ['吃食'], BODY_A2_0],
+  [1, 0n, 1100n, '桂花开的时候', ['秋天'], BODY_A1_0],
+  [0, 0n, 900n, '', [], BODY_A0_0],
 ];
 
 const delay = () =>
@@ -207,7 +214,16 @@ function buildWorld() {
   for (const [ai, index, block, title, tags, markdown] of SEED) {
     const author = AUTHORS[ai];
     const txHash = txOf(author, index);
-    byAuthor.get(keyOf(author)).push({ author, index, block, prevBlock: 0n, title, txHash });
+    byAuthor.get(keyOf(author)).push({
+      author,
+      index,
+      block,
+      prevBlock: 0n,
+      title,
+      txHash,
+      eventIndex: 0,
+      logIndex: 0,
+    });
     bodyByTx.set(txHash, { tags, markdown });
   }
   for (const posts of byAuthor.values()) {
@@ -216,90 +232,101 @@ function buildWorld() {
       p.prevBlock = i === 0 ? 0n : posts[i - 1].block;
     });
   }
-  const feed = [...byAuthor.values()].flat().sort((a, b) => Number(b.block - a.block));
+  const feed = [...byAuthor.values()].flat().sort((a, b) => Number(a.block - b.block));
   return { byAuthor, bodyByTx, feed };
 }
 
-/** Build the fixture impl. `mode === 'empty'` → no posts anywhere (empty-state QA). */
-export function makeFixtures(mode) {
+/** Window size override from `?window=N`, else the chain's default. */
+function windowOverride() {
+  try {
+    const n = Number(new URLSearchParams(window.location.search).get('window'));
+    return Number.isInteger(n) && n > 0 ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Build the fixture chain I/O. `mode === 'empty'` → no posts anywhere
+ * (empty-state QA). Same surface as createChainIO(); see chainIO.js.
+ */
+export function createFixtureIO(chainId, mode) {
   const { byAuthor, bodyByTx, feed } =
     mode === 'empty'
       ? { byAuthor: new Map(), bodyByTx: new Map(), feed: [] }
       : buildWorld();
-
   const postsOf = (author) => byAuthor.get(keyOf(author)) ?? [];
   const metaByTx = new Map();
   for (const posts of byAuthor.values()) {
-    for (const p of posts) metaByTx.set(p.txHash.toLowerCase(), { ...p, eventIndex: 0 });
+    for (const p of posts) metaByTx.set(p.txHash.toLowerCase(), p);
   }
+  const meta = (p) => ({ ...p });
 
   return {
-    async loadTitleList(author, n) {
+    chainId: Number(chainId),
+    /** Demo data never enters the real IndexedDB cache. */
+    ephemeral: true,
+    /** Genesis: nothing is deployed, the whole chain is worth reading. */
+    floor: 0n,
+    windowSize: windowOverride(),
+
+    async blockNumber() {
       await delay();
-      return postsOf(author).slice().reverse().slice(0, n).map((p) => ({ ...p }));
+      return HEAD;
     },
 
-    async loadMoreTitles(author, oldestShown, n) {
+    async block(which) {
       await delay();
-      if (!oldestShown) return [];
+      const number = which === 'latest' ? HEAD : BigInt(which);
+      const now = Math.floor(Date.now() / 1000);
+      return { number, timestamp: now - Number(HEAD - number) * SECONDS_PER_BLOCK };
+    },
+
+    async postsInRange(from, to) {
+      await delay();
+      const lo = BigInt(from);
+      const hi = BigInt(to);
+      return { rows: feed.filter((p) => p.block >= lo && p.block <= hi).map(meta), to: hi };
+    },
+
+    async authorPostsInBlock(author, block) {
+      await delay();
+      const at = BigInt(block);
       return postsOf(author)
-        .filter((p) => p.index < oldestShown.index)
-        .reverse()
-        .slice(0, n)
-        .map((p) => ({ ...p }));
+        .filter((p) => p.block === at)
+        .map(meta);
     },
 
-    async findTitleMeta(author, targetIndex) {
+    async latestBlock(author) {
       await delay();
-      const target = BigInt(targetIndex);
-      const hit = postsOf(author).find((p) => p.index === target);
-      return hit ? { ...hit } : null;
+      const posts = postsOf(author);
+      return posts.length ? posts[posts.length - 1].block : 0n;
     },
 
-    async loadRecentAcrossAuthors(n) {
-      await delay();
-      return feed.slice(0, n).map((p) => ({ ...p }));
-    },
-
-    async loadMoreAcrossAuthors(oldestShown, n) {
-      await delay();
-      if (!oldestShown) return { rows: [], done: feed.length === 0 };
-      const older = feed.filter((p) => p.block < BigInt(oldestShown.block));
-      return { rows: older.slice(0, n).map((p) => ({ ...p })), done: older.length <= n };
-    },
-
-    async loadPostBody(txHash) {
-      await delay();
-      const body = bodyByTx.get(txHash);
-      if (!body) throw new Error('演示数据中找不到这笔交易');
-      return {
-        body: { tags: [...body.tags], markdown: body.markdown },
-        fromCache: false,
-      };
-    },
-
-    async findMetaByTx(txHash, eventIndex = 0) {
-      await delay();
-      if (eventIndex !== 0) return null; // demo posts are one event per tx
-      return metaByTx.get(String(txHash).toLowerCase()) ?? null;
-    },
-
-    async resolveImages(markdown) {
-      return { markdown, urls: [] };
-    },
-
-    async resolveEnsName(address) {
-      return null; // demo data has no ENS names
-    },
-
-    async getAuthorCount(author) {
+    async count(author) {
       await delay();
       return BigInt(postsOf(author).length);
     },
 
-    async getChainClock() {
+    async postsInTx(txHash) {
       await delay();
-      return { block: CLOCK_BLOCK, ts: Math.floor(Date.now() / 1000) };
+      const p = metaByTx.get(String(txHash).toLowerCase());
+      return p ? [meta(p)] : []; // demo posts are one event per tx
+    },
+
+    async postBody(txHash) {
+      await delay();
+      const body = bodyByTx.get(txHash);
+      if (!body) throw new Error('演示数据中找不到这笔交易');
+      return { tags: [...body.tags], markdown: body.markdown };
+    },
+
+    async imageBytes() {
+      throw new Error('演示数据没有链上图片'); // bodies use data: URIs instead
+    },
+
+    async ensName() {
+      return null; // demo data has no ENS names
     },
   };
 }

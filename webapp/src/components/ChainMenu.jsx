@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHAINS, SELECTABLE_CHAIN_IDS } from '../lib/chains';
-import { CHAIN_ID, setActiveChain } from '../lib/config';
+import { setActiveChain, useActiveChainId } from '../lib/config';
 import { Check, ChevronDown } from './Icons';
 
 /**
  * Chain switcher in the masthead. Glyph is CREATE2-deployed to the same
  * address on every chain, so switching is purely a matter of which node the
- * reader talks to — picking one persists it and reloads, since the viem
- * client is built once at module load.
+ * reader talks to — picking one persists it and swaps the reader in place.
+ * Nothing reloads: a scan running on the chain being left finishes in the
+ * background and its results are cached for the next visit.
  *
  * The active chain is always listed even when it isn't one of the selectable
  * ones (a testnet from VITE_CHAIN_ID), so the menu never hides where you are.
  */
 export default function ChainMenu() {
+  const CHAIN_ID = useActiveChainId();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const ids = SELECTABLE_CHAIN_IDS.includes(CHAIN_ID)

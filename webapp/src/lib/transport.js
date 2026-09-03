@@ -38,9 +38,10 @@ function isNodeFailure(err) {
 
 /**
  * A transport that walks `urls` in order, skipping endpoints still cooling
- * off from a recent failure.
+ * off from a recent failure. `label` names the chain in the console.
  */
-export function orderedFallback(urls, chain) {
+export function orderedFallback(urls, chain, label = chain?.name ?? '') {
+  const log = rpcLog.scoped(label);
   const nodes = urls.map((url) => ({
     url,
     request: http(url, { timeout: TIMEOUT_MS, retryCount: 0 })({ chain }).request,
@@ -67,7 +68,7 @@ export function orderedFallback(urls, chain) {
           const failed = isNodeFailure(err);
           if (failed) node.downUntil = Date.now() + COOLDOWN_MS;
           if (i < order.length - 1) {
-            rpcLog.endpointFailed(node.url, args.method, err, {
+            log.endpointFailed(node.url, args.method, err, {
               cooled: failed,
               next: order[i + 1].url,
             });
