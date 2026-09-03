@@ -112,7 +112,7 @@ function Footer({ navigate }) {
  */
 const scanSpan = (segments) =>
   segments.length
-    ? ` ${fmtBlock(lowest(segments))} 至 ${fmtBlock(highest(segments))}` +
+    ? ` ${fmtBlock(lowest(segments))} - ${fmtBlock(highest(segments))}` +
       (segments.length > 1 ? ` · ${segments.length} 段` : '')
     : '';
 
@@ -127,7 +127,7 @@ function ChainLine({ chainId, span, scanning, go }) {
       </a>
       <span className="select-none" aria-hidden="true">·</span>
       <a href={hrefFor({ scan: '1' })} onClick={go({ scan: '1' })} title="查看扫描范围" className={FOOT_LINK}>
-        扫描范围
+        已扫描区块
         {span}
         {scanning && <span className="animate-pulse"> · 扫描中</span>}
       </a>
