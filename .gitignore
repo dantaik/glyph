@@ -37,3 +37,6 @@ Thumbs.db
 .env.local
 .env.*.local
 .gstack/
+
+# A stray root-level cache (vitest run from the repo root)
+node_modules/
