@@ -210,7 +210,7 @@ export default function PostPage({ meta, onBack, neighbors, onNavigate, onOpenAu
           className="article-column prose-glyph"
           dangerouslySetInnerHTML={{ __html: html }}
           onClick={(e) => {
-            // glyph: cross-article refs render as /tx/<hash>/<n> links —
+            // 0x… cross-article refs render as /tx/<hash>/<n> links —
             // route them in-app instead of a full page load.
             const a = e.target.closest?.('a[href^="/tx/"]');
             if (!a) return;

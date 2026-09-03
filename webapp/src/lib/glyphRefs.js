@@ -1,7 +1,7 @@
-// glyphRefs.js — cross-article references (the `glyph:` scheme, §8.1 of the spec).
+// glyphRefs.js — cross-article references (§8.1 of the spec).
 //
-// In-article reference form:
-//   [文字](glyph:0x<txhash>/<eventIndex>)
+// In-article reference form — the publish tx hash itself is the target:
+//   [文字](0x<txhash>/<eventIndex>)
 // - <txhash> is the publish() transaction of the target post (64 hex);
 // - <eventIndex> is the 0-based ordinal of the Post event inside that
 //   transaction (one tx can publish several posts) — optional, default 0;
@@ -15,7 +15,9 @@
 import { findMetaByTx } from './data';
 import { shortAddr } from './format';
 
-const REF_RE = /\[([^\]]*)\]\(glyph:(0x[0-9a-fA-F]{64})(?:\/(\d+))?\)/g;
+// Only a full 64-hex tx hash (with optional event ordinal) counts as a
+// reference — ordinary 0x…-ish links never match.
+const REF_RE = /\[([^\]]*)\]\((0x[0-9a-fA-F]{64})(?:\/(\d+))?\)/g;
 
 // target -> Promise<title | null>. Posts are immutable on-chain, so a
 // failed or absent target stays null for the session — no point retrying.
@@ -35,7 +37,7 @@ function titleFor(hash, eventIndex) {
 }
 
 /**
- * Rewrite `glyph:` refs to canonical /tx/<hash>/<n> markdown links.
+ * Rewrite `0x…` article refs to canonical /tx/<hash>/<n> markdown links.
  * @returns {Promise<string>} rewritten markdown
  */
 export async function resolveGlyphRefs(markdown) {

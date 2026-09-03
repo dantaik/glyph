@@ -327,7 +327,7 @@ export default function Publisher() {
         </Suspense>
       </div>
       <p className="mb-10 -mt-6 text-xs text-ink-ghost">
-        引用另一篇文章：<code className="rounded bg-paper-sunken px-1 py-0.5 font-mono text-2xs text-ink-soft">[文字](glyph:0x交易哈希/0)</code>
+        引用另一篇文章：<code className="rounded bg-paper-sunken px-1 py-0.5 font-mono text-2xs text-ink-soft">[文字](0x交易哈希/0)</code>
         ；序号是该交易内的第几篇，可省略；文字留空则自动显示对方标题。
       </p>
 
