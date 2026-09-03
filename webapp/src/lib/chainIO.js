@@ -15,6 +15,7 @@ import { getClient } from './clients';
 import { GLYPH_ADDRESS } from './config';
 import { decodeTitle } from './title';
 import { decodePayload } from './payload';
+import { shortAddr } from './format';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -122,7 +123,6 @@ async function mapLimit(items, limit, fn) {
 }
 
 const short = (s) => `${String(s).slice(0, 10)}…`;
-const shortAddr = (a) => `${String(a).slice(0, 8)}…`;
 
 /**
  * An address as an argument to the node. viem checks the EIP-55 checksum
