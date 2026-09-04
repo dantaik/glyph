@@ -541,6 +541,14 @@ To reference another article from a body, the link target is written as the targ
 npm i viem brotli-wasm
 ```
 
+The command-line tool (`cli/`) needs `viem` alone: Node has brotli, argument parsing and a test
+runner of its own. It does not reimplement the format — `cli/src/shared.js` imports
+`payloadText.js`, `title.js`, `abi.js`, `chains.js` and `limits.js` straight out of
+`webapp/src/lib/`, which is why those modules are kept free of any import that plain Node cannot
+follow. A post published from a terminal is therefore byte for byte the post the browser would have
+written, and that is checked rather than assumed: the CLI's tests run against the same mock node the
+browser tests use, and compare its bytes with `encodePayload`'s.
+
 **Deployment (Foundry)**
 ```bash
 forge create src/Blog.sol:Glyph \

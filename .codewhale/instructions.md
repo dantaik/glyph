@@ -24,9 +24,14 @@ See `README.md` and `glyph-spec.md`.
   i18n + locales/{en,zh} (the interface language store and its dictionaries;
   `t()` outside React, `useT()` / `useLang()` inside it)
 - `webapp/src/components/` — Reader/Publisher UI
+- `cli/` — `xueni`, the command-line tool (publish, fetch, author, export, verify);
+  plain Node over viem, sharing `webapp/src/lib/payloadText.js`, `chains.js` and
+  `limits.js` so the bytes are identical to the web app's
 - `glyph-spec.md` — full technical spec
 
 **Workflows:**
 
 - Contracts: `cd contracts && forge install foundry-rs/forge-std && forge build`
+- CLI: `cd cli && npm install && npm test` (its tests boot `webapp/test/e2e/rpcServer.mjs`,
+  so `webapp`'s dependencies must be installed too)
 - Webapp: `cd webapp && npm install && npm run dev` (DEV demo: `?fixtures=1`; add `&window=700` to watch the feed fill window by window)

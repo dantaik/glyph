@@ -144,8 +144,6 @@ export async function run(argv) {
       chains: perChain,
     });
   }
-  for (const chain of perChain) {
-    print(`${chain.chain} · ${chain.posts} post${chain.posts === 1 ? '' : 's'}, ${chain.images} image${chain.images === 1 ? '' : 's'}`);
-  }
+  for (const chain of perChain) print(msg.chainSummary(chain.chain, chain.posts, chain.images));
   print(msg.wroteArchive(archivePath, posts.length, images.length));
 }

@@ -195,6 +195,8 @@ export const msg = {
   chainFailed: (chain, detail) => `${chain}: ${detail}`,
 
   // --- Export ---
+  chainSummary: (chain, posts, images) =>
+    `${chain} · ${posts} post${posts === 1 ? '' : 's'}, ${images} image${images === 1 ? '' : 's'}`,
   wroteArchive: (path, posts, images) =>
     `${path} · ${posts} post${posts === 1 ? '' : 's'}, ${images} image${images === 1 ? '' : 's'}`,
   walkingChain: (chain, address) => `${chain} · walking ${address}…`,

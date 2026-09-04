@@ -136,6 +136,24 @@ post would have cost then. WHERE: the same draft priced on the other network, wi
 it there instead. Both degrade quietly — no USD when CoinGecko is unreachable, no line when a node
 will not serve headers.
 
+## Command line
+
+`xueni` publishes, reads, exports and verifies posts from a terminal — for scripting, for bulk work,
+and for a nightly backup of an author. It shares the payload layer with the web app rather than
+reimplementing it, so a post published from the command line is byte for byte the post the browser
+would have written.
+
+```bash
+cd cli && npm install
+node bin/xueni.js fetch taiko 0xTXHASH          # print the post
+node bin/xueni.js author all 0xAUTHOR           # their titles, newest first
+node bin/xueni.js export 0xAUTHOR --out ./mine  # every post as .md, plus an importable archive
+node bin/xueni.js publish letter.md --chain taiko --dry-run
+```
+
+`PRIVATE_KEY` comes from the environment and is never an argument. See [`cli/README.md`](cli/README.md)
+for every command and option.
+
 ## Testing
 
 ```bash
@@ -150,7 +168,8 @@ The e2e mock node (`webapp/test/e2e/rpcServer.mjs`) serves the demo world (`src/
 JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-encoded Post events whose
 bodies are brotli-compressed `publish()` calldata, so viem, chainIO and the brotli WASM all really run.
 During development, `npm run dev` and then `/?fixtures=1` shows the same demo data from memory. GitHub
-Actions (`.github/workflows/ci.yml`) runs all three steps on every PR.
+Actions (`.github/workflows/ci.yml`) runs all three steps on every PR, and the `cli` job runs the
+command-line tool's tests against that same mock node (`cd cli && npm test`).
 
 Most of the demo world is written in English. Two of its posts are deliberately left in Chinese: they are
 the multi-byte-title fixtures — one title is exactly 27 bytes of UTF-8, the other is a `bytes32` title cut

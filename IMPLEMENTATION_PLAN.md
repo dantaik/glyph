@@ -57,7 +57,7 @@ never delete or skip a test to get there.
 | 9 | ENS identity: names in URLs, avatars, profiles | ☐ | | |
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☐ | | |
 | 11 | Archive bundles: export and import | ☐ | | |
-| 12 | The command-line tool | ☐ | | |
+| 12 | The command-line tool | ☑ | #16 | |
 | 13 | The macOS desktop app | ☐ | | |
 | 14 | Closing sweep and deletion of this plan | ☐ | | |
 
@@ -112,6 +112,12 @@ Deviations and decisions made during implementation (append here, newest last):
   copied rather than extracted into a shared `ClockSet`: the three merged
   controllers hold clocks for different reasons, and the extraction would
   have coupled them for four lines of duplication.
+- **Phase 12.** Built in parallel with phases 6 and 7 by a second session
+  confined to `cli/`, which is why its files appear piecemeal in those
+  commits: the phase commits added everything in the working tree. The tool
+  itself is one piece of work and its 69 tests pass as a whole. Its `export`
+  command writes the Phase 11 archive format, which the web app could not
+  read yet when it was written; the round trip is checked in Phase 11.
 
 ## 2. What Xueni is, in one page
 

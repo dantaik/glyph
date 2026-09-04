@@ -79,6 +79,11 @@ describe('author', () => {
     assert.match(stdout, /published nothing/);
   });
 
+  test('--chain stands in for the positional when only the address is given', async () => {
+    const { stdout } = await ok(['author', '--chain', 'ethereum', author, '--json', '--rpc', node.rpc(1)]);
+    assert.equal(JSON.parse(stdout).length, oracle.counts[author].byChain['1']);
+  });
+
   test('a malformed address is refused before any request', async () => {
     const { code, stderr } = await run(['author', 'ethereum', '0xnope']);
     assert.equal(code, 1);

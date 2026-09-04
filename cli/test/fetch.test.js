@@ -87,7 +87,12 @@ describe('fetch', () => {
     const absent = `0x${'ab'.repeat(32)}`;
     const { code, stderr } = await run(['fetch', 'ethereum', absent, ...rpc()]);
     assert.equal(code, 1);
-    assert.match(stderr, /no transaction/i);
+    assert.match(stderr, /no such transaction/i);
+  });
+
+  test('--chain stands in for the positional when only the post is given', async () => {
+    const { stdout } = await ok(['fetch', '--chain', 'ethereum', post.txHash, '--json', ...rpc()]);
+    assert.equal(JSON.parse(stdout).txHash, post.txHash);
   });
 
   test('a chain nobody has heard of is refused before any request', async () => {
