@@ -58,7 +58,7 @@ describe('config — the chain written to', () => {
     expect(resolvePublishChain(null, null)).toBe(1);
     expect(resolvePublishChain(null, 167000)).toBe(167000);
     expect(resolvePublishChain(null, 1)).toBe(1);
-    expect(resolvePublishChain(null, 5)).toBe(1); // a wallet on a chain Glyph doesn't read
+    expect(resolvePublishChain(null, 5)).toBe(1); // a wallet on a chain Xueni doesn't read
     expect(resolvePublishChain(167000, 1)).toBe(167000);
     expect(resolvePublishChain('167000', null)).toBe(167000);
     expect(resolvePublishChain(424242, 167000)).toBe(167000);

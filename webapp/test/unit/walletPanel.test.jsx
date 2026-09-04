@@ -145,7 +145,7 @@ describe('WalletPanel', () => {
     expect(added.params[0]).toMatchObject({ chainId: '0x28c58', chainName: expect.any(String) });
   });
 
-  it('a wallet on a chain Glyph does not read is told so', async () => {
+  it('a wallet on a chain Xueni does not read is told so', async () => {
     await mountPanel({ provider: fakeProvider({ accounts: [ACCOUNT], chainId: '0xaa36a7' }) });
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('ID 11155111');

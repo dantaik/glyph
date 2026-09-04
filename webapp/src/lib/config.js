@@ -117,7 +117,7 @@ export function usePublishChainId() {
 
 /**
  * The chain to publish on: the one picked, else the wallet's own chain when
- * it is one Glyph is read on, else the default. Pure, so the write tab and
+ * it is one Xueni is read on, else the default. Pure, so the write tab and
  * its tests agree.
  */
 export function resolvePublishChain(stored, walletChainId) {

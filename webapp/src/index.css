@@ -124,7 +124,7 @@
 /* Body prose is the same face as everything else; code keeps its box, not a face of its own. */
 .prose-glyph {
   font-size: var(--article-size);
-  line-height: 1.95;
+  line-height: 1.75;
   letter-spacing: 0.015em;
   font-weight: 400;
   color: var(--color-ink);

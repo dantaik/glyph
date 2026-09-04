@@ -7,8 +7,8 @@
 
 export default {
   // --- The masthead and the shell -----------------------------------------
-  'brand.wordmark': 'Glyph',
-  'brand.title': 'Glyph',
+  'brand.wordmark': 'Xueni',
+  'brand.title': 'Xueni',
   'nav.read': 'Read',
   'nav.write': 'Write',
   'nav.home': 'Back to the front page',
@@ -116,7 +116,7 @@ export default {
   'post.navLabel': 'Previous and next posts',
   /** A post's ordinal in its author's chain-local list. */
   'post.index': ({ index }) => `#${index}`,
-  'post.titleSuffix': ({ title }) => `${title} · Glyph`,
+  'post.titleSuffix': ({ title }) => `${title} · Xueni`,
 
 
   // --- The scan page (/scan) ----------------------------------------------
@@ -293,7 +293,7 @@ Drop images into the area below or click to upload; click an image or its name t
   // --- Reading a settings file --------------------------------------------
   'settingsFile.notJson': 'Not a valid JSON file.',
   'settingsFile.notObject': 'The file does not contain a settings object.',
-  'settingsFile.notGlyph': 'This is not a Glyph settings file (the glyph.settings marker is missing).',
+  'settingsFile.notGlyph': 'This is not a Xueni settings file (the glyph.settings marker is missing).',
   'settingsFile.badFormat': ({ format, supported }) =>
     `Settings file format version ${format} is not supported (this version supports ${supported}).`,
   'settingsFile.rpcsShape': 'rpcs should be endpoint lists grouped by chain ID.',

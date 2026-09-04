@@ -3,7 +3,7 @@ import { blo } from 'blo';
 import { shortAddr } from '../lib/format';
 
 /**
- * How a person is shown in Glyph.
+ * How a person is shown in Xueni.
  *
  * Every wallet is its own author here, and the addresses are unrelated to
  * each other — so the eye needs something it can tell apart at a glance in a
