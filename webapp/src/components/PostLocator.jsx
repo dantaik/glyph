@@ -12,12 +12,18 @@ import ErrorState from './ErrorState';
  * receipt read each) and the URL replaced with the one that has it, so the
  * link keeps working and the address bar ends up telling the truth.
  */
-export default function PostLocator({ view, txHash, eventIndex, navigate }) {
+export default function PostLocator({ view, txHash, eventIndex, navigate, headless = false }) {
   const hit = useAsync(() => view.findPostAnywhere(txHash, eventIndex), [view, txHash, eventIndex]);
 
+  // The replace lands on the SAME post, so `?headless=1` rides along —
+  // otherwise a chainless headless link would grow a masthead on arrival.
   useEffect(() => {
-    if (hit.value) navigate({ chain: hit.value.chainId, tx: txHash, txEvent: eventIndex }, { replace: true });
-  }, [hit.value, navigate, txHash, eventIndex]);
+    if (!hit.value) return;
+    navigate(
+      { chain: hit.value.chainId, tx: txHash, txEvent: eventIndex, ...(headless && { headless: '1' }) },
+      { replace: true },
+    );
+  }, [hit.value, navigate, txHash, eventIndex, headless]);
 
   if (hit.error) return <ErrorState error={hit.error} onRetry={hit.retry} />;
   if (hit.loading || hit.value) {

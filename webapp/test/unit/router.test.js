@@ -50,6 +50,50 @@ describe('readParams — the URL as a state map', () => {
   });
 });
 
+describe('isHeadless — the chrome comes off, on post routes only', () => {
+  it('is on for a post URL carrying the flag, with a chain or without', async () => {
+    const named = await routerAt(`/ethereum/tx/${TX}/0?headless=1`);
+    expect(named.isHeadless(named.readParams())).toBe(true);
+    // A chainless link is still a post route: PostLocator keeps the flag
+    // across the replace that names the chain.
+    const chainless = await routerAt(`/tx/${TX}/0?headless=1`);
+    expect(chainless.isHeadless(chainless.readParams())).toBe(true);
+  });
+
+  it('is off on every route that is not a post', async () => {
+    for (const url of [
+      '/?headless=1',
+      '/taiko?headless=1',
+      `/author/${ADDR}?headless=1`,
+      '/scan?headless=1',
+      '/settings?headless=1',
+    ]) {
+      const { readParams, isHeadless } = await routerAt(url);
+      expect(isHeadless(readParams())).toBe(false);
+    }
+  });
+
+  it('is off without the flag, and off for any other value', async () => {
+    const plain = await routerAt(`/ethereum/tx/${TX}/0`);
+    expect(plain.isHeadless(plain.readParams())).toBe(false);
+    const other = await routerAt(`/ethereum/tx/${TX}/0?headless=yes`);
+    expect(other.isHeadless(other.readParams())).toBe(false);
+  });
+
+  it('does not stick: a link off the page drops it', async () => {
+    const { hrefFor } = await routerAt(`/ethereum/tx/${TX}/0?headless=1`);
+    expect(hrefFor({ author: ADDR })).toBe(`/author/${ADDR}`);
+    expect(hrefFor({ chain: 167000 })).toBe('/taiko');
+  });
+
+  it('rides along when a route asks for it — the canonicalising replaces', async () => {
+    const { hrefFor } = await routerAt(`/ethereum/tx/${TX}?headless=1`);
+    expect(hrefFor({ chain: 1, tx: TX, txEvent: 0, headless: '1' })).toBe(
+      `/ethereum/tx/${TX}/0?headless=1`,
+    );
+  });
+});
+
 describe('hrefFor — the chain segment is a filter', () => {
   it('names a chain, or none, when told', async () => {
     const { hrefFor } = await routerAt('/');

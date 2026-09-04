@@ -26,7 +26,13 @@ import { ArticleSkeleton } from './Skeleton';
  * Single post view — a letter set on the page.
  * Props: { reader, meta: { author, index, block, title, txHash, eventIndex },
  *          onBack, neighbors: { prev, next } (undefined=resolving,
- *          null=absent), onNavigate(neighborMeta), onOpenAuthor() }
+ *          null=absent), onNavigate(neighborMeta), onOpenAuthor(),
+ *          headless }
+ *
+ * `headless` (`?headless=1`, router.js) leaves out everything that is a way
+ * OFF this page — the back button and the prev/next cards, matching the
+ * masthead and site footer App already drops — so what is left is the
+ * letter and its provenance, which is what an embed wants.
  *
  * Fetches the body (tags + markdown) from the publish() tx calldata through
  * the reader of the chain the post is on, rewrites `0x<txhash>/<n>` article
@@ -41,6 +47,7 @@ export default function PostPage({
   neighbors,
   onNavigate,
   onOpenAuthor,
+  headless = false,
 }) {
   const [body, setBody] = useState(null); // { tags, markdown }
   const [fromCache, setFromCache] = useState(false);
@@ -120,16 +127,21 @@ export default function PostPage({
 
   return (
     <article>
-      <div className="mb-8">
-        <BackButton onClick={onBack} />
-      </div>
+      {!headless && (
+        <div className="mb-8">
+          <BackButton onClick={onBack} />
+        </div>
+      )}
 
       <header className="mb-10">
         <div className="article-column text-center">
         <ArticleTitle>
           {title || <span className="text-ink-ghost">{t('common.untitled')}</span>}
         </ArticleTitle>
-        <Meta as="div" nums className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
+        {/* Author, network, index and time on ONE centred line, on the
+            title's own axis. Split across the column edges they read as two
+            unrelated things; together they are one byline. */}
+        <Meta as="div" nums className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
           <span className="flex items-center gap-1">
             <span>{t('post.by')}</span>
             <a
@@ -144,17 +156,16 @@ export default function PostPage({
               {ensName || <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />}
             </a>
           </span>
-          <span className="flex items-center gap-2">
-            <ChainChip chainId={reader.chainId} navigate={navigate} />
-            <span className="select-none" aria-hidden="true">·</span>
-            <span>{fmtIndex(meta.index)}</span>
-            {relTime && (
-              <>
-                <span className="select-none" aria-hidden="true">·</span>
-                <span title={absTime ?? undefined}>{relTime}</span>
-              </>
-            )}
-          </span>
+          <Dot />
+          <ChainChip chainId={reader.chainId} navigate={navigate} />
+          <Dot />
+          <span>{fmtIndex(meta.index)}</span>
+          {relTime && (
+            <>
+              <Dot />
+              <span title={absTime ?? undefined}>{relTime}</span>
+            </>
+          )}
         </Meta>
         </div>
       </header>
@@ -213,7 +224,7 @@ export default function PostPage({
         <footer className="mt-14 text-center">
           <Meta nums className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
             <span>{t('post.block', { block: fmtBlock(meta.block) })}</span>
-            <span className="select-none" aria-hidden="true">·</span>
+            <Dot />
             <a
               href={etherscanTxUrl(meta.txHash, reader.chainId)}
               target="_blank"
@@ -224,7 +235,7 @@ export default function PostPage({
             </a>
             {fromCache && (
               <>
-                <span className="select-none" aria-hidden="true">·</span>
+                <Dot />
                 <span>{t('post.fromCache')}</span>
               </>
             )}
@@ -244,11 +255,22 @@ export default function PostPage({
         </footer>
       )}
 
-      <PostNav
-        prev={neighbors?.prev}
-        next={neighbors?.next}
-        onGo={onNavigate}
-      />
+      {!headless && (
+        <PostNav
+          prev={neighbors?.prev}
+          next={neighbors?.next}
+          onGo={onNavigate}
+        />
+      )}
     </article>
+  );
+}
+
+/** The separator between meta items — decorative, so never read aloud. */
+function Dot() {
+  return (
+    <span className="select-none" aria-hidden="true">
+      ·
+    </span>
   );
 }

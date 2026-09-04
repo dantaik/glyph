@@ -17,6 +17,9 @@
 //
 // Routes are real paths (`/taiko/tx/0x…/0?tab=write`) that the host
 // rewrites to index.html (vercel.json; test/e2e/serve.mjs does the same).
+//
+// One query param is read here rather than by a component: `?headless=1`
+// on a post route, which takes the app chrome off (see `isHeadless`).
 
 import { useEffect, useState, useCallback } from 'react';
 import { chainFromSlug, chainSlug } from './chains';
@@ -170,5 +173,19 @@ export function useUrlState() {
 export function queryParam(name) {
   return new URLSearchParams(currentUrl().search).get(name);
 }
+
+/**
+ * `?headless=1` on a post route: the page is the letter and nothing else —
+ * no masthead, no site footer, no back button, no prev/next cards. It is
+ * there so a post can be embedded (an iframe, a preview pane, a print
+ * view) without the app around it.
+ *
+ * Scoped to post routes, because a feed with no way to move is not a page
+ * anyone wants; and it does not stick — `buildUrl` only writes the keys a
+ * navigate() is given, so following a link out of a headless post lands in
+ * the ordinary UI. The two canonicalising replaces that stay on the same
+ * post (Reader, PostLocator) pass it along by hand.
+ */
+export const isHeadless = (params) => params.headless === '1' && Boolean(params.tx);
 
 export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;

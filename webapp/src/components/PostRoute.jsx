@@ -9,10 +9,12 @@ import PostPage from './PostPage';
 /**
  * `/tx/<hash>/<n>`: resolve the post's metadata through the reader of the
  * chain being shown, then show the post with its prev/next neighbours.
+ * `headless` (from `?headless=1`) takes the page's navigation off, so the
+ * neighbours are neither shown nor worth resolving.
  */
-export default function PostRoute({ reader, txHash, eventIndex, navigate }) {
+export default function PostRoute({ reader, txHash, eventIndex, navigate, headless = false }) {
   const meta = useAsync(() => reader.findMetaByTx(txHash, eventIndex), [reader, txHash, eventIndex]);
-  const neighbors = useNeighbors(reader, meta.value ?? null);
+  const neighbors = useNeighbors(reader, headless ? null : (meta.value ?? null));
 
   if (meta.error) return <ErrorState error={meta.error} onRetry={meta.retry} />;
   if (meta.loading) {
@@ -42,6 +44,7 @@ export default function PostRoute({ reader, txHash, eventIndex, navigate }) {
       neighbors={neighbors}
       onNavigate={(m) => navigate({ chain: reader.chainId, tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
       onOpenAuthor={() => navigate({ author: post.author })}
+      headless={headless}
     />
   );
 }

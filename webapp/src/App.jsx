@@ -8,7 +8,7 @@ import { FIXTURES_MODE } from './lib/data';
 import { chainName, fmtBlock } from './lib/format';
 import { t, useLang } from './lib/i18n';
 import { lowest, highest } from './lib/segments';
-import { hrefFor, useUrlState } from './lib/router';
+import { hrefFor, isHeadless, useUrlState } from './lib/router';
 import { getAllChainsView } from './lib/view';
 import { Micro } from './components/Text';
 
@@ -30,6 +30,10 @@ export default function App() {
   const urlSurface = Boolean(params.settings || params.scan || params.tx || params.author);
   const writing = tab === 'write' && !urlSurface;
 
+  // `?headless=1` on a post route: the letter alone, for embedding — no
+  // masthead, no footer (PostPage drops its own navigation to match).
+  const headless = isHeadless(params);
+
   const handleTabChange = useCallback(
     (key) => {
       if (key === 'write' && urlSurface) navigate({}, { replace: true });
@@ -40,13 +44,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header
-        // Settings is neither reading nor writing, so neither tab is
-        // current while it is open. /tx, /author and /scan still are.
-        tab={params.settings ? null : writing ? 'write' : 'read'}
-        onTabChange={handleTabChange}
-        onOpenSettings={() => navigate({ settings: '1' })}
-      />
+      {!headless && (
+        <Header
+          // Settings is neither reading nor writing, so neither tab is
+          // current while it is open. /tx, /author and /scan still are.
+          tab={params.settings ? null : writing ? 'write' : 'read'}
+          onTabChange={handleTabChange}
+          onOpenSettings={() => navigate({ settings: '1' })}
+        />
+      )}
       <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-8 pb-16">
         {params.settings ? (
           <SettingsPage navigate={navigate} />
@@ -56,7 +62,7 @@ export default function App() {
           <Reader onStartWriting={() => handleTabChange('write')} />
         )}
       </main>
-      <Footer navigate={navigate} />
+      {!headless && <Footer navigate={navigate} />}
       {FIXTURES_MODE && (
         <Micro as="div" className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1">
           {t('app.fixtures')}

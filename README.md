@@ -43,7 +43,11 @@ time), `/ethereum` or `/taiko` (one chain only), `/author/0xAUTHOR` (that author
 chains merged; `/taiko/author/0x…` for one chain), `/taiko/tx/0xTXHASH/0` (a single post — the path
 names the chain, and the trailing number is the event's index within the transaction; an older link
 without a chain is looked up on both chains and then redirected), or `/scan` (the multi-segment block
-ranges this browser has scanned so far, reachable from the footer).
+ranges this browser has scanned so far, reachable from the footer). Add `?headless=1` to a post URL
+(`/taiko/tx/0xTXHASH/0?headless=1`) to get that post with no app around it — no masthead, no site
+footer, no back button and no previous/next cards, just the letter, its byline and its provenance —
+for embedding one in an iframe or a preview pane. It applies to post URLs only and to that page
+alone: a link followed out of it lands in the ordinary interface.
 **Writing**: the "Wallet and network" panel at the top of the Write tab — connect a wallet, choose which
 chain to publish to (it follows the wallet's own network until you pick one, and then it is remembered),
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
