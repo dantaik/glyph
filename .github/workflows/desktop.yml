@@ -89,6 +89,45 @@ jobs:
             echo 'XUENI_NOTES_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # Apple signing is optional, but "optional" has to mean ABSENT rather
+      # than empty: a secret that does not exist becomes an empty string, and
+      # tauri reads a set-but-empty APPLE_CERTIFICATE as a certificate to
+      # import, which fails the bundle at codesign. `secrets` cannot be read
+      # in an `if:`, so the variables are put into the environment here, and
+      # only when there is really something to sign with. With none of them
+      # set tauri skips signing, the DMG is ad-hoc signed, and Gatekeeper
+      # warns on first launch (the README says what to do about it).
+      - name: Apple signing, when there is a certificate
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          ID: ${{ secrets.APPLE_ID }}
+          PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CERTIFICATE" ]; then
+            echo "No Apple certificate in this repository: the DMG will be ad-hoc signed."
+            exit 0
+          fi
+          # The heredoc form, because a certificate is multi-line and a
+          # password may be anything at all.
+          for name in APPLE_CERTIFICATE:CERTIFICATE \
+                      APPLE_CERTIFICATE_PASSWORD:CERTIFICATE_PASSWORD \
+                      APPLE_SIGNING_IDENTITY:SIGNING_IDENTITY \
+                      APPLE_ID:ID \
+                      APPLE_PASSWORD:PASSWORD \
+                      APPLE_TEAM_ID:TEAM_ID; do
+            key=${name%%:*}
+            value=$(printenv "${name##*:}" || true)
+            {
+              echo "$key<<XUENI_SECRET_EOF"
+              echo "$value"
+              echo "XUENI_SECRET_EOF"
+            } >> "$GITHUB_ENV"
+          done
+          echo "Signing with an Apple Developer ID."
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -96,15 +135,6 @@ jobs:
           # is the only way to sign. Without the secret the app still
           # builds and reads; the write tab says it cannot publish.
           VITE_WALLETCONNECT_PROJECT_ID: ${{ secrets.WALLETCONNECT_PROJECT_ID }}
-          # All optional. Unset, tauri-action reads them as "do not sign",
-          # the DMG is ad-hoc signed, and Gatekeeper warns on first launch
-          # (the README says what to do about it).
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: desktop
           args: --target universal-apple-darwin
@@ -130,7 +160,11 @@ jobs:
           # ad-hoc signature, but that is a detail of the toolchain and not
           # something worth failing a release over. The architectures are.
           codesign -dv /Volumes/XueniCheck/Xueni.app || echo "not signed (expected without an Apple identity)"
-          archs=$(lipo -archs /Volumes/XueniCheck/Xueni.app/Contents/MacOS/Xueni)
+          # Found rather than named: what the executable inside the bundle is
+          # called follows from productName, and is not ours to assume.
+          bin=$(find /Volumes/XueniCheck/Xueni.app/Contents/MacOS -type f -perm -111 -print -quit)
+          if [ -z "$bin" ]; then echo "no executable in the bundle"; exit 1; fi
+          archs=$(lipo -archs "$bin")
           echo "architectures: $archs"
           case "$archs" in *arm64*) ;; *) echo "no arm64 slice"; exit 1 ;; esac
           case "$archs" in *x86_64*) ;; *) echo "no x86_64 slice"; exit 1 ;; esac
