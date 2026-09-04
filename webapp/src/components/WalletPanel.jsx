@@ -3,9 +3,16 @@ import { READ_CHAIN_IDS, savePublishChainId } from '../lib/config';
 import { chainName } from '../lib/format';
 import { useUrlState } from '../lib/router';
 import { useT } from '../lib/i18n';
-import { switchToConfiguredChain, useWallet } from '../lib/wallet';
+import {
+  disconnectWallet,
+  listWallets,
+  selectedWallet,
+  switchToConfiguredChain,
+  useWallet,
+} from '../lib/wallet';
 import AddressLabel from './Address';
 import ChainIcon from './ChainIcon';
+import WalletChooser from './WalletChooser';
 import SectionHeader from './SectionHeader';
 import { BTN_PILL, SEGMENT_GROUP, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 import { Body, Meta, Note } from './Text';
@@ -24,11 +31,16 @@ import { Body, Meta, Note } from './Text';
  */
 export default function WalletPanel({ chainId, picked, disabled = false }) {
   const t = useT();
-  const { account, chainId: walletChainId, isConnecting, connect } = useWallet();
+  const { account, chainId: walletChainId, isConnecting, selected, connect } = useWallet();
   const [, navigate] = useUrlState();
   const [error, setError] = useState(null);
   const [switching, setSwitching] = useState(false);
-  const hasProvider = typeof window !== 'undefined' && Boolean(window.ethereum);
+  // Every wallet that announced itself, plus WalletConnect where this build
+  // has it. Read on each render: wallets announce asynchronously, and the
+  // store re-renders this panel when one does.
+  const wallets = listWallets();
+  const current = selectedWallet();
+  const hasProvider = wallets.length > 0;
   const mismatch = Boolean(account) && walletChainId != null && walletChainId !== chainId;
 
   const handleConnect = async () => {
@@ -74,7 +86,17 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
           {account ? (
             <Body as="span" className="inline-flex items-center gap-2" title={account}>
               <AddressLabel address={account} size={16} tailClassName="text-xs" />
-              <Meta as="span">{t('wallet.connected')}</Meta>
+              <Meta as="span">
+                {current ? t('wallet.connectedWith', { wallet: current.name }) : t('wallet.connected')}
+              </Meta>
+              <Meta
+                as="button"
+                type="button"
+                onClick={() => disconnectWallet()}
+                className="underline-offset-4 hover:text-accent hover:underline"
+              >
+                {t('wallet.disconnect')}
+              </Meta>
             </Body>
           ) : hasProvider ? (
             <button type="button" onClick={handleConnect} disabled={isConnecting} className={BTN_PILL}>
@@ -103,6 +125,11 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
             </div>
           </div>
         </div>
+
+        {/* Only when there is a choice to make: one wallet is not a choice. */}
+        {wallets.length > 1 && (
+          <WalletChooser wallets={wallets} selected={selected} disabled={disabled} />
+        )}
 
         {mismatch ? (
           <p role="alert" className="mt-3 text-xs leading-relaxed text-danger">

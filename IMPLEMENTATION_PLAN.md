@@ -47,7 +47,7 @@ never delete or skip a test to get there.
 |---|---|---|---|---|
 | 0 | Groundwork: shared refactors and two doc fixes | ☑ | #16 | |
 | 1 | Draft autosave | ☑ | #16 | |
-| 2 | Wallets: EIP-6963 discovery, optional WalletConnect | ☐ | | |
+| 2 | Wallets: EIP-6963 discovery, optional WalletConnect | ☑ | #16 | ID still needed |
 | 3 | Cost awareness: base-fee history and both chains side by side | ☐ | | |
 | 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☐ | | |
 | 5 | Markdown round trip and the raw view | ☐ | | |
@@ -80,6 +80,15 @@ Deviations and decisions made during implementation (append here, newest last):
   the publish had cleared the draft, putting a letter that was already on
   chain back in the editor. Fixed with an epoch the save checks before it
   writes, bumped whenever the draft is deliberately forgotten.
+- **Phase 2.** Built and verified without a WalletConnect project id, which
+  the repository owner has not supplied yet. The code path is complete and
+  the gating is proven both ways: a default build contains no WalletConnect
+  library code at all (only the app's own `'walletconnect'` string), and a
+  build with `VITE_WALLETCONNECT_PROJECT_ID` set bundles it. What is untested
+  is the QR flow itself, which needs a real project id and a real wallet.
+  A remembered WalletConnect choice is deliberately NOT reconnected on load:
+  opening the write tab must never put a QR code on screen nobody asked for,
+  so it reconnects on the next connect instead.
 
 ## 2. What Xueni is, in one page
 

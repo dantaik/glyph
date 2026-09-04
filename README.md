@@ -53,6 +53,11 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Wallets**: every wallet that announces itself (EIP-6963) is listed by name and icon in the "Wallet and
+network" panel, so a browser with two of them is a choice rather than a coin toss; the choice is
+remembered. Build with `VITE_WALLETCONNECT_PROJECT_ID=<id from Reown Cloud>` to add WalletConnect as
+one more entry — the only way to sign on a device with no extension. Without that variable the entry
+does not exist and none of its code is in the bundle.
 **Drafts**: what you are writing — title, tags, body and attached images — is saved in this browser
 half a second after you stop typing, and offered back the next time the Write tab opens, so a reload
 or a wallet sending you away and back loses nothing. "Discard" throws it away; publishing clears it.

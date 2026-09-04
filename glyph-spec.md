@@ -236,6 +236,10 @@ export async function decodePayload(compressed) {
 
 A browser module. Authorship is the connected wallet's address; the contract performs no identity check at all.
 
+Which wallet signs is `wallet.js`'s business, not this module's: it lists whatever announced itself
+through EIP-6963 (and WalletConnect where the build carries a project id), remembers the choice, and
+hands the chosen EIP-1193 provider to viem's `custom()` transport here.
+
 ```js
 import { createWalletClient, custom, toHex } from "viem";
 import { mainnet } from "viem/chains";
@@ -449,6 +453,7 @@ To reference another article from a body, the link target is written as the targ
 | ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
 | Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
 | Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
 | Local cache | IndexedDB, never expiring | The content is immutable; a cache hit costs no RPC; ten thousand posts is ~20 MB |
 | Scan coverage | localStorage records **a set of ranges** already scanned, rather than one frontier | Paging back only fills unread gaps; a range already scanned is never scanned again |

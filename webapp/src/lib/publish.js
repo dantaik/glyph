@@ -17,6 +17,7 @@ import { encodeTitle } from './title';
 import { encodePayload } from './payload';
 import { MAX_CALLDATA_BYTES, MAX_TX_BYTES } from './limits';
 import { t } from './i18n';
+import { getProvider, noWalletMessage } from './wallet';
 
 // The ceilings themselves live in limits.js, which imports nothing, so the
 // command-line tool can enforce the same numbers without the browser
@@ -31,12 +32,15 @@ const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
  * write tab (which asks the wallet to switch to it) is the one to sign on.
  */
 async function getWallet(chainId) {
-  if (!window.ethereum) {
-    throw new Error(t('wallet.none'));
+  // Whichever wallet the write tab is signing with — the one chosen from
+  // the wallets that announced themselves, or WalletConnect (wallet.js).
+  const provider = getProvider();
+  if (!provider) {
+    throw new Error(noWalletMessage());
   }
   const wallet = createWalletClient({
     chain: getChain(chainId).viem,
-    transport: custom(window.ethereum),
+    transport: custom(provider),
   });
   const [account] = await wallet.getAddresses();
   return { wallet, account };

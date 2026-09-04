@@ -197,6 +197,11 @@ export default {
   'wallet.followingWallet': ({ chain }) => `钱包已在${chain}上；发布目标跟随钱包所在的网络。`,
   'wallet.willConnect': '发布时会请求连接钱包；文章会永久写入所选网络上的合约。',
   'wallet.none': '未检测到钱包，请安装 MetaMask 等浏览器钱包。',
+  'wallet.chooseWallet': '用哪个钱包签名',
+  'wallet.browserWallet': '浏览器钱包',
+  'wallet.walletConnect': 'WalletConnect',
+  'wallet.disconnect': '断开连接',
+  'wallet.connectedWith': ({ wallet }) => `已通过 ${wallet} 连接`,
 
   // --- 留在浏览器里的草稿 ---------------------------------------------------
   'draft.restored': ({ when }) => `已恢复${when}的草稿`,
