@@ -53,6 +53,13 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Relations**: a post can say what it is to other posts, in its own front-matter and therefore on chain:
+a reply (`re`), a replacement for an earlier version (`supersedes` — the only honest kind of edit on an
+immutable chain), a continuation (`prev`), a place in a `series`, and the `lang` it is written in. Fill
+them in the folded "Relations" section of the Write tab, or press "Reply" under a post to start one
+with the reference already there. Reading, the forward half comes from the post itself and is always
+there; the backward half — its replies, what continues it, whether a newer version exists — is drawn
+from the posts this browser has read, and says so.
 **The letter as the chain holds it**: every post page has "Raw", which shows the exact decompressed
 document — front-matter included — with what it cost to store and what it decompresses to, and
 "Download .md", which saves those same bytes as a file named for the day and the title. "Import .md…"

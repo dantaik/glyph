@@ -210,24 +210,26 @@ function placeholderHash() {
  * the draft as typed would undercount.
  * @returns {Promise<{ bytes: number, limit: number, ok: boolean }>}
  */
-export async function measurePayload({ tags = [], markdown, files = {} }) {
+export async function measurePayload({ tags = [], markdown, files = {}, meta = {} }) {
   let doc = markdown || '';
   for (const key of usedImageKeys(doc, files)) {
     doc = doc.replace(imageRefRe(key, 'g'), `$1eth:${placeholderHash()}`);
   }
-  const payload = await encodePayload({ tags, markdown: doc });
+  const payload = await encodePayload({ tags, markdown: doc, meta });
   const limit = MAX_CALLDATA_BYTES;
   return { bytes: payload.length, limit, ok: payload.length <= limit };
 }
 
 /**
  * Publish a post on `chainId`.
- * @param {{ chainId: number, title: string, tags?: string[], markdown: string }} draft
+ * `meta` is the rest of the front-matter — the language, the relations —
+ * which rides in the same payload as the tags (spec §5.1).
+ * @param {{ chainId: number, title: string, tags?: string[], markdown: string, meta?: object }} draft
  * @returns {Promise<`0x${string}`>} tx hash of the publish call
  */
-export async function publishPost({ chainId, title, tags = [], markdown }) {
+export async function publishPost({ chainId, title, tags = [], markdown, meta = {} }) {
   const { wallet, account } = await getWallet(chainId);
-  const payload = await encodePayload({ tags, markdown });
+  const payload = await encodePayload({ tags, markdown, meta });
   const titleHex = encodeTitle(title);
   return wallet.writeContract({
     account,

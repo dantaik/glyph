@@ -12,7 +12,7 @@ import PostPage from './PostPage';
  * `headless` (from `?headless=1`) takes the page's navigation off, so the
  * neighbours are neither shown nor worth resolving.
  */
-export default function PostRoute({ reader, txHash, eventIndex, navigate, headless = false }) {
+export default function PostRoute({ reader, txHash, eventIndex, navigate, headless = false, onStartWriting }) {
   const meta = useAsync(() => reader.findMetaByTx(txHash, eventIndex), [reader, txHash, eventIndex]);
   const neighbors = useNeighbors(reader, headless ? null : (meta.value ?? null));
 
@@ -44,6 +44,7 @@ export default function PostRoute({ reader, txHash, eventIndex, navigate, headle
       neighbors={neighbors}
       onNavigate={(m) => navigate({ chain: reader.chainId, tx: m.txHash, txEvent: m.eventIndex ?? 0 })}
       onOpenAuthor={() => navigate({ author: post.author })}
+      onStartWriting={onStartWriting}
       headless={headless}
     />
   );

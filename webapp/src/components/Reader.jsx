@@ -60,6 +60,7 @@ export default function Reader({ onStartWriting }) {
         eventIndex={txEvent}
         navigate={navigate}
         headless={headless}
+        onStartWriting={onStartWriting}
       />
     );
   }

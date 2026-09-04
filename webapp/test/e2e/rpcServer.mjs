@@ -291,6 +291,8 @@ function oracleOf(s) {
       index: Number(p.index),
       href: `/${CHAINS[p.chainId].slug}/tx/${p.txHash}/0`,
       probe: probeOf(c.bodies.get(p.txHash), p.title),
+      tags: [...(c.bodies.get(p.txHash)?.tags ?? [])],
+      meta: { ...(c.bodies.get(p.txHash)?.meta ?? {}) },
     };
   });
   const counts = {};

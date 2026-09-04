@@ -18,8 +18,51 @@
 // the title lookup and the link are bound to that chain (reader.js builds
 // one resolver per chain with createRefResolver).
 
+import { chainFromSlug, chainSlug } from './chains';
 import { shortAddr } from './format';
 import { hrefFor } from './router';
+
+/**
+ * A POST REFERENCE, as front-matter carries it (spec §5.1):
+ *
+ *     [<chainSlug>:]0x<64 hex>[/<eventIndex>]
+ *
+ * The transaction that published the post, an optional 0-based ordinal for
+ * the Post event within it (default 0), and an optional chain prefix. With
+ * no prefix the reference means the chain the referring post is on, which is
+ * the common case and keeps the bytes short.
+ */
+const POST_REF_RE = /^(?:([a-z0-9-]+):)?(0x[0-9a-fA-F]{64})(?:\/(\d+))?$/;
+
+/** The same post as a URL of this app, which is what a reader will paste. */
+const POST_URL_RE = /\/(?:([a-z0-9-]+)\/)?tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?(?:[?#]|$)/;
+
+/**
+ * Read a post reference. Accepts the reference form above and a full or
+ * partial URL of this app, so pasting a link from the address bar works.
+ * @returns {{ chainId: number, txHash: string, eventIndex: number } | null}
+ */
+export function parsePostRef(value, defaultChainId = null) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const m = text.match(POST_REF_RE) ?? text.match(POST_URL_RE);
+  if (!m) return null;
+  const [, slug, txHash, index] = m;
+  const chainId = slug ? chainFromSlug(slug) : (defaultChainId ?? null);
+  if (chainId == null) return null; // a prefix we don't know, or no chain to assume
+  return { chainId: Number(chainId), txHash: txHash.toLowerCase(), eventIndex: index != null ? Number(index) : 0 };
+}
+
+/**
+ * Write a reference in its shortest honest form: no chain prefix when it is
+ * the same chain as the post carrying it, and no `/0` for the usual case of
+ * one post per transaction.
+ */
+export function formatPostRef({ chainId, txHash, eventIndex = 0 }, currentChainId = null) {
+  const prefix = currentChainId != null && Number(chainId) === Number(currentChainId) ? '' : `${chainSlug(chainId)}:`;
+  const suffix = eventIndex ? `/${eventIndex}` : '';
+  return `${prefix}${String(txHash).toLowerCase()}${suffix}`;
+}
 
 // Only a full 64-hex tx hash (with optional event ordinal) counts as a
 // reference — ordinary 0x…-ish links never match.

@@ -205,6 +205,33 @@ node builds bodies with it and the command-line tool encodes with it.
 includes `text`, the exact document the chain holds, so the raw view, a `.md`
 download and an archive bundle can all carry it byte for byte.
 
+### 5.1 Front-matter keys
+
+All optional. A reader that does not know a key ignores it, and a key it does not know survives a
+decode/encode round trip untouched — which is what makes this an extension point rather than a fixed
+list.
+
+A **post reference** is `[<chainSlug>:]0x<64 hex>[/<eventIndex>]`: the publish transaction, an optional
+0-based ordinal for the Post event inside it (default 0), and an optional chain prefix (`taiko:`,
+`ethereum:`). With no prefix the reference means the chain the referring post is on.
+
+| Key | Value | Meaning |
+|---|---|---|
+| `tags` | `a, b` | free-form labels |
+| `lang` | BCP 47, e.g. `zh` | the language the post is written in; becomes the article's `lang` |
+| `re` | post reference | this post replies to that one |
+| `supersedes` | post reference | this post replaces that one — the only honest edit on an immutable chain |
+| `prev` | post reference | this post continues that one |
+| `series` | text, ≤ 64 chars | the name of a series, belonging to its author |
+| `part` | positive integer | this post's number within `series` |
+
+Forward relations are read from the post itself and are as durable as it is. The reverse — replies,
+continuations, a newer version — cannot be asked of a node, because it would mean filtering on the
+inside of compressed calldata. They come instead from `bodyIndex.js`, a per-chain index of the bodies
+THIS BROWSER has read (warmed from the IndexedDB cache on first use), and every surface built on it
+says so rather than implying completeness. An index that fetched more would be a crawler; one that
+claimed more would be lying.
+
 **Why front-matter rather than a custom binary format?**
 - It has been a stable, universal convention for 15 years (Jekyll, Hugo, Obsidian and every static-site generator understand it), and does not depend on this app.
 - Decompressed, it is directly readable by a person — which is the core principle.
@@ -467,6 +494,8 @@ To reference another article from a body, the link target is written as the targ
 | ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
 | Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
 | Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| Relations between posts | Front-matter keys (`re`, `supersedes`, `prev`, `series`/`part`), with the reverse direction indexed locally from bodies already read | The contract indexes only authors, and indexing the inside of calldata is exactly the off-chain dependency this design refuses; forward relations are durable, reverse ones are honest about their scope |
+| The language of a post | A `lang` front-matter key, applied to the article element | Better CJK line breaking and a screen reader that pronounces it correctly, without guessing from the characters |
 | Getting a post out and back | "Raw" and "Download .md" hand over the exact stored document; "Import .md…" reads one into a draft | The design's central claim is that the bytes are plain readable Markdown; this is where the claim can be checked, and the simplest personal backup there is |
 | Publishing an image twice | The processed bytes are hashed (SHA-256) and the transaction remembered per chain in `localStorage`; a match is referenced, not re-sent | An image is its own transaction and the dearest part of a post; nothing in the protocol stopped paying for the same bytes twice |
 | When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |

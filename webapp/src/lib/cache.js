@@ -201,6 +201,41 @@ export async function deleteRecord(storeName, key) {
   }
 }
 
+/**
+ * Every body cached for `chainId`, as `[{ txHash, body }]`.
+ *
+ * The index of what bodies SAY (bodyIndex.js) is built from what has been
+ * read; without this it would start empty on every visit and a reader who
+ * has been here for months would see nothing until they read something
+ * again. Entries written before keys carried their chain are keyed by hash
+ * alone; they are handed to the chain asking, since that is the only chain
+ * that browser could have read them on.
+ */
+export async function getCachedBodies(chainId) {
+  if (idbDenied) {
+    const prefix = `bodies:${Number(chainId)}:`;
+    return [...memory.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, body]) => ({ txHash: key.slice(prefix.length), body }));
+  }
+  try {
+    const db = await openDB();
+    const store = db.transaction('bodies', 'readonly').objectStore('bodies');
+    const [keys, values] = await Promise.all([promisify(store.getAllKeys()), promisify(store.getAll())]);
+    const scope = `${Number(chainId)}:`;
+    const out = [];
+    keys.forEach((key, i) => {
+      const name = String(key);
+      if (name.startsWith(scope)) out.push({ txHash: name.slice(scope.length), body: values[i] });
+      else if (!name.includes(':')) out.push({ txHash: name, body: values[i] }); // pre-chain-scoped
+    });
+    return out;
+  } catch {
+    idbDenied = true;
+    return [];
+  }
+}
+
 // --- Post bodies ---
 
 /**

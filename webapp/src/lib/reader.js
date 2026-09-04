@@ -21,6 +21,7 @@ import { FeedController } from './feed';
 import { AuthorListController } from './authorList';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
 import { createRefResolver } from './glyphRefs';
+import { getBodyIndex } from './bodyIndex';
 
 /** Posts per page, on the feed and on author lists. */
 export const PAGE_SIZE = 20;
@@ -56,6 +57,8 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
   // `volatile` holds the two answers that really do move — the head block
   // and an author's post count — for a short fixed window.
   const forever = makeForeverCache();
+  // What the bodies read on this chain say — tags, relations, series.
+  const index = getBodyIndex(id);
   const volatile = makeTtlCache(() => VOLATILE_TTL_MS);
 
   const feed = new FeedController({
@@ -243,6 +246,11 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
       if (!io.ephemeral) setCachedBody(id, txHash, body).catch(() => {});
       return { body, fromCache: false };
     })();
+    // Whatever the body turns out to say is filed as soon as it is known,
+    // whether it came from the node or from the cache.
+    promise
+      .then(({ body }) => index.add(store.knownPostByTx(txHash, 0), { ...body, txHash }))
+      .catch(() => {});
     promise.catch(() => bodies.delete(txHash));
     bodies.set(txHash, promise);
     return promise;
@@ -331,6 +339,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     ensName,
     loadPostBody,
     loadPostText,
+    index,
     baseFees,
     resolveGlyphRefs,
     resolveImages,

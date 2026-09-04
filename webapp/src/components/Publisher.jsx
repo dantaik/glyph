@@ -20,6 +20,7 @@ import { t, useLang } from '../lib/i18n';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
 import ImportMarkdown from './ImportMarkdown';
+import RelationsFields from './RelationsFields';
 import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
@@ -450,7 +451,7 @@ export default function Publisher() {
       // Images are uploaded one paid transaction at a time, so check the
       // body against the transaction ceiling while failing is still free.
       setStatusMsg(t('publish.compressing'));
-      const size = await measurePayload({ tags, markdown, files });
+      const size = await measurePayload({ tags, markdown, files, meta });
       if (!size.ok) {
         const kb = (n) => `${Math.ceil(n / 1024)} KB`;
         setStatus('error');
@@ -478,6 +479,7 @@ export default function Publisher() {
         title: title.trim(),
         tags,
         markdown: finalMd,
+        meta,
       });
       setTxHash(hash);
       setStatus('done');
@@ -583,6 +585,15 @@ export default function Publisher() {
             className="flex-1 min-w-[6rem] bg-transparent text-sm outline-none placeholder:text-ink-ghost"
           />
         </div>
+      </div>
+
+      <div className="mb-10">
+        <RelationsFields
+          meta={meta}
+          onChange={setMeta}
+          chainId={chainId}
+          disabled={status === 'processing' || status === 'signing'}
+        />
       </div>
 
       <SectionHeader

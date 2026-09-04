@@ -238,15 +238,19 @@ export const WORLDS = {
     scanBlocks: undefined, // the chain's default (270,000) — sweeps to the floor
     seeds: (txOf) => [
       [0, 4n, 2870n, 'A letter before the solstice', ['letters home'], BODY_A0_4],
-      [1, 3n, 2660n, 'A letter from the hills', ['living up here'], BODY_A1_3(txOf(AUTHORS[0], 2n))],
-      [2, 2n, 2480n, 'Winter by the sea', ['sea'], BODY_A2_2],
+      [1, 3n, 2660n, 'A letter from the hills', ['living up here'], BODY_A1_3(txOf(AUTHORS[0], 2n)),
+        { re: txOf(AUTHORS[0], 2n) }],
+      [2, 2n, 2480n, 'Winter by the sea', ['sea'], BODY_A2_2,
+        { series: 'Kitchen notes', part: '3', prev: txOf(AUTHORS[2], 1n) }],
       [0, 3n, 2330n, 'The yard in spring', ['the yard', 'spring'], BODY_A0_3],
-      [1, 2n, 2120n, '记忆里的那条回家的小�', ['旧事'], BODY_A1_2],
-      [0, 2n, 1980n, '关于外婆的香樟木箱', ['家信', '冬天'], LONG_ARTICLE],
-      [2, 1n, 1810n, 'To myself, ten years on', ['for me'], BODY_A2_1],
+      [1, 2n, 2120n, '记忆里的那条回家的小�', ['旧事'], BODY_A1_2, { lang: 'zh' }],
+      [0, 2n, 1980n, '关于外婆的香樟木箱', ['家信', '冬天'], LONG_ARTICLE, { lang: 'zh' }],
+      [2, 1n, 1810n, 'To myself, ten years on', ['for me'], BODY_A2_1,
+        { series: 'Kitchen notes', part: '2', prev: txOf(AUTHORS[2], 0n) }],
       [1, 1n, 1640n, 'The night boat', [], BODY_A1_1],
       [0, 1n, 1420n, 'The first letter to Xiaoman', ['letters home'], BODY_A0_1],
-      [2, 0n, 1260n, 'The stove and the smoke', ['food'], BODY_A2_0],
+      [2, 0n, 1260n, 'The stove and the smoke', ['food'], BODY_A2_0,
+        { series: 'Kitchen notes', part: '1' }],
       [1, 0n, 1100n, 'When the osmanthus opens', ['autumn'], BODY_A1_0],
       [0, 0n, 900n, '', [], BODY_A0_0],
     ],
@@ -256,8 +260,9 @@ export const WORLDS = {
     secondsPerBlock: 2,
     floor: 0n,
     scanBlocks: 12_000n,
-    seeds: () => [
-      [0, 2n, 28_900n, 'The drums', ['letters home'], BODY_T0_2],
+    seeds: (txOf) => [
+      [0, 2n, 28_900n, 'The drums', ['letters home'], BODY_T0_2,
+        { supersedes: txOf(AUTHORS[0], 1n) }],
       [3, 2n, 27_400n, 'Morning fog at the crossing', ['the crossing'], BODY_T3_2],
       [1, 1n, 24_800n, 'Rain at midnight', [], BODY_T1_1],
       [0, 1n, 21_600n, 'A short note to Xiaoman', ['letters home'], BODY_T0_1],
@@ -305,7 +310,10 @@ export function buildWorld(chainId, { now = Math.floor(Date.now() / 1000), scale
 
   const byAuthor = new Map(AUTHORS.map((a) => [keyOf(a), []]));
   const bodyByTx = new Map();
-  for (const [ai, index, block, title, tags, markdown] of spec.seeds(tx)) {
+  // A seed is [author, index, block, title, tags, markdown, meta?] — the
+  // last being the rest of the front-matter: a language, a relation to
+  // another post, a place in a series.
+  for (const [ai, index, block, title, tags, markdown, meta = {}] of spec.seeds(tx)) {
     const author = AUTHORS[ai];
     const txHash = tx(author, index);
     byAuthor.get(keyOf(author)).push({
@@ -319,7 +327,7 @@ export function buildWorld(chainId, { now = Math.floor(Date.now() / 1000), scale
       logIndex: 0,
       ts: tsOf(block * scaleN),
     });
-    bodyByTx.set(txHash, { tags, markdown });
+    bodyByTx.set(txHash, { tags, markdown, meta });
   }
   for (const list of byAuthor.values()) {
     list.sort((a, b) => Number(a.index - b.index));

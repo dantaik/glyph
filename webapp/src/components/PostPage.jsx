@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useAsync } from '../lib/hooks';
 import { chainFromSlug } from '../lib/chains';
 import ChainChip from './ChainChip';
@@ -14,6 +14,8 @@ import {
   friendlyError,
 } from '../lib/format';
 import { downloadText, postFileName } from '../lib/download';
+import { setPendingDraftPatch } from '../lib/drafts';
+import { formatPostRef } from '../lib/glyphRefs';
 import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
 import AddressLabel from './Address';
@@ -22,6 +24,7 @@ import { BTN_OUTLINE_PILL } from './formStyles';
 import { ArticleTitle, Meta, Micro } from './Text';
 import PostNav from './PostNav';
 import RawView from './RawView';
+import { RelationsAbove, RelationsBelow, SupersededNotice } from './RelationsPanel';
 import { ArticleSkeleton } from './Skeleton';
 
 /**
@@ -49,6 +52,7 @@ export default function PostPage({
   neighbors,
   onNavigate,
   onOpenAuthor,
+  onStartWriting,
   headless = false,
 }) {
   const [body, setBody] = useState(null); // { meta, tags, markdown }
@@ -132,6 +136,53 @@ export default function PostPage({
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
 
+  // --- What this post says about others, and they about it -------------
+  //
+  // Forward relations come from the post's own front-matter and are as
+  // durable as the post itself. Backward ones come from the local index of
+  // bodies this browser has read, so they grow as the reader reads — and
+  // the panel says so rather than implying it has them all.
+  const index = reader.index;
+  const indexVersion = useSyncExternalStore(index.subscribe, index.getVersion, index.getVersion);
+  useEffect(() => {
+    index.warm();
+  }, [index]);
+
+  const eventIndex = meta.eventIndex ?? 0;
+  const backlinks = useMemo(
+    () => index.backlinksTo(meta.txHash, eventIndex),
+    // indexVersion IS the subscription: the answers change when it changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [index, meta.txHash, eventIndex, indexVersion],
+  );
+  const seriesParts = useMemo(
+    () => (body?.meta?.series ? index.seriesOf(meta.author, body.meta.series) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [index, meta.author, body?.meta?.series, indexVersion],
+  );
+  const supersededBy = backlinks.filter((b) => b.kind === 'supersedes');
+
+  // A relation is learnt from a body, which can be read long before anything
+  // says who wrote it — a body cached on an earlier visit, above all. The
+  // missing rows are one receipt read each, and resolving them makes the
+  // lists below appear; the index notices and re-renders.
+  useEffect(() => {
+    for (const hash of index.unresolvedRelated(meta.txHash, eventIndex, body?.meta?.series)) {
+      reader.findMetaByTx(hash, 0).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, reader, meta.txHash, eventIndex, body?.meta?.series, indexVersion]);
+
+  /** Answer this letter: the write tab opens with the reference filled in. */
+  const reply = () => {
+    setPendingDraftPatch({
+      meta: {
+        re: formatPostRef({ chainId: reader.chainId, txHash: meta.txHash, eventIndex }, reader.chainId),
+      },
+    });
+    onStartWriting?.();
+  };
+
   /**
    * The document byte for byte. Bodies cached before the text was kept do
    * not carry it, so it is read once and the record upgraded (reader.js).
@@ -163,7 +214,9 @@ export default function PostPage({
   };
 
   return (
-    <article>
+    // The language the post was written in, when it says: better line
+    // breaking for CJK, and a screen reader that pronounces it correctly.
+    <article lang={body?.meta?.lang || undefined}>
       {!headless && (
         <div className="mb-8">
           <BackButton onClick={onBack} />
@@ -204,8 +257,18 @@ export default function PostPage({
             </>
           )}
         </Meta>
+        {body?.meta && (
+          <RelationsAbove
+            meta={body.meta}
+            chainId={reader.chainId}
+            navigate={navigate}
+            series={seriesParts}
+          />
+        )}
         </div>
       </header>
+
+      {loaded && <SupersededNotice by={supersededBy} chainId={reader.chainId} navigate={navigate} />}
 
       {loading && <ArticleSkeleton />}
 
@@ -284,6 +347,14 @@ export default function PostPage({
             <button type="button" onClick={download} className="hover:text-accent transition-colors">
               {t('export.download')}
             </button>
+            {onStartWriting && (
+              <>
+                <Dot />
+                <button type="button" onClick={reply} className="hover:text-accent transition-colors">
+                  {t('relations.reply')}
+                </button>
+              </>
+            )}
           </Meta>
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -307,6 +378,16 @@ export default function PostPage({
           block={meta.block}
           txHash={meta.txHash}
           chainId={reader.chainId}
+        />
+      )}
+
+      {loaded && (
+        <RelationsBelow
+          backlinks={backlinks}
+          seriesParts={seriesParts}
+          meta={{ ...(body?.meta ?? {}), txHash: meta.txHash }}
+          chainId={reader.chainId}
+          navigate={navigate}
         />
       )}
 

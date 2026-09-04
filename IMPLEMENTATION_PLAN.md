@@ -51,7 +51,7 @@ never delete or skip a test to get there.
 | 3 | Cost awareness: base-fee history and both chains side by side | ☑ | #16 | |
 | 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☑ | #16 | |
 | 5 | Markdown round trip and the raw view | ☑ | #16 | |
-| 6 | Front-matter relations and the body index | ☐ | | |
+| 6 | Front-matter relations and the body index | ☑ | #16 | |
 | 7 | Tags and search over what this browser has read | ☐ | | |
 | 8 | The following feed | ☐ | | |
 | 9 | ENS identity: names in URLs, avatars, profiles | ☐ | | |
@@ -80,6 +80,15 @@ Deviations and decisions made during implementation (append here, newest last):
   the publish had cleared the draft, putting a letter that was already on
   chain back in the editor. Fixed with an epoch the save checks before it
   writes, bumped whenever the draft is deliberately forgotten.
+- **Phase 6.** Two things the plan did not foresee, both found by the
+  end-to-end tests. A series was originally filed under its author, but who
+  wrote a post is often unknown at the moment its body is read (a body
+  cached on an earlier visit arrives before any list says whose it is), so
+  series are filed by transaction and the author is matched when the
+  question is asked. And the page now resolves the rows of related posts it
+  does not know — one receipt read each — because otherwise the backward
+  relations stayed invisible after a reload. A post that qualifies for two
+  lists at once is shown in one.
 - **Phase 4.** The reuse path is covered end to end (publish an image, then
   publish it again and count the transactions) rather than by a unit test:
   `embedImages` runs the image through a canvas, which jsdom has no answer
