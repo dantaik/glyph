@@ -103,8 +103,13 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     return feed;
   }
 
+  // Only mainnet hosts ENS, and an address is the same everywhere, so a
+  // Taiko-only view still asks Ethereum. When this view has no mainnet
+  // reader at all, every lookup answers null rather than guessing.
   const ens = ensReader ?? byId.get(DEFAULT_CHAIN_ID) ?? null;
   const ensName = (address) => (ens ? ens.ensName(address) : Promise.resolve(null));
+  const resolveEnsName = (name) => (ens ? ens.resolveEnsName(name) : Promise.resolve(null));
+  const ensProfile = (address) => (ens ? ens.ensProfile(address) : Promise.resolve(null));
 
   /** The reader for one of this view's chains (null when it isn't in the view). */
   const reader = (chainId) => byId.get(Number(chainId)) ?? null;
@@ -141,6 +146,8 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     authorList,
     counts,
     ensName,
+    resolveEnsName,
+    ensProfile,
     knownRows,
     loadPostBody,
     findMetaByTx,

@@ -39,6 +39,29 @@ describe('readParams — the URL as a state map', () => {
     expect((await routerAt('/scan')).readParams()).toMatchObject({ chain: null, scan: '1' });
   });
 
+  it('an author may be named as well as numbered', async () => {
+    const named = await routerAt('/author/xiaoman.eth');
+    expect(named.readParams()).toMatchObject({ chain: null, authorName: 'xiaoman.eth' });
+    expect(named.readParams().author).toBeUndefined();
+    // The case a person types is not the case the registry holds.
+    expect((await routerAt('/author/Xiaoman.ETH')).readParams().authorName).toBe('xiaoman.eth');
+    expect((await routerAt('/taiko/author/xiaoman.eth')).readParams()).toMatchObject({
+      chain: 167000,
+      authorName: 'xiaoman.eth',
+    });
+    // A name is a name only if it looks like one; a typo is not a lookup.
+    expect((await routerAt('/author/xiaoman')).readParams().authorName).toBeUndefined();
+    expect((await routerAt('/author/0x1234')).readParams().authorName).toBeUndefined();
+    // An address is still an address, never a name.
+    expect((await routerAt(`/author/${ADDR}`)).readParams().authorName).toBeUndefined();
+  });
+
+  it('writes a name back into the URL, keeping the chain filter', async () => {
+    const r = await routerAt('/');
+    expect(r.hrefFor({ authorName: 'xiaoman.eth' })).toBe('/author/xiaoman.eth');
+    expect(r.hrefFor({ chain: 167000, authorName: 'xiaoman.eth' })).toBe('/taiko/author/xiaoman.eth');
+  });
+
   it('flags a legacy ?author= query link', async () => {
     const { readParams } = await routerAt(`/?author=${ADDR}`);
     expect(readParams()).toMatchObject({ author: ADDR, authorFromQuery: true });

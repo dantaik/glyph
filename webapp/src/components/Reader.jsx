@@ -3,6 +3,7 @@ import { getReader } from '../lib/data';
 import { useUrlState, isHeadless, ADDRESS_RE } from '../lib/router';
 import { useView } from '../lib/view';
 import AuthorPage from './AuthorPage';
+import AuthorResolver from './AuthorResolver';
 import HomeFeed from './HomeFeed';
 import PostLocator from './PostLocator';
 import PostRoute from './PostRoute';
@@ -79,5 +80,14 @@ export default function Reader({ onStartWriting }) {
     );
   }
   if (author) return <AuthorPage view={view} author={author} navigate={navigate} currentChain={params.chain} />;
+  if (params.authorName)
+    return (
+      <AuthorResolver
+        view={view}
+        name={params.authorName}
+        navigate={navigate}
+        currentChain={params.chain}
+      />
+    );
   return <HomeFeed view={view} navigate={navigate} currentChain={params.chain} onStartWriting={onStartWriting} />;
 }

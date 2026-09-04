@@ -26,18 +26,29 @@
 import { createServer } from 'node:http';
 import { brotliCompressSync, constants } from 'node:zlib';
 import {
+  decodeAbiParameters,
   decodeFunctionData,
   encodeAbiParameters,
   encodeFunctionData,
+  hexToBytes,
   keccak256,
   pad,
   stringToHex,
   toEventSelector,
   toHex,
 } from 'viem';
+import { mainnet } from 'viem/chains';
 import { abi } from '../../src/lib/abi.js';
 import { CHAINS } from '../../src/lib/chains.js';
-import { AUTHORS, buildWorlds, expectedMergedOrder } from '../../src/lib/fixtureWorld.js';
+import {
+  AUTHORS,
+  ENS_NAMES,
+  ENS_RECORDS,
+  buildWorlds,
+  ensAddressOf,
+  ensNameOf,
+  expectedMergedOrder,
+} from '../../src/lib/fixtureWorld.js';
 import { buildPayloadText } from '../../src/lib/payloadText.js';
 
 const PORT = Number(process.argv[2] || process.env.GLYPH_RPC_PORT || 8545);
@@ -246,6 +257,8 @@ function answer(c, method, params) {
         .map((p) => logOf(c, p));
     }
     case 'eth_call': {
+      const ens = ensCall(c, params[0]);
+      if (ens !== undefined) return ens;
       const { functionName, args } = decodeFunctionData({ abi, data: params[0].data });
       const list = c.byAuthor.get(String(args[0]).toLowerCase()) ?? [];
       const v =
@@ -263,6 +276,92 @@ function answer(c, method, params) {
     default:
       throw rpcError(-32601, `the mock node does not answer ${method}`);
   }
+}
+
+// --- ENS ------------------------------------------------------------------------
+//
+// Only Ethereum hosts ENS, and the app knows it, so this answers on chain 1
+// alone. Enough of the universal resolver to satisfy viem: `resolve` for
+// `addr` and `text`, and `reverse` for the name an address has claimed. The
+// demo's names and records are in fixtureWorld.js, so the DEV demo and these
+// tests agree about who is called what.
+
+const ENS_RESOLVER = mainnet.contracts.ensUniversalResolver.address.toLowerCase();
+/** A resolver address to hand back. Nothing reads it; viem wants a value. */
+const ENS_RESOLVER_IMPL = '0x0000000000000000000000000000000000e5e5e5';
+
+const SEL_RESOLVE = '0xa1472844'; // resolveWithGateways(bytes,bytes,string[])
+const SEL_REVERSE = '0xb7d6ca64'; // reverseWithGateways(bytes,uint256,string[])
+const SEL_ADDR = '0x3b3b57de'; // addr(bytes32)
+const SEL_TEXT = '0x59d1d43c'; // text(bytes32,string)
+
+/** DNS wire format back to a dotted name: <len><label><len><label>…<0>. */
+function nameFromDns(hex) {
+  const bytes = hexToBytes(hex);
+  const labels = [];
+  let i = 0;
+  while (i < bytes.length && bytes[i] !== 0) {
+    const len = bytes[i];
+    labels.push(Buffer.from(bytes.slice(i + 1, i + 1 + len)).toString('utf8'));
+    i += len + 1;
+  }
+  return labels.join('.');
+}
+
+/**
+ * Answer an `eth_call` to the ENS universal resolver, or `undefined` when the
+ * call is not one (in which case the caller decodes it as a Glyph call).
+ */
+function ensCall(c, call) {
+  if (c.id !== 1) return undefined;
+  if (String(call?.to ?? '').toLowerCase() !== ENS_RESOLVER) return undefined;
+  const data = String(call.data ?? '');
+  const selector = data.slice(0, 10);
+
+  if (selector === SEL_RESOLVE) {
+    const [dnsName, inner] = decodeAbiParameters(
+      [{ type: 'bytes' }, { type: 'bytes' }, { type: 'string[]' }],
+      `0x${data.slice(10)}`,
+    );
+    const name = nameFromDns(dnsName);
+    const innerSelector = inner.slice(0, 10);
+    // A name nobody registered resolves to nothing, which viem reads as null.
+    const result = (() => {
+      if (innerSelector === SEL_ADDR) {
+        // Lower-cased: the demo addresses are written the way a person types
+        // them, and viem refuses an address whose checksum case is wrong.
+        const address = ensAddressOf(name);
+        return address ? encodeAbiParameters([{ type: 'address' }], [address.toLowerCase()]) : '0x';
+      }
+      if (innerSelector === SEL_TEXT) {
+        const [, key] = decodeAbiParameters(
+          [{ type: 'bytes32' }, { type: 'string' }],
+          `0x${inner.slice(10)}`,
+        );
+        const value = ENS_RECORDS[name]?.[key] ?? '';
+        return value ? encodeAbiParameters([{ type: 'string' }], [value]) : '0x';
+      }
+      return '0x'; // a record this mock does not keep
+    })();
+    return encodeAbiParameters(
+      [{ type: 'bytes' }, { type: 'address' }],
+      [result, ENS_RESOLVER_IMPL],
+    );
+  }
+
+  if (selector === SEL_REVERSE) {
+    const [addressBytes] = decodeAbiParameters(
+      [{ type: 'bytes' }, { type: 'uint256' }, { type: 'string[]' }],
+      `0x${data.slice(10)}`,
+    );
+    const name = ensNameOf(addressBytes) ?? '';
+    return encodeAbiParameters(
+      [{ type: 'string' }, { type: 'address' }, { type: 'address' }],
+      [name, ENS_RESOLVER_IMPL, ENS_RESOLVER_IMPL],
+    );
+  }
+
+  throw rpcError(-32601, `the mock node does not answer this ENS call: ${selector}`);
 }
 
 // --- The oracle: what the pages must show --------------------------------------
@@ -308,7 +407,14 @@ function oracleOf(s) {
     }
     counts[a] = { total, byChain };
   }
-  return { now: NOW, posts: s.spec.empty ? [] : posts, counts, authors: AUTHORS };
+  return {
+    now: NOW,
+    posts: s.spec.empty ? [] : posts,
+    counts,
+    authors: AUTHORS,
+    // Who has an ENS name here, and what that name says about itself.
+    ens: { names: ENS_NAMES, records: ENS_RECORDS },
+  };
 }
 
 // --- HTTP -------------------------------------------------------------------------

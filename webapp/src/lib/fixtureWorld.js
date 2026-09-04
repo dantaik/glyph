@@ -17,6 +17,37 @@ export const AUTHORS = [
   '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', // writes on Taiko only
 ];
 
+/**
+ * The demo's ENS, as one author who has a name and three who have not — the
+ * mix a real feed shows. Only Ethereum hosts ENS, so this belongs to chain 1
+ * wherever it is served from: the DEV fixtures and the end-to-end mock node
+ * both read it here, so the two demos agree.
+ */
+export const ENS_NAMES = {
+  'xiaoman.eth': AUTHORS[0],
+};
+
+/** The text records that name publishes. Everything else is empty. */
+export const ENS_RECORDS = {
+  'xiaoman.eth': {
+    description: 'Letters home, mostly about weather and food.',
+    url: 'https://xiaoman.example',
+    'com.github': 'xiaoman',
+  },
+};
+
+/** The address a demo name points at, or null. */
+export const ensAddressOf = (name) => ENS_NAMES[String(name ?? '').toLowerCase()] ?? null;
+
+/** The name an address has claimed, or null. */
+export function ensNameOf(address) {
+  const a = String(address ?? '').toLowerCase();
+  for (const [name, addr] of Object.entries(ENS_NAMES)) {
+    if (addr.toLowerCase() === a) return name;
+  }
+  return null;
+}
+
 // data:image/svg+xml URIs must pass the marked sanitizer allowlist and the
 // markdown `![](…)` parser: encode everything, with parens forced to %28/%29
 // (encodeURIComponent leaves them alone) and `#` colors becoming %23.

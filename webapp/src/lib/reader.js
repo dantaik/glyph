@@ -22,6 +22,7 @@ import { AuthorListController } from './authorList';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
 import { createRefResolver } from './glyphRefs';
 import { getBodyIndex } from './bodyIndex';
+import { createEns } from './ens';
 
 /** Posts per page, on the feed and on author lists. */
 export const PAGE_SIZE = 20;
@@ -210,18 +211,11 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
       return { block: latest.number, ts: latest.timestamp, secondsPerBlock };
     });
 
-  // --- ENS names — cached; null when the address has none, or when the
-  //     chain doesn't host ENS (only Ethereum mainnet does). -------------
+  // --- ENS — names, avatars and profiles; all null when the address has
+  //     none, or when the chain doesn't host ENS (only mainnet does). ----
 
-  const ens = new Map(); // address (lowercase) -> Promise<string | null>
-
-  function ensName(address) {
-    const key = addrKey(address);
-    if (ens.has(key)) return ens.get(key);
-    const promise = io.ensName(address).catch(() => null); // RPC hiccup → no name
-    ens.set(key, promise);
-    return promise;
-  }
+  const ens = createEns(io);
+  const { ensName, resolveEnsName, ensProfile } = ens;
 
   // --- Post body (tags + markdown) — fetched on demand from tx calldata,
   //     with IndexedDB permanent cache (posts are immutable on-chain). ---
@@ -337,6 +331,9 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     clock,
     blockTime,
     ensName,
+    resolveEnsName,
+    ensProfile,
+    hasEns: ens.enabled,
     loadPostBody,
     loadPostText,
     index,

@@ -59,6 +59,14 @@ a substring, so Chinese works without word splitting. Both cover the posts this 
 so in their subtitle, and offer the ordinary "read earlier posts" as the way to cover more. Neither
 asks anything of a server: no node can filter on the inside of compressed calldata, and an index that
 went looking would be a crawler.
+**Names**: an author who has an ENS name is shown by it — in bylines, on their own page, and at
+`/author/xiaoman.eth`, which resolves the name and shows their posts. Their ENS avatar replaces the
+identicon once it has loaded, and their `description`, `url`, `com.twitter` and `com.github` records
+become a short profile above the list. The contract knows only addresses and always will; ENS is the
+identity layer already on chain, under a registry with no owner, so none of this needs a server. A
+reverse record is a claim the address makes about itself, so the name is resolved forward again and
+only shown when it comes back to the same address. Every lookup is best effort and only Ethereum
+answers it.
 **Following**: "Follow" on an author's page (or under any post of theirs) keeps them in a list held in this
 browser and nowhere else, and `/following` — one click from the home feed — shows their newest posts merged
 across both chains. It is the cheap path the contract was designed for: the home feed has to sweep block

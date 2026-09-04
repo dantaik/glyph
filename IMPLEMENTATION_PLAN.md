@@ -54,7 +54,7 @@ never delete or skip a test to get there.
 | 6 | Front-matter relations and the body index | ☑ | #16 | |
 | 7 | Tags and search over what this browser has read | ☑ | #16 | |
 | 8 | The following feed | ☑ | #16 | |
-| 9 | ENS identity: names in URLs, avatars, profiles | ☐ | | |
+| 9 | ENS identity: names in URLs, avatars, profiles | ☑ | #16 | |
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☐ | | |
 | 11 | Archive bundles: export and import | ☐ | | |
 | 12 | The command-line tool | ☑ | #16 | |
@@ -118,6 +118,15 @@ Deviations and decisions made during implementation (append here, newest last):
   itself is one piece of work and its 69 tests pass as a whole. Its `export`
   command writes the Phase 11 archive format, which the web app could not
   read yet when it was written; the round trip is checked in Phase 11.
+- **Phase 9.** The mock node answers the universal resolver's
+  `resolveWithGateways` and `reverseWithGateways` (the shapes viem 2.52
+  actually calls) rather than the older `resolve`/`reverse`; a name with no
+  record answers empty bytes, which viem reads as null, instead of the
+  resolver's revert — the revert path is not what the app's behaviour turns
+  on. The demo's names and text records live in `fixtureWorld.js` so the DEV
+  demo and the end-to-end mock agree about who is called what. No
+  `useEnsProfile` hook was added: `AuthorName.jsx` is the component that
+  needed one, and a component reads better than a hook with a view in it.
 
 ## 2. What Xueni is, in one page
 

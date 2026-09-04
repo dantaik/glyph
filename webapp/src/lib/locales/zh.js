@@ -270,6 +270,16 @@ export default {
   'following.none': '还没有关注任何人。',
   'following.remove': ({ address }) => `取消关注 ${address}`,
 
+  // --- ENS：合约有意不提供的身份层 -----------------------------------------
+  'ens.resolving': '正在解析名称……',
+  'ens.notFound': ({ name }) => `没有这个名称：${name}`,
+  'ens.notFoundBody':
+    '这个名称在以太坊上没有对应的地址。可能从未注册，可能已过期，也可能指向的不是地址。用地址总能找到作者。',
+  'ens.goHome': '回到列表',
+  'profile.website': '网站',
+  'profile.twitter': 'X',
+  'profile.github': 'GitHub',
+
   // --- 在已读过的文章里查找 -------------------------------------------------
   'tag.title': ({ tag }) => `标签：${tag}`,
   'tag.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,

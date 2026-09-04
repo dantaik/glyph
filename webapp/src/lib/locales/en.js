@@ -287,6 +287,16 @@ Drop images into the area below or click to upload; click an image or its name t
   'following.none': 'Nobody yet.',
   'following.remove': ({ address }) => `Stop following ${address}`,
 
+  // --- ENS: the identity layer the contract deliberately has not got -------
+  'ens.resolving': 'Looking up the name…',
+  'ens.notFound': ({ name }) => `No such name: ${name}`,
+  'ens.notFoundBody':
+    'This name resolves to no address on Ethereum. It may never have been registered, it may have expired, or it may point somewhere other than an address. An author can always be reached by their address.',
+  'ens.goHome': 'Back to the feed',
+  'profile.website': 'Website',
+  'profile.twitter': 'On X',
+  'profile.github': 'On GitHub',
+
   // --- Finding things among what this browser has read ---------------------
   'tag.title': ({ tag }) => `Tagged ${tag}`,
   'tag.scope': ({ count }) => `Among the ${count} posts this browser has read`,

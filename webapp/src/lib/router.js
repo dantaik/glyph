@@ -32,6 +32,23 @@ function currentUrl() {
   return { path: window.location.pathname, search: window.location.search };
 }
 
+/**
+ * What counts as a name in a URL. Narrow on purpose: it decides whether
+ * `/author/<segment>` is worth a lookup or is a mistyped address, and this
+ * has to agree with `isEnsName` in ens.js (which cannot be imported here —
+ * the router is the one module with no dependencies).
+ */
+export const ENS_NAME_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.eth$/;
+
+/** A path segment as a name: percent-escapes undone, lower-cased. */
+function decodeName(segment) {
+  try {
+    return decodeURIComponent(segment).trim().toLowerCase();
+  } catch {
+    return segment.trim().toLowerCase();
+  }
+}
+
 export function readParams() {
   if (typeof window === 'undefined') return {};
   const { path, search } = currentUrl();
@@ -53,8 +70,14 @@ export function readParams() {
     if (mTx[2] != null) out.txEvent = mTx[2];
   }
   const mAuthor = route.match(/^\/author\/(0x[0-9a-fA-F]{40})\/?$/);
+  // An author may also be named rather than numbered: `/author/xiaoman.eth`.
+  // The name stays in the URL — it is the readable half of the link, and the
+  // address it resolves to is a detail of this visit.
+  const mAuthorName = !mAuthor && route.match(/^\/author\/([^/]+)\/?$/);
   if (mAuthor) {
     out.author = mAuthor[1];
+  } else if (mAuthorName && ENS_NAME_RE.test(decodeName(mAuthorName[1]))) {
+    out.authorName = decodeName(mAuthorName[1]);
   } else if (out.author) {
     out.authorFromQuery = true; // legacy ?author= link
   }
@@ -108,6 +131,7 @@ function buildUrl(next) {
       k === 'tx' ||
       k === 'txEvent' ||
       k === 'author' ||
+      k === 'authorName' ||
       k === 'scan' ||
       k === 'settings' ||
       k === 'tag' ||
@@ -126,6 +150,7 @@ function buildUrl(next) {
   const route = (() => {
     if (next.tx) return `/tx/${next.tx}${next.txEvent != null ? `/${next.txEvent}` : ''}`;
     if (next.author) return `/author/${next.author}`;
+    if (next.authorName) return `/author/${encodeURIComponent(next.authorName)}`;
     if (next.tag) return `/tag/${encodeURIComponent(next.tag)}`;
     if (next.following) return '/following';
     if (next.search) return '/search';
@@ -206,3 +231,4 @@ export function queryParam(name) {
 export const isHeadless = (params) => params.headless === '1' && Boolean(params.tx);
 
 export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+

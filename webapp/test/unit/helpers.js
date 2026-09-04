@@ -164,7 +164,18 @@ export function fakeChain({
     async imageBytes() {
       throw new Error('fake chain has no images');
     },
+    // Only Ethereum hosts ENS, the same rule the real chainIO applies.
+    hasEns: Number(chainId) === 1,
     async ensName() {
+      return null;
+    },
+    async ensAddress() {
+      return null;
+    },
+    async ensAvatar() {
+      return null;
+    },
+    async ensText() {
       return null;
     },
   };

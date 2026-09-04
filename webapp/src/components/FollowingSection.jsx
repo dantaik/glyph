@@ -1,7 +1,7 @@
 import { unfollow, useFollowing } from '../lib/following';
 import { useT } from '../lib/i18n';
 import { hrefFor } from '../lib/router';
-import AddressLabel from './Address';
+import AuthorName from './AuthorName';
 import { Trash } from './Icons';
 import SectionHeader from './SectionHeader';
 import { Body, Note } from './Text';
@@ -36,7 +36,7 @@ export default function FollowingSection({ navigate }) {
                 title={address}
                 className="inline-flex min-w-0 flex-1 items-center text-ink-soft hover:text-accent transition-colors"
               >
-                <AddressLabel address={address} size={14} tailClassName="text-xs" />
+                <AuthorName address={address} />
               </a>
               <button
                 type="button"

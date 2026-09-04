@@ -18,7 +18,7 @@ import { setPendingDraftPatch } from '../lib/drafts';
 import { formatPostRef } from '../lib/glyphRefs';
 import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
-import AddressLabel from './Address';
+import AddressLabel, { Identicon } from './Address';
 import BackButton from './BackButton';
 import FollowButton from './FollowButton';
 import { BTN_OUTLINE_PILL } from './formStyles';
@@ -131,8 +131,9 @@ export default function PostPage({
   const absTime = fmtAbsTime(time.value);
 
   // Author display: ENS name when the address has one, else the address.
-  const ens = useAsync(() => reader.ensName(meta.author), [reader, meta.author]);
-  const ensName = ens.value ?? null;
+  // The byline shows the author's ENS name and avatar when they have them.
+  const profile = useAsync(() => reader.ensProfile(meta.author), [reader, meta.author]);
+  const ensName = profile.value?.name ?? null;
 
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
@@ -244,7 +245,14 @@ export default function PostPage({
               title={meta.author}
               className="inline-flex items-center hover:text-accent transition-colors"
             >
-              {ensName || <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />}
+              {ensName ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Identicon address={meta.author} size={14} avatar={profile.value?.avatar ?? null} />
+                  <span>{ensName}</span>
+                </span>
+              ) : (
+                <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />
+              )}
             </a>
           </span>
           <Dot />

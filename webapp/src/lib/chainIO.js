@@ -8,7 +8,8 @@
 // Every call goes through the chain's client of the moment (clients.js), so
 // an edited endpoint list applies to the next request, even mid-sweep.
 
-import { decodeEventLog, decodeFunctionData, hexToBytes } from 'viem';
+import { decodeEventLog, decodeFunctionData, hexToBytes, zeroAddress } from 'viem';
+import { normalize } from 'viem/ens';
 import { abi, POST_EVENT } from './abi';
 import { mapLimit } from './async';
 import { getChain } from './chains';
@@ -38,6 +39,15 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
     }
   }
 }
+
+const ZERO_ADDRESS = zeroAddress;
+
+/**
+ * ENS names are normalised before they are hashed (UTS-46 plus ENSIP-15), so
+ * "Xiaoman.ETH" and "xiaoman.eth" are the same name. A name that cannot be
+ * normalised is not a name; viem would throw, and the caller wants null.
+ */
+const normalizeEns = (name) => normalize(String(name).trim());
 
 const errorText = (err) => String(err?.details || err?.shortMessage || err?.message || err);
 
@@ -125,6 +135,10 @@ export function createChainIO(chainId, log) {
   const id = Number(chainId);
   const chain = getChain(id);
   const client = () => getClient(id);
+
+  // Only Ethereum mainnet hosts ENS. Asking any other chain is a wasted
+  // round trip that can only answer null, so it is never made.
+  const hasEns = Boolean(chain.viem?.contracts?.ensUniversalResolver);
 
   // A block's timestamp, once per block for the life of the page. Blocks
   // are immutable once mined, so the promise is kept for good — except on
@@ -373,7 +387,7 @@ export function createChainIO(chainId, log) {
 
     /** ENS name for `address`, or null — without a round trip on chains that have no ENS. */
     async ensName(address) {
-      if (!chain.viem?.contracts?.ensUniversalResolver) return null;
+      if (!hasEns) return null;
       const name = await log.fromNode(
         'ens_getName',
         shortAddr(address),
@@ -381,6 +395,46 @@ export function createChainIO(chainId, log) {
         (v) => v ?? 'no name',
       );
       return name ?? null;
+    },
+
+    /** Does this chain host ENS at all? Only mainnet does; the rest never ask. */
+    hasEns,
+
+    /** The address a name points at, or null. */
+    async ensAddress(name) {
+      if (!hasEns) return null;
+      const address = await log.fromNode(
+        'ens_getAddress',
+        name,
+        () => client().getEnsAddress({ name: normalizeEns(name) }),
+        (v) => v ?? 'no address',
+      );
+      // The resolver answers the zero address for a name with no record.
+      return address && address !== ZERO_ADDRESS ? address : null;
+    },
+
+    /** The avatar a name publishes, already resolved to a URL, or null. */
+    async ensAvatar(name) {
+      if (!hasEns) return null;
+      const url = await log.fromNode(
+        'ens_getAvatar',
+        name,
+        () => client().getEnsAvatar({ name: normalizeEns(name) }),
+        (v) => v ?? 'no avatar',
+      );
+      return url ?? null;
+    },
+
+    /** One text record of a name (`description`, `url`, `com.github`…), or null. */
+    async ensText(name, key) {
+      if (!hasEns) return null;
+      const value = await log.fromNode(
+        'ens_getText',
+        `${name} ${key}`,
+        () => client().getEnsText({ name: normalizeEns(name), key }),
+        (v) => v ?? 'empty',
+      );
+      return value || null;
     },
   };
   return io;
