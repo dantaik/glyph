@@ -235,6 +235,8 @@ export default {
   'publish.compressing': '正在压缩正文…',
   'publish.uploadingToChain': '正在上传图片到链上…',
   'publish.uploadProgress': ({ index, total, key }) => `正在上传图片（${index}/${total}）：${key}`,
+  'publish.reusingImage': ({ index, total, key }) =>
+    `图片（${index}/${total}）：${key} 已在链上，直接复用`,
   'publish.done': '发布成功！',
   'publish.failed': '发布失败',
   'publish.noWalletConnected': '未连接钱包',
@@ -246,6 +248,7 @@ export default {
   'publish.writeAnother': '再写一封',
 
   // --- 图片上传 ------------------------------------------------------------
+  'image.pasteHint': '也可以直接把图片粘贴或拖进正文，会自动作为附件并在光标处插入引用。',
   'image.hint': '图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。',
   'image.copyRef': ({ key }) => `复制引用 ${key}`,
   'image.copyRefTitle': '点击复制引用',
@@ -263,6 +266,7 @@ export default {
   'cost.nearLimit': ({ limit }) =>
     `正文接近单笔交易上限（约 ${limit} KB 压缩后）。超出时发布会被节点拒绝，请精简正文或拆成多篇。`,
   'cost.total': '合计',
+  'cost.alreadyOnChain': '已在链上 · 无需费用',
   'cost.sparklineLabel': ({ chain }) => `${chain} 最近一天的基础费`,
   'cost.nowAt': ({ fee }) => `当前 ${fee}`,
   'cost.low24h': ({ fee, time }) => `24 小时最低 ${fee}，在 ${time}`,

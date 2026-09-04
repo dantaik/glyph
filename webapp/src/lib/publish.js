@@ -15,6 +15,8 @@ import { getChain } from './chains';
 import { abi } from './abi';
 import { encodeTitle } from './title';
 import { encodePayload } from './payload';
+import { nextImageKeys } from './imageKeys';
+import { knownImage, rememberImage, sha256Hex } from './imageLedger';
 import { MAX_CALLDATA_BYTES, MAX_TX_BYTES } from './limits';
 import { t } from './i18n';
 import { getProvider, noWalletMessage } from './wallet';
@@ -112,6 +114,19 @@ async function processImage(
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+/**
+ * The processed bytes of `file` and their hash, without sending anything.
+ * The write tab uses it to tell, before publishing, which attached images
+ * are already on chain and therefore free.
+ * @returns {Promise<{ bytes: Uint8Array, hash: string }>}
+ */
+export async function hashProcessedImage(file, opts = {}) {
+  const bytes = await processImage(file, opts);
+  return { bytes, hash: await sha256Hex(bytes) };
+}
+
+export { nextImageKeys };
+
 export async function storeImage(bytes, wallet, account) {
   return wallet.sendTransaction({
     account,
@@ -145,23 +160,36 @@ export function usedImageKeys(markdown, files) {
 /**
  * Replace `upload:KEY` refs in markdown with `eth:0x<txhash>` after uploading
  * the images the body shows (see usedImageKeys — the rest are left alone)
- * on `chainId`. Optional `onProgress(key, i, total)` fires before each
- * image upload (i is 1-based) so the UI can show per-image progress.
+ * on `chainId`.
+ *
+ * An image whose exact processed bytes this browser has already published on
+ * this chain is NOT sent again: the reference points at the copy that is
+ * there (imageLedger.js). `onProgress(key, i, total, { reused })` fires
+ * before each one so the UI can say which.
  */
 export async function embedImages(markdown, files, { chainId, quality = 0.6, onProgress } = {}) {
   const used = usedImageKeys(markdown, files);
   if (used.length === 0) return markdown; // nothing to pay for
-  const { wallet, account } = await getWallet(chainId);
+  let wallet = null;
+  let account = null;
   let out = markdown;
   let i = 0;
   for (const key of used) {
     i += 1;
-    onProgress?.(key, i, used.length);
-    const bytes = await processImage(files[key], { quality }).catch((err) => {
+    const { bytes, hash } = await hashProcessedImage(files[key], { quality }).catch((err) => {
       throw new Error(t('error.imageNamed', { key, message: err.message }));
     });
-    const hash = await storeImage(bytes, wallet, account);
-    out = out.replace(imageRefRe(key, 'g'), `$1eth:${hash}`);
+    const already = knownImage(chainId, hash);
+    onProgress?.(key, i, used.length, { reused: Boolean(already) });
+    let txHash = already;
+    if (!txHash) {
+      // The wallet is only needed once something actually has to be sent, so
+      // a body whose images are all already on chain costs no prompt at all.
+      if (!wallet) ({ wallet, account } = await getWallet(chainId));
+      txHash = await storeImage(bytes, wallet, account);
+      rememberImage(chainId, hash, txHash);
+    }
+    out = out.replace(imageRefRe(key, 'g'), `$1eth:${txHash}`);
   }
   return out;
 }

@@ -249,6 +249,8 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.compressing': 'Compressing the body…',
   'publish.uploadingToChain': 'Uploading images on-chain…',
   'publish.uploadProgress': ({ index, total, key }) => `Uploading image (${index}/${total}): ${key}`,
+  'publish.reusingImage': ({ index, total, key }) =>
+    `Image (${index}/${total}): ${key} is already on chain — reusing it`,
   'publish.done': 'Published.',
   'publish.failed': 'Could not publish',
   'publish.noWalletConnected': 'No wallet connected',
@@ -260,6 +262,8 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.writeAnother': 'Write another',
 
   // --- The image dropzone --------------------------------------------------
+  'image.pasteHint':
+    'You can also paste or drop an image straight into the body; it is attached and referenced where the cursor is.',
   'image.hint':
     'Images are numbered img1, img2, … automatically; click an image or its name to copy its reference and paste it into the body. An image the body never references is not written on-chain and is not charged for.',
   'image.copyRef': ({ key }) => `Copy the reference for ${key}`,
@@ -278,6 +282,7 @@ Drop images into the area below or click to upload; click an image or its name t
   'cost.nearLimit': ({ limit }) =>
     `The body is close to the single-transaction ceiling (about ${limit} KB compressed). Over it, the node rejects the publish — shorten the body or split it across several posts.`,
   'cost.total': 'Total',
+  'cost.alreadyOnChain': 'already on chain · no cost',
   'cost.sparklineLabel': ({ chain }) => `${chain} base fee over the last day`,
   'cost.nowAt': ({ fee }) => `now ${fee}`,
   'cost.low24h': ({ fee, time }) => `24h low ${fee} at ${time}`,

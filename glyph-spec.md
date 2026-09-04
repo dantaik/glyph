@@ -33,6 +33,7 @@
 - **One contract, any number of authors.** The contract is **non-upgradeable and ownerless**; every `msg.sender` is its own author, and one author's stream never touches another's. Authorship is the wallet address — no registration, no permission.
 - **Store plain Markdown (a subset).** Open, human-readable, and openable in any editor forever.
 - **Compress the body with brotli q11**, no custom dictionary; the decoder needs no side data.
+- **An image is published once.** The processed bytes are hashed and the transaction that carried them is remembered per chain, so reusing a photograph costs a reference rather than a second transaction (`imageLedger.js`). Local and best-effort: another browser pays once itself, and clearing site data costs one duplicate, never correctness.
 - **Images: WebP at q60, each one its own plain-calldata transaction**, with the 32-byte tx hash written into the Markdown (`eth:0x...`).
 - **O(1) "latest post" per author, plus a reverse block-linked list**: a read only ever queries a single block, never a block range.
 - **Title, tags and body live at different layers**:
@@ -459,6 +460,7 @@ To reference another article from a body, the link target is written as the targ
 | ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
 | Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
 | Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| Publishing an image twice | The processed bytes are hashed (SHA-256) and the transaction remembered per chain in `localStorage`; a match is referenced, not re-sent | An image is its own transaction and the dearest part of a post; nothing in the protocol stopped paying for the same bytes twice |
 | When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |

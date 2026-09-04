@@ -79,8 +79,14 @@ export default function CostPanel({ estimate, market, chainId, history = [], com
           <Body as="li" key={c.key} className="flex items-baseline justify-between gap-4">
             <span className="truncate">{t('cost.image', { key: c.key })}</span>
             <span className="tabular-nums text-right shrink-0">
-              {fmtEth(c.eth)}
-              {usdAvailable && <span className="ml-2 text-ink-faint">{fmtUsd(c.usd)}</span>}
+              {c.reused ? (
+                <span className="text-success">{t('cost.alreadyOnChain')}</span>
+              ) : (
+                <>
+                  {fmtEth(c.eth)}
+                  {usdAvailable && <span className="ml-2 text-ink-faint">{fmtUsd(c.usd)}</span>}
+                </>
+              )}
             </span>
           </Body>
         ))}

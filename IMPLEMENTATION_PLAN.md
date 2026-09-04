@@ -49,7 +49,7 @@ never delete or skip a test to get there.
 | 1 | Draft autosave | ☑ | #16 | |
 | 2 | Wallets: EIP-6963 discovery, optional WalletConnect | ☑ | #16 | ID still needed |
 | 3 | Cost awareness: base-fee history and both chains side by side | ☑ | #16 | |
-| 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☐ | | |
+| 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☑ | #16 | |
 | 5 | Markdown round trip and the raw view | ☐ | | |
 | 6 | Front-matter relations and the body index | ☐ | | |
 | 7 | Tags and search over what this browser has read | ☐ | | |
@@ -80,6 +80,13 @@ Deviations and decisions made during implementation (append here, newest last):
   the publish had cleared the draft, putting a letter that was already on
   chain back in the editor. Fixed with an epoch the save checks before it
   writes, bumped whenever the draft is deliberately forgotten.
+- **Phase 4.** The reuse path is covered end to end (publish an image, then
+  publish it again and count the transactions) rather than by a unit test:
+  `embedImages` runs the image through a canvas, which jsdom has no answer
+  for, so the honest test is a real browser. A useful side effect of the
+  reuse check falls out of it: a body whose images are all already on chain
+  now needs no wallet prompt at all, because the wallet is only fetched when
+  something actually has to be sent.
 - **Phase 2.** Built and verified without a WalletConnect project id, which
   the repository owner has not supplied yet. The code path is complete and
   the gating is proven both ways: a default build contains no WalletConnect

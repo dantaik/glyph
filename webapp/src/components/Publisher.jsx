@@ -1,11 +1,14 @@
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
+import { useCallback, useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   embedImages,
+  hashProcessedImage,
+  nextImageKeys,
   publishPost,
   usedImageKeys,
   measurePayload,
   MAX_CALLDATA_BYTES,
 } from '../lib/publish';
+import { knownImage } from '../lib/imageLedger';
 import { getClient } from '../lib/clients';
 import { READ_CHAIN_IDS } from '../lib/config';
 import { getReader } from '../lib/data';
@@ -188,6 +191,60 @@ export default function Publisher() {
   // what publishing will really sign.
   const usedKeys = useMemo(() => usedImageKeys(markdown, files), [markdown, files]);
 
+  // --- Images already on chain -------------------------------------------
+  //
+  // An attached image whose processed bytes this browser has already
+  // published on this chain costs nothing to use again (imageLedger.js), and
+  // the estimate should say so before the writer commits. Hashing means
+  // processing the image, so each File is hashed once and remembered.
+  const [alreadyOnChain, setAlreadyOnChain] = useState({});
+  const hashes = useRef(new WeakMap()); // File -> hash
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const out = {};
+      for (const key of usedKeys) {
+        const file = files[key];
+        if (!file) continue;
+        try {
+          let hash = hashes.current.get(file);
+          if (!hash) {
+            hash = (await hashProcessedImage(file)).hash;
+            hashes.current.set(file, hash);
+          }
+          out[key] = Boolean(knownImage(chainId, hash));
+        } catch {
+          // A browser that cannot process the image here will say so
+          // properly at publish time; the estimate just assumes it is new.
+          out[key] = false;
+        }
+      }
+      if (!cancelled) setAlreadyOnChain(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [usedKeys, files, chainId]);
+
+  /** Images pasted or dropped into the editor: attached, and named. */
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const addImagesFromEditor = useCallback((incoming) => {
+    const keys = nextImageKeys(filesRef.current, incoming.length);
+    setFiles((cur) => {
+      const next = { ...cur };
+      keys.forEach((key, i) => {
+        next[key] = incoming[i];
+      });
+      return next;
+    });
+    return keys;
+  }, []);
+
+  /** On-chain image references, resolved for the preview pane. */
+  const resolveEth = useCallback((md) => reader.resolveImages(md), [reader]);
+
   // First-post status (drives the cold-SSTORE estimate), from the shared
   // wallet store instead of a one-off eth_accounts poll.
   useEffect(() => {
@@ -256,7 +313,11 @@ export default function Publisher() {
     // a fair guess until it has actually been processed.
     const images = usedKeys.map((key) => ({
       key,
-      gas: estimateImageGas(Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3))),
+      // Already on chain: the reference costs nothing to write.
+      reused: alreadyOnChain[key] === true,
+      gas: alreadyOnChain[key]
+        ? 0
+        : estimateImageGas(Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3))),
     }));
     return {
       estCompressed,
@@ -264,7 +325,7 @@ export default function Publisher() {
       images,
       totalGas: postGas + images.reduce((a, c) => a + c.gas, 0),
     };
-  }, [tags, markdown, files, usedKeys, isFirstPost]);
+  }, [tags, markdown, files, usedKeys, isFirstPost, alreadyOnChain]);
 
   const costEstimate = useMemo(() => {
     if (!market.gasPriceWei) return null;
@@ -272,7 +333,7 @@ export default function Publisher() {
     return {
       postGas: gas.postGas,
       postCost: price(gas.postGas),
-      imageCosts: gas.images.map(({ key, gas: g }) => ({ key, gas: g, ...price(g) })),
+      imageCosts: gas.images.map(({ key, gas: g, reused }) => ({ key, gas: g, reused, ...price(g) })),
       totalGas: gas.totalGas,
       totalCost: price(gas.totalGas),
       estCompressed: gas.estCompressed,
@@ -391,8 +452,10 @@ export default function Publisher() {
         setStatusMsg(t('publish.uploadingToChain'));
         finalMd = await embedImages(markdown, files, {
           chainId,
-          onProgress: (key, i, total) =>
-            setStatusMsg(t('publish.uploadProgress', { index: i, total, key })),
+          onProgress: (key, i, total, { reused } = {}) =>
+            setStatusMsg(
+              t(reused ? 'publish.reusingImage' : 'publish.uploadProgress', { index: i, total, key }),
+            ),
         });
         setMarkdown(finalMd);
       }
@@ -547,6 +610,8 @@ export default function Publisher() {
             disabled={status === 'processing'}
             height="26rem"
             previewUrls={filePreviews}
+            resolveEth={resolveEth}
+            onAddImages={addImagesFromEditor}
           />
         </Suspense>
       </div>

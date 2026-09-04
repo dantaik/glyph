@@ -53,6 +53,10 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Images**: paste or drop one straight into the body and it is attached and referenced where the cursor
+is; the preview shows both an attached file and an image already on chain (`eth:0x…`). An image whose
+processed bytes this browser has already published on this chain is referenced again rather than paid
+for again — the estimate says "already on chain · no cost" before you sign, and no transaction is sent.
 **Wallets**: every wallet that announces itself (EIP-6963) is listed by name and icon in the "Wallet and
 network" panel, so a browser with two of them is a choice rather than a coin toss; the choice is
 remembered. Build with `VITE_WALLETCONNECT_PROJECT_ID=<id from Reown Cloud>` to add WalletConnect as
