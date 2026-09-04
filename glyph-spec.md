@@ -494,7 +494,10 @@ To reference another article from a body, the link target is written as the targ
      those posts then open with no node at all.
   2. **The IndexedDB local cache**: every body and image you have visited is cached permanently in the
      browser, at zero network latency. It is what the bundle is made from, and what a cleared browser
-     profile takes away — which is the whole reason the bundle exists.
+     profile takes away — which is the whole reason the bundle exists. The macOS application carries
+     the same permanent caches in its own WebKit data store, so a reader who uses both keeps two
+     independent copies of everything they have read, on one machine and with no coordination
+     between them.
   3. **The on-chain anchor**: the bytes are anchored to Ethereum, and you hold a copy you can verify.
      "Download .md" on any post page saves the exact document the chain holds, and `xueni verify` diffs
      a file against the transaction that carries it.
@@ -575,6 +578,7 @@ code, and any tool that reads JSON can read it decades from now.
 | Publishing an image twice | The processed bytes are hashed (SHA-256) and the transaction remembered per chain in `localStorage`; a match is referenced, not re-sent | An image is its own transaction and the dearest part of a post; nothing in the protocol stopped paying for the same bytes twice |
 | When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
+| Desktop app | Tauri 2 around the same `webapp/dist`, macOS first | The reader is a static single-page app, so a desktop version is a window plus the two things WebKit cannot do — encode WebP from a canvas, and honour `<a download>`; Tauri's shell is ~10 MB against Electron's ~200 MB and has no bundled browser to keep patched |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
 | Archive bundles | One JSON file: the exact stored text of what has been read, the images, and which author lists are complete | The local cache is the only copy a reader controls, and until it is a file it is a browser profile a cleared cache takes away. It is also the answer to history expiry: a reader in 2040 opens a bundle instead of running an archive node |
 | Getting a post off this page | A share menu: the canonical link, an `<iframe>` for `?headless=1`, and the Markdown reference `[title](0x…)` | A quotation written as a reference goes on chain with the quoting post and stays resolvable as long as both transactions exist, which is the only citation this journal can honestly offer |

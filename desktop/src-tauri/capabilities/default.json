@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Everything the shell needs and nothing else: a save dialog and the one file it returns, links out to the default browser, and the window remembering where it was. The image command is not listed because a command the app defines itself needs no capability.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-save",
+    "fs:allow-write-file",
+    "opener:default",
+    "window-state:default"
+  ]
+}

@@ -9,6 +9,20 @@ The interface reads in **English by default and can be switched to Chinese** at 
 
 Technical design: [`glyph-spec.md`](./glyph-spec.md)
 
+## Download for macOS
+
+[**Xueni for macOS**](https://github.com/dantaik/glyph/releases/latest/download/Xueni-macOS.dmg) —
+one universal application for Apple Silicon and Intel, macOS 13 or later, around ten megabytes. It is
+this repository's web app in a window, not a second program: the same reader, the same permanent
+caches, the same two chains, and links to explorers open in your own browser. Publishing from it signs
+through WalletConnect — an application has no browser extension in it — so the write tab shows a QR
+code to scan with a wallet on your phone.
+
+Today's builds are ad-hoc signed rather than signed with an Apple Developer ID, so macOS refuses the
+first launch with "the developer cannot be verified": right-click the app, choose Open, and Open again
+in the dialog. macOS remembers the answer. To build it yourself, or to read exactly what the shell
+does, see [`desktop/README.md`](./desktop/README.md).
+
 ## Quick start
 
 The contract is deployed, and both its address (the same on every chain, via CREATE2) and each

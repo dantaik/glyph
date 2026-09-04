@@ -20,6 +20,8 @@ See `README.md` and `glyph-spec.md`.
   hands them out), payloadText (front-matter + Markdown as text, importable by
   plain Node), payload (brotli over it), limits (per-tx byte ceilings),
   clipboard, publish, cache (IndexedDB, chain-scoped), wallet,
+  platform (desktop shell detection: save dialog, external links, native WebP
+  encoding; every function a no-op on the web), archive (bundles in and out),
   price, fixtures (DEV: an in-memory chain behind the same I/O surface),
   i18n + locales/{en,zh} (the interface language store and its dictionaries;
   `t()` outside React, `useT()` / `useLang()` inside it)
@@ -27,6 +29,10 @@ See `README.md` and `glyph-spec.md`.
 - `cli/` — `xueni`, the command-line tool (publish, fetch, author, export, verify);
   plain Node over viem, sharing `webapp/src/lib/payloadText.js`, `chains.js` and
   `limits.js` so the bytes are identical to the web app's
+- `desktop/` — the macOS application: a Tauri 2 shell around the same `webapp/dist`.
+  `src-tauri/src/lib.rs` holds the plugins, the menu and the one `transcode_image`
+  command; `src-tauri/transcode/` is the image crate and the only Rust tests.
+  The web side of the seam is `webapp/src/lib/platform.js`
 - `glyph-spec.md` — full technical spec
 
 **Workflows:**
@@ -34,4 +40,8 @@ See `README.md` and `glyph-spec.md`.
 - Contracts: `cd contracts && forge install foundry-rs/forge-std && forge build`
 - CLI: `cd cli && npm install && npm test` (its tests boot `webapp/test/e2e/rpcServer.mjs`,
   so `webapp`'s dependencies must be installed too)
+- Desktop: `cd desktop && npm install && npm run build` (needs a Rust toolchain and Xcode's
+  command line tools; the DMG lands in `desktop/src-tauri/target/.../bundle/dmg/`). Tests:
+  `cd desktop/src-tauri/transcode && cargo test`. `.github/workflows/desktop.yml` builds on a
+  `v*` tag and publishes the GitHub Release the README links to.
 - Webapp: `cd webapp && npm install && npm run dev` (DEV demo: `?fixtures=1`; add `&window=700` to watch the feed fill window by window)

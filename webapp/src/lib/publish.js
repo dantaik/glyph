@@ -20,6 +20,7 @@ import { knownImage, rememberImage, sha256Hex } from './imageLedger';
 import { MAX_CALLDATA_BYTES, MAX_TX_BYTES } from './limits';
 import { t } from './i18n';
 import { getProvider, noWalletMessage } from './wallet';
+import { invoke, isDesktop } from './platform';
 
 // The ceilings themselves live in limits.js, which imports nothing, so the
 // command-line tool can enforce the same numbers without the browser
@@ -75,6 +76,29 @@ async function canvasToBlob(canvas, type, quality) {
 }
 
 /**
+ * The same work in the desktop app, where the canvas is no help: WebKit
+ * cannot encode WebP from one, so the shell does it with libwebp (the
+ * `transcode_image` command, desktop/src-tauri). The loop is the canvas
+ * loop, in the whole numbers the encoder there takes.
+ */
+async function transcodeInShell(file, { maxEdge, quality, maxBytes }) {
+  // A plain array, not the Uint8Array: nested inside the argument object it
+  // is JSON-serialised, and a typed array stringifies to `{"0":…}`, which is
+  // not a list of bytes any more. One image, once, so the cost is nothing.
+  const source = Array.from(new Uint8Array(await file.arrayBuffer()));
+  let q = Math.round(quality * 100);
+  let bytes;
+  do {
+    bytes = new Uint8Array(await invoke('transcode_image', { bytes: source, maxEdge, quality: q }));
+    q -= 10;
+  } while (bytes.length > maxBytes && q > 30);
+  if (bytes.length > maxBytes) {
+    throw new Error(t('error.imageTooBig', { size: asKB(bytes.length), limit: asKB(maxBytes) }));
+  }
+  return bytes;
+}
+
+/**
  * Downscale and compress an image file to WebP.
  * Falls back to a DOM canvas when OffscreenCanvas is unavailable.
  */
@@ -82,6 +106,8 @@ async function processImage(
   file,
   { maxEdge = 1600, quality = 0.6, maxBytes = MAX_CALLDATA_BYTES } = {},
 ) {
+  if (isDesktop()) return transcodeInShell(file, { maxEdge, quality, maxBytes });
+
   const bmp = await createImageBitmap(file);
   const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * scale);
@@ -102,6 +128,11 @@ async function processImage(
   let blob;
   do {
     blob = await canvasToBlob(canvas, 'image/webp', q);
+    // A browser that cannot encode WebP does not refuse: it hands back PNG
+    // bytes under a different type and leaves the caller to notice. Those
+    // bytes would go on chain as an image the reader is told is WebP, so
+    // the type is checked rather than assumed.
+    if (blob.type !== 'image/webp') throw new Error(t('error.noWebp'));
     q -= 0.1;
   } while (blob.size > maxBytes && q > 0.3);
   // The loop stops lowering quality at 0.3 whether or not it got under

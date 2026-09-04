@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { READ_CHAIN_IDS, savePublishChainId } from '../lib/config';
 import { chainName } from '../lib/format';
+import { isDesktop } from '../lib/platform';
 import { useUrlState } from '../lib/router';
 import { useT } from '../lib/i18n';
 import {
@@ -103,7 +104,13 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
               {isConnecting ? t('wallet.connecting') : t('wallet.connect')}
             </button>
           ) : (
-            <Note as="span" className="max-w-md">{t('wallet.none')}</Note>
+            // No wallet at all. In the desktop app that can only mean this
+            // build carries no WalletConnect project id — there are no
+            // extensions inside a WKWebView to look for — so the advice to
+            // install one would be advice nobody can take.
+            <Note as="span" className="max-w-md">
+              {isDesktop() ? t('desktop.noPublishInThisBuild') : t('wallet.none')}
+            </Note>
           )}
 
           <div role="group" aria-label={t('wallet.publishTo')} className="inline-flex items-center gap-2">
@@ -153,8 +160,12 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
               ? t('wallet.onTarget', { chain: chainName(chainId) })
               : t('wallet.followingWallet', { chain: chainName(chainId) })}
           </Note>
-        ) : !account ? (
-          <Note className="mt-3">{t('wallet.willConnect')}</Note>
+        ) : !account && (hasProvider || !isDesktop()) ? (
+          // Suppressed in the one case where it would contradict the line
+          // above: a desktop build that cannot publish at all.
+          <Note className="mt-3">
+            {isDesktop() ? t('desktop.walletConnectOnly') : t('wallet.willConnect')}
+          </Note>
         ) : null}
         {error && (
           <p role="alert" className="mt-2 text-xs text-danger">

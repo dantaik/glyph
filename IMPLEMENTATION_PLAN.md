@@ -58,7 +58,7 @@ never delete or skip a test to get there.
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☑ | #16 | |
 | 11 | Archive bundles: export and import | ☑ | #16 | |
 | 12 | The command-line tool | ☑ | #16 | |
-| 13 | The macOS desktop app | ☐ | | |
+| 13 | The macOS desktop app | ☑ | #16 | |
 | 14 | Closing sweep and deletion of this plan | ☐ | | |
 
 Deviations and decisions made during implementation (append here, newest last):
@@ -146,6 +146,32 @@ Deviations and decisions made during implementation (append here, newest last):
   A new `archiveInterop.test.js` builds a bundle with `cli/src/archive.js`
   and parses it with the web app's reader, so the two implementations of
   one format cannot drift apart unnoticed.
+- **Phase 13.** Built in parallel by a second session confined to
+  `desktop/` and a named list of web-app files; the identifier is
+  `xyz.xueni.desktop`, not `.app`, because Tauri warns that `.app`
+  collides with the bundle extension and the identifier decides where
+  WebKit keeps the caches — changing it after a release would silently
+  empty a reader's copy. Three things the plan did not foresee. The
+  single-page fallback needed no code: Tauri's own asset resolver already
+  answers `index.html` for a path matching no bundled file, so the rule
+  `vercel.json` implements came free, and the pinned `Cargo.lock` is what
+  keeps it true. The image work had to move out of the shell crate into a
+  crate beside it (`src-tauri/transcode/`), because `cargo test` on the
+  shell compiles Tauri and Tauri does not compile without a system
+  webview — split out, its tests run anywhere, which is the only reason
+  CI can run them before the build. And the workflow cannot filter tag
+  pushes by path: GitHub applies a `paths` filter to every push, so a
+  release tag whose commit happened not to touch `desktop/**` would have
+  been silently skipped; tags therefore build unconditionally and the
+  path filter lives on pull requests.
+  **What is not verified**: `src-tauri/src/lib.rs` has never been
+  compiled — this machine has neither macOS nor webkit2gtk, so the first
+  real compile is CI's; `capabilities/default.json` was never checked
+  against the generated schema; the save panel, the external-link handler
+  and the native transcode are tested against a fake shell rather than a
+  real one; and publishing through WalletConnect is still untested for
+  want of a project id. The image crate's own tests, `cargo fmt` and
+  `cargo clippy` are green here.
 
 ## 2. What Xueni is, in one page
 
