@@ -1,5 +1,7 @@
 import { ArrowLeft, ArrowRight } from './Icons';
 import { fmtTitle } from '../lib/format';
+import { t } from '../lib/i18n';
+import { Meta } from './Text';
 
 const CARD =
   'group block rounded-xl border border-edge px-5 py-4 hover:border-accent hover:bg-paper-raised transition-colors w-full text-left';
@@ -28,23 +30,21 @@ function NeighborCard({ side, meta, onGo }) {
       onClick={() => onGo(meta)}
       className={`${CARD}${next ? ' sm:col-start-2' : ''}`}
     >
-      <span
-        className={`flex items-center gap-1.5 text-xs text-ink-faint${next ? ' justify-end' : ''}`}
-      >
+      <Meta as="span" className={`flex items-center gap-1.5${next ? ' justify-end' : ''}`}>
         {next ? (
           <>
-            下一篇
+            {t('post.next')}
             <ArrowRight size={14} />
           </>
         ) : (
           <>
             <ArrowLeft size={14} />
-            上一篇
+            {t('post.prev')}
           </>
         )}
-      </span>
+      </Meta>
       <span className="mt-1 text-base leading-snug text-ink group-hover:text-accent line-clamp-2">
-        {fmtTitle(meta.title) || '无标题'}
+        {fmtTitle(meta.title) || t('common.untitled')}
       </span>
     </button>
   );
@@ -58,7 +58,7 @@ function NeighborCard({ side, meta, onGo }) {
 export default function PostNav({ prev, next, onGo }) {
   if (prev === null && next === null) return null;
   return (
-    <nav aria-label="前后篇" className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10">
+    <nav aria-label={t('post.navLabel')} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10">
       {prev === undefined ? (
         <SkeletonCard side="prev" />
       ) : prev ? (

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fmtTitle, fmtIndex, excerpt } from '../lib/format';
+import { t } from '../lib/i18n';
+import { ArticleTitle, Body } from './Text';
 import { hrefFor } from '../lib/router';
 import AuthorLink from './AuthorLink';
 import PostMeta from './PostMeta';
@@ -9,8 +11,8 @@ export const EXCERPT_CHARS = 256;
 /**
  * One article row in a reading list — shared by the home feed and the
  * author title list. Layout: title on the first line; author (left) +
- * chain/time meta (right) on the second. `showIndex` prepends 第 N 篇
- * for author views. Rows come from a merged view, so each carries the
+ * chain/time meta (right) on the second. `showIndex` prepends the post's
+ * ordinal for author views. Rows come from a merged view, so each carries the
  * chain it was read on; `currentChain` is the chain the list is filtered
  * to, if any, so that chain's chip reads as a label rather than a link.
  */
@@ -36,19 +38,20 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
   return (
     <li className="py-4">
       <div className="flex items-baseline gap-3">
-        <a
+        <ArticleTitle
+          as="a"
           href={hrefFor(target)}
           onClick={(e) => {
             e.preventDefault();
             navigate(target);
           }}
-          className="flex-1 text-display sm:text-jumbo group-hover:text-accent transition-colors line-clamp-1"
+          className="line-clamp-1 flex-1 transition-colors group-hover:text-accent"
         >
-          {fmtTitle(post.title) ?? <span className="text-ink-ghost">无标题</span>}
-        </a>
+          {fmtTitle(post.title) ?? <span className="text-ink-ghost">{t('common.untitled')}</span>}
+        </ArticleTitle>
       </div>
       {teaser && (
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{teaser}</p>
+        <Body className="mt-2 leading-relaxed">{teaser}</Body>
       )}
       <div className="mt-1.5">
         <PostMeta

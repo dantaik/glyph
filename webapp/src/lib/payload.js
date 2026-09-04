@@ -4,11 +4,11 @@
 // optional YAML-ish front-matter block carrying tags:
 //
 //   ---
-//   tags: 家庭, 旅行, 山
+//   tags: family, travel, mountains
 //   ---
 //
-//   # 周末爬山
-//   正文...
+//   # A weekend in the hills
+//   The body…
 //
 // When there are no tags, the payload is *pure Markdown* — no wrapper at
 // all — so it stays maximally portable ("any editor, decades later").

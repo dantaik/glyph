@@ -19,6 +19,9 @@ export const BTN_QUIET =
 /** A small tinted pill — the wallet's connect button. */
 export const BTN_PILL =
   'inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-accent-wash px-3 text-xs font-medium text-accent-strong hover:bg-accent hover:text-paper disabled:opacity-40 disabled:cursor-not-allowed transition-colors';
+/** The pill-shaped outline action a centred placeholder or an article offers. */
+export const BTN_OUTLINE_PILL =
+  'rounded-full border border-edge-strong px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors';
 /** An outlined action — the secondary button on a page. */
 export const BTN_OUTLINE =
   'inline-flex items-center justify-center gap-2 rounded-lg border border-edge-strong px-4 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors';

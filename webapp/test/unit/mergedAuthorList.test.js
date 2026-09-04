@@ -35,7 +35,7 @@ describe('MergedAuthorList', () => {
     expect(snap.hasMore).toBe(false);
   });
 
-  it('marks the frontier while one chain\'s walk is incomplete, and 加载更早 walks it', async () => {
+  it('marks the frontier while one chain\'s walk is incomplete, and load-more walks it', async () => {
     // 25 posts on chain 1 (a walk shows 20), 3 on 167000, same author.
     const eth = fakeChain({
       chainId: 1, head: 30_000, now: NOW,

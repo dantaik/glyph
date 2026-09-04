@@ -22,7 +22,7 @@ function mount(view, props = {}) {
 }
 
 describe('AuthorPage', () => {
-  it('lists every post as a row — the newest too — with author, chain, 第 N 篇, time', async () => {
+  it('lists every post as a row — the newest too — with author, chain, ordinal, time', async () => {
     const view = createView([worldReader(1), worldReader(167000)]);
     const { container, navigate } = mount(view);
     const list = view.authorList(A0);
@@ -37,12 +37,12 @@ describe('AuthorPage', () => {
     expect(rowsOnPage).toHaveLength(rows.length);
     expect(container.querySelector('article')).toBeNull();
 
-    // Every row names the author and says which 第 N 篇 it is on its chain.
+    // Every row names the author and says which post it is on its chain.
     const authorHref = hrefFor({ author: rows[0].author });
     rowsOnPage.forEach((li, i) => {
       expect(li.querySelector(`a[href="${authorHref}"]`)).not.toBeNull();
       expect(li.textContent).toContain(fmtIndex(rows[i].index));
-      expect(li.querySelector('a[title^="只看"]')).not.toBeNull();
+      expect(li.querySelector('a[title$=" only"]')).not.toBeNull();
     });
 
     // The author link is the way into the author's page.

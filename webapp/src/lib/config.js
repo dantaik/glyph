@@ -216,7 +216,7 @@ export function saveRescanDelay(minutes) {
 
 /**
  * How long the two reads that DO change on-chain are held: the head block
- * (behind every 约 N 小时前) and an author's post count. Short, fixed, and
+ * (behind every "about N hours ago") and an author's post count. Short, fixed, and
  * not worth a setting — unlike a scan, these are one cheap call each.
  */
 export const VOLATILE_TTL_MS = 60_000;

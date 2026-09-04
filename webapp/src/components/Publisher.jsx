@@ -8,17 +8,18 @@ import {
 } from '../lib/publish';
 import { getClient } from '../lib/clients';
 import { getReader } from '../lib/data';
-import { chainName } from '../lib/chains';
 import { resolvePublishChain, usePublishChainId } from '../lib/config';
 import { useWallet } from '../lib/wallet';
-import { etherscanTxUrl } from '../lib/format';
+import { chainName, etherscanTxUrl } from '../lib/format';
+import { t, useLang } from '../lib/i18n';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
 import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
 import WalletPanel from './WalletPanel';
-import { SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { BTN_PRIMARY, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { Body, Meta, Micro } from './Text';
 import {
   getMarketState,
   estimatePublishGas,
@@ -35,17 +36,19 @@ import {
 const MarkdownEditor = lazy(() => import('./MarkdownEditor'));
 
 const PLACEHOLDER_TITLE = '';
-const PLACEHOLDER_MD = `# 小标题
 
-写点什么...
-
-把图片拖入下方区域或点击上传；点击图片或名称即可复制引用，粘贴到正文。`;
+/**
+ * The starting draft, in the language the tab was opened in. Read as a
+ * function rather than a constant: it seeds state, so a later language
+ * change must not rewrite what someone has already started writing.
+ */
+const placeholderBody = () => t('publish.placeholderBody');
 
 export default function Publisher() {
   const [title, setTitle] = useState(PLACEHOLDER_TITLE);
   const [tagsInput, setTagsInput] = useState('');
   const [tags, setTags] = useState([]);
-  const [markdown, setMarkdown] = useState(PLACEHOLDER_MD);
+  const [markdown, setMarkdown] = useState(placeholderBody);
   const [files, setFiles] = useState({});
   const [view, setView] = useState('edit'); // 'edit' | 'preview'
   const [status, setStatus] = useState('idle');
@@ -53,6 +56,7 @@ export default function Publisher() {
   const [txHash, setTxHash] = useState(null);
   const [isFirstPost, setIsFirstPost] = useState(true);
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
+  useLang(); // the phrases below are read at render time
   const { account, chainId: walletChainId, connect } = useWallet();
   // The chain to publish on: the one picked here, else the wallet's own
   // when Glyph is read on it, else Ethereum (config.js). Reading and
@@ -169,8 +173,8 @@ export default function Publisher() {
 
   // --- Tag handling ---
   // Delimiters: Enter, half/full-width comma (,) and semicolon (;).
-  // addTagFromInput splits whatever is in the box, so pasted strings
-  // like "家，山；海" become three tags.
+  // addTagFromInput splits whatever is in the box, so a pasted string like
+  // "home, hills; sea" becomes three tags.
   const addTagFromInput = () => {
     const parts = tagsInput
       .split(/[,，;；]/)
@@ -181,8 +185,8 @@ export default function Publisher() {
       return;
     }
     const next = [...tags];
-    for (const t of parts) {
-      if (!next.includes(t)) next.push(t);
+    for (const tag of parts) {
+      if (!next.includes(tag)) next.push(tag);
     }
     setTags(next);
     setTagsInput('');
@@ -200,7 +204,7 @@ export default function Publisher() {
   const ensureWallet = async () => {
     if (account) return account;
     const a = await connect();
-    if (!a) throw new Error('未连接钱包');
+    if (!a) throw new Error(t('publish.noWalletConnected'));
     return a;
   };
 
@@ -214,7 +218,7 @@ export default function Publisher() {
   const resetDraft = () => {
     setTitle(PLACEHOLDER_TITLE);
     setTags([]);
-    setMarkdown(PLACEHOLDER_MD);
+    setMarkdown(placeholderBody());
     setFiles({});
     setStatus('idle');
     setStatusMsg('');
@@ -225,7 +229,7 @@ export default function Publisher() {
     const missingRefs = uploadRefs.filter((k) => !files[k]);
     if (missingRefs.length > 0) {
       setStatus('error');
-      setStatusMsg(`图片未上传: ${missingRefs.join(', ')}`);
+      setStatusMsg(t('publish.missingImages', { keys: missingRefs.join(', ') }));
       return;
     }
     try {
@@ -234,30 +238,28 @@ export default function Publisher() {
 
       // Images are uploaded one paid transaction at a time, so check the
       // body against the transaction ceiling while failing is still free.
-      setStatusMsg('正在压缩正文…');
+      setStatusMsg(t('publish.compressing'));
       const size = await measurePayload({ tags, markdown, files });
       if (!size.ok) {
         const kb = (n) => `${Math.ceil(n / 1024)} KB`;
         setStatus('error');
-        setStatusMsg(
-          `正文压缩后 ${kb(size.bytes)}，超过单笔交易上限 ${kb(size.limit)}。请精简正文，或拆成多篇发布。`,
-        );
+        setStatusMsg(t('publish.bodyTooBig', { size: kb(size.bytes), limit: kb(size.limit) }));
         return;
       }
 
       let finalMd = markdown;
       if (usedKeys.length > 0) {
-        setStatusMsg('正在上传图片到链上…');
+        setStatusMsg(t('publish.uploadingToChain'));
         finalMd = await embedImages(markdown, files, {
           chainId,
           onProgress: (key, i, total) =>
-            setStatusMsg(`正在上传图片（${i}/${total}）：${key}`),
+            setStatusMsg(t('publish.uploadProgress', { index: i, total, key })),
         });
         setMarkdown(finalMd);
       }
 
       setStatus('signing');
-      setStatusMsg('请在钱包中确认…');
+      setStatusMsg(t('publish.confirmInWallet'));
       const hash = await publishPost({
         chainId,
         title: title.trim(),
@@ -266,10 +268,10 @@ export default function Publisher() {
       });
       setTxHash(hash);
       setStatus('done');
-      setStatusMsg('发布成功！');
+      setStatusMsg(t('publish.done'));
     } catch (err) {
       setStatus('error');
-      setStatusMsg(err.message || '发布失败');
+      setStatusMsg(err.message || t('publish.failed'));
     }
   };
 
@@ -282,43 +284,40 @@ export default function Publisher() {
         disabled={status === 'processing' || status === 'signing'}
       />
 
-      <SectionHeader label="标题" />
+      <SectionHeader label={t('publish.titleHeading')} />
       <div className="mb-10">
         <input
           id="post-title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="我想表达什么"
+          placeholder={t('publish.titlePlaceholder')}
           aria-invalid={titleOver}
           aria-describedby="post-title-bytes"
-          className={`w-full bg-transparent pb-2.5 text-2xl font-bold border-0 border-b
-                     focus:outline-none placeholder:text-ink-ghost transition-colors
+          className={`w-full border-0 border-b bg-transparent pb-2.5 text-display transition-colors
+                     placeholder:text-ink-ghost focus:outline-none
                      ${titleOver ? 'border-danger' : 'border-edge-strong focus:border-accent'}`}
         />
         {titleOver && (
-          <div
-            id="post-title-bytes"
-            className="text-2xs mt-1 tabular-nums text-danger"
-          >
-            标题太长，无法编码为 bytes32
+          <div id="post-title-bytes" className="mt-1 text-2xs tabular-nums text-danger">
+            {t('publish.titleTooLong')}
           </div>
         )}
       </div>
 
-      <SectionHeader label="标签" />
+      <SectionHeader label={t('publish.tagsHeading')} />
       <div className="mb-10">
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-edge-strong bg-paper-raised px-3 py-2 focus-within:border-accent transition-colors">
-          {tags.map((t) => (
+          {tags.map((tag) => (
             <span
-              key={t}
+              key={tag}
               className="inline-flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs text-accent-strong"
             >
-              {t}
+              {tag}
               <button
                 type="button"
-                onClick={() => setTags(tags.filter((x) => x !== t))}
-                aria-label={`移除标签 ${t}`}
+                onClick={() => setTags(tags.filter((x) => x !== tag))}
+                aria-label={t('publish.removeTag', { tag })}
                 className="hover:text-danger transition-colors"
               >
                 <Close size={12} />
@@ -332,18 +331,18 @@ export default function Publisher() {
             onChange={(e) => setTagsInput(e.target.value)}
             onKeyDown={handleTagKey}
             onBlur={addTagFromInput}
-            placeholder={tags.length === 0 ? '回车或逗号分隔' : ''}
+            placeholder={tags.length === 0 ? t('publish.tagsPlaceholder') : ''}
             className="flex-1 min-w-[6rem] bg-transparent text-sm outline-none placeholder:text-ink-ghost"
           />
         </div>
       </div>
 
       <SectionHeader
-        label="正文"
+        label={t('publish.bodyHeading')}
         right={
           <div
             role="group"
-            aria-label="编辑器视图"
+            aria-label={t('publish.editorView')}
             className="inline-flex rounded-full border border-edge p-0.5 gap-0.5"
           >
             <button
@@ -352,7 +351,7 @@ export default function Publisher() {
               aria-pressed={view === 'edit'}
               className={view === 'edit' ? SEGMENT_ON : SEGMENT_OFF}
             >
-              编辑
+              {t('publish.edit')}
             </button>
             <button
               type="button"
@@ -360,7 +359,7 @@ export default function Publisher() {
               aria-pressed={view === 'preview'}
               className={view === 'preview' ? SEGMENT_ON : SEGMENT_OFF}
             >
-              预览
+              {t('publish.preview')}
             </button>
           </div>
         }
@@ -377,12 +376,15 @@ export default function Publisher() {
           />
         </Suspense>
       </div>
-      <p className="mb-10 -mt-6 text-xs text-ink-ghost">
-        引用另一篇文章：<code className="rounded bg-paper-sunken px-1 py-0.5 text-2xs text-ink-soft">[文字](0x交易哈希/0)</code>
-        ；序号是该交易内的第几篇，可省略；文字留空则自动显示对方标题。
-      </p>
+      <Meta className="-mt-6 mb-10">
+        {t('publish.refHintPrefix')}
+        <Micro as="code" className="rounded bg-paper-sunken px-1 py-0.5">
+          {t('publish.refExample')}
+        </Micro>
+        {t('publish.refHintSuffix')}
+      </Meta>
 
-      <SectionHeader label="图片" />
+      <SectionHeader label={t('publish.imagesHeading')} />
       <div className="mb-10">
         <ImageUploader
           files={files}
@@ -394,20 +396,18 @@ export default function Publisher() {
         />
       </div>
 
-      <SectionHeader label="预估成本" />
+      <SectionHeader label={t('publish.costHeading')} />
       <div className="mb-6">
         <CostPanel estimate={costEstimate} market={market} chainId={chainId} />
       </div>
 
       <div className="pt-6">
-        <p className="mb-4 text-xs text-ink-faint">
-          一经发布，文章将永久公开发布于区块链；不可修改、不可删除。
-        </p>
+        <Meta className="mb-4">{t('publish.permanentNotice')}</Meta>
         <div className="flex flex-wrap items-center justify-between gap-4">
           {status === 'processing' && statusMsg && (
-            <span role="status" className="text-sm text-ink-faint">
+            <Body as="span" role="status">
               {statusMsg}
-            </span>
+            </Body>
           )}
           <button
             onClick={handlePublish}
@@ -417,9 +417,7 @@ export default function Publisher() {
               status === 'signing' ||
               chainMismatch
             }
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm
-                       font-medium text-paper hover:bg-accent-strong disabled:opacity-40
-                       disabled:cursor-not-allowed transition-colors"
+            className={BTN_PRIMARY}
           >
             {(status === 'processing' || status === 'signing') && (
               <span
@@ -428,10 +426,10 @@ export default function Publisher() {
               />
             )}
             {status === 'processing'
-              ? '正在上传图片…'
+              ? t('publish.uploadingImages')
               : status === 'signing'
-                ? '请在钱包中确认…'
-                : '发布到链上'}
+                ? t('publish.confirmInWallet')
+                : t('publish.button')}
           </button>
         </div>
 
@@ -449,7 +447,7 @@ export default function Publisher() {
           <div className="mt-4 rounded-lg bg-success-wash px-4 py-3 text-sm text-success">
             <div className="flex flex-wrap items-center gap-2">
               <Check size={16} className="shrink-0" />
-              <span className="font-medium">已发布到{chainName(chainId)}</span>
+              <span className="font-medium">{t('publish.publishedTo', { chain: chainName(chainId) })}</span>
               <a
                 href={etherscanTxUrl(txHash, chainId)}
                 target="_blank"
@@ -460,13 +458,13 @@ export default function Publisher() {
                 <ExternalLink size={12} />
               </a>
             </div>
-            <p className="mt-1 text-xs">等待区块确认后即可在列表中看到</p>
+            <p className="mt-1 text-xs">{t('publish.waitForBlock')}</p>
             <button
               type="button"
               onClick={resetDraft}
               className="-ml-3 mt-2 rounded-lg px-3 py-1.5 text-sm text-accent hover:text-accent-strong hover:bg-paper-sunken transition-colors"
             >
-              再写一封
+              {t('publish.writeAnother')}
             </button>
           </div>
         )}

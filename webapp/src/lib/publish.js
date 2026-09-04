@@ -15,6 +15,7 @@ import { getChain } from './chains';
 import { abi } from './abi';
 import { encodeTitle } from './title';
 import { encodePayload } from './payload';
+import { t } from './i18n';
 
 /**
  * Per-transaction byte ceiling. NOT a consensus rule: geth's transaction
@@ -42,7 +43,7 @@ const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
  */
 async function getWallet(chainId) {
   if (!window.ethereum) {
-    throw new Error('未检测到钱包，请安装 MetaMask 等浏览器钱包。');
+    throw new Error(t('wallet.none'));
   }
   const wallet = createWalletClient({
     chain: getChain(chainId).viem,
@@ -64,14 +65,14 @@ async function canvasToBlob(canvas, type, quality) {
   el.width = canvas.width;
   el.height = canvas.height;
   const ctx = el.getContext('2d');
-  if (!ctx) throw new Error('无法创建画布上下文');
+  if (!ctx) throw new Error(t('error.noCanvasContext'));
   ctx.drawImage(canvas, 0, 0);
   return new Promise((resolve, reject) => {
     el.toBlob(
       (blob) =>
         blob
           ? resolve(blob)
-          : reject(new Error('当前浏览器不支持 WebP 编码，请换用 Chrome / Firefox。')),
+          : reject(new Error(t('error.noWebp'))),
       type,
       quality,
     );
@@ -112,9 +113,7 @@ async function processImage(
   // budget. Returning an over-budget blob would just buy an "oversized
   // data" rejection from the node, so say what happened instead.
   if (blob.size > maxBytes) {
-    throw new Error(
-      `压缩到最低画质后仍有 ${asKB(blob.size)}，超过单笔交易上限 ${asKB(maxBytes)}，请改用尺寸更小的图片。`,
-    );
+    throw new Error(t('error.imageTooBig', { size: asKB(blob.size), limit: asKB(maxBytes) }));
   }
 
   return new Uint8Array(await blob.arrayBuffer());
@@ -166,7 +165,7 @@ export async function embedImages(markdown, files, { chainId, quality = 0.6, onP
     i += 1;
     onProgress?.(key, i, used.length);
     const bytes = await processImage(files[key], { quality }).catch((err) => {
-      throw new Error(`图片 ${key}：${err.message}`);
+      throw new Error(t('error.imageNamed', { key, message: err.message }));
     });
     const hash = await storeImage(bytes, wallet, account);
     out = out.replace(imageRefRe(key, 'g'), `$1eth:${hash}`);

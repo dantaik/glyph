@@ -1,12 +1,14 @@
+import { t } from '../lib/i18n';
 import { fmtEth, fmtUsd, fmtGwei } from '../lib/price';
+import { Body, Meta, Micro } from './Text';
 
 /** Live cost breakdown for the current draft (body + images + total). */
 export default function CostPanel({ estimate, market, chainId }) {
   if (!estimate) {
     return (
-      <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4 text-xs text-ink-faint">
-        正在获取 gas 价格…
-      </div>
+      <Meta as="div" className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
+        {t('cost.loading')}
+      </Meta>
     );
   }
   const { postCost, imageCosts, totalCost, estCompressed, limitBytes, nearLimit } = estimate;
@@ -15,51 +17,47 @@ export default function CostPanel({ estimate, market, chainId }) {
   return (
     <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
       <div className="mb-3 flex justify-end">
-        <span className="text-2xs tabular-nums text-ink-faint">
+        <Micro as="span" nums>
           {fmtGwei(market.gasPriceWei)}
           {usdAvailable && market.ethUsd != null ? (
             <> · ETH ${market.ethUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}</>
           ) : (
-            <> · 美元价格不可用</>
+            <>{t('cost.noUsd')}</>
           )}
-        </span>
+        </Micro>
       </div>
 
-      <ul className="space-y-1.5 text-sm">
-        <li className="flex items-baseline justify-between gap-4 text-ink-soft">
-          <span>正文（~{estCompressed} B 压缩后）</span>
+      <ul className="space-y-1.5">
+        <Body as="li" className="flex items-baseline justify-between gap-4">
+          <span>{t('cost.body', { bytes: estCompressed })}</span>
           <span className="tabular-nums text-right">
             {fmtEth(postCost.eth)}
             {usdAvailable && (
               <span className="ml-2 text-ink-faint">{fmtUsd(postCost.usd)}</span>
             )}
           </span>
-        </li>
+        </Body>
         {imageCosts.map((c) => (
-          <li
-            key={c.key}
-            className="flex items-baseline justify-between gap-4 text-sm text-ink-soft"
-          >
-            <span className="truncate">图片 {c.key}</span>
+          <Body as="li" key={c.key} className="flex items-baseline justify-between gap-4">
+            <span className="truncate">{t('cost.image', { key: c.key })}</span>
             <span className="tabular-nums text-right shrink-0">
               {fmtEth(c.eth)}
               {usdAvailable && (
                 <span className="ml-2 text-ink-faint">{fmtUsd(c.usd)}</span>
               )}
             </span>
-          </li>
+          </Body>
         ))}
       </ul>
 
       {nearLimit && (
         <p className="mt-3 text-2xs leading-relaxed text-danger">
-          正文接近单笔交易上限（约 {Math.floor(limitBytes / 1024)} KB 压缩后）。
-          超出时发布会被节点拒绝，请精简正文或拆成多篇。
+          {t('cost.nearLimit', { limit: Math.floor(limitBytes / 1024) })}
         </p>
       )}
 
       <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-edge pt-2.5 text-sm font-medium text-ink">
-        <span>合计</span>
+        <span>{t('cost.total')}</span>
         <span className="tabular-nums text-right">
           {fmtEth(totalCost.eth)}
           {usdAvailable && (

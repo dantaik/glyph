@@ -5,7 +5,7 @@
 // the walks: rows tagged with their chain, newest first by time, and the
 // same frontier idea as the feed — a chain whose walk hasn't reached the
 // author's first post is complete only down to its oldest walked row, so
-// rows older than the newest such row sit under a marker, and 加载更早
+// rows older than the newest such row sit under a marker, and loading more
 // walks that chain further.
 
 import { useEffect, useSyncExternalStore } from 'react';

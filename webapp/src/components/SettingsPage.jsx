@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { CHAINS, defaultRpcs } from '../lib/chains';
+import { defaultRpcs } from '../lib/chains';
 import { GLYPH_ADDRESS, READ_CHAIN_IDS, getRescanDelayMs, getRpcUrls, hasCustomRpcs, hasOverrides, resetEndpointConfig, saveRescanDelay, saveRpcUrls, useRpcVersion } from '../lib/config';
-import { shortAddr } from '../lib/format';
+import { chainName, shortAddr } from '../lib/format';
+import { LANGS, LANG_NAMES, setLang, useLang, useT } from '../lib/i18n';
 import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
 import BackupSection from './BackupSection';
 import ListHeader from './ListHeader';
-import Note from './Note';
 import SectionHeader from './SectionHeader';
-import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT } from './formStyles';
+import { Micro, Note } from './Text';
+import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT, SEGMENT_GROUP, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 
 const chainIds = READ_CHAIN_IDS;
 
@@ -16,13 +17,15 @@ const readLists = () => Object.fromEntries(chainIds.map((id) => [id, getRpcUrls(
 
 /**
  * Settings page (/settings): each chain's ordered RPC endpoints, the
- * rescan delay, backup and restore. Endpoints are
+ * rescan delay, the interface language, backup and restore. Endpoints are
  * tried top-down and the reader falls back to the next when one fails,
  * so order is the setting — hence move-up / move-down rather than a
  * single URL field. Saving takes effect at once, without a reload: even a
  * scan already running moves to the new endpoints at its next request.
  */
 export default function SettingsPage({ navigate }) {
+  const t = useT();
+  const lang = useLang();
   const rpcVersion = useRpcVersion();
   const [lists, setLists] = useState(() => readLists());
   const [drafts, setDrafts] = useState(() => Object.fromEntries(chainIds.map((id) => [id, ''])));
@@ -71,40 +74,63 @@ export default function SettingsPage({ navigate }) {
         <BackButton onClick={() => navigate({})} />
       </div>
 
-      <ListHeader title="设置" subtitle={hasOverrides() ? '已自定义' : '使用默认配置'} />
+      <ListHeader
+        title={t('settings.title')}
+        subtitle={hasOverrides() ? t('settings.customized') : t('settings.defaults')}
+      />
 
-      <Note className="mb-8 max-w-2xl">
-        合约通过 CREATE2 部署，在每条链上都是同一个地址（{shortAddr(GLYPH_ADDRESS)}），
-        所以两条链读的是同一本刊物：首页把两条链上的文章按时间合在一起。每条链可以配置多个 RPC 节点：
-        按顺序使用第一个，失败时自动回退到下一个。保存后立即生效，不刷新页面；正在进行的扫描会从下一次请求起使用新的节点。
-      </Note>
+      <Note className="mb-8 max-w-2xl">{t('settings.intro', { address: shortAddr(GLYPH_ADDRESS) })}</Note>
+
+      <section className="mb-10">
+        <SectionHeader label={t('settings.languageHeading')} />
+        <div role="group" aria-label={t('settings.languageLabel')} className={SEGMENT_GROUP}>
+          {LANGS.map((code) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => setLang(code)}
+              aria-pressed={code === lang}
+              className={code === lang ? SEGMENT_ON : SEGMENT_OFF}
+            >
+              {LANG_NAMES[code]}
+            </button>
+          ))}
+        </div>
+        <Note className="mt-2 max-w-2xl">{t('settings.languageNote')}</Note>
+      </section>
 
       {chainIds.map((id) => {
-        const chain = CHAINS[id];
+        const name = chainName(id);
         const list = lists[id] ?? [];
         return (
           <section key={id} className="mb-10">
-            <SectionHeader label={`${chain?.name ?? `链 ${id}`} · ${id}`} />
+            <SectionHeader label={t('settings.chainLabel', { chain: name, id })} />
 
             {list.length === 0 ? (
-              <Note className="mb-3">没有节点，保存后将使用内置默认节点。</Note>
+              <Note className="mb-3">{t('settings.noEndpoints')}</Note>
             ) : (
               <ol className="mb-3 divide-y divide-edge border-y border-edge">
                 {list.map((url, i) => (
                   <li key={`${url}-${i}`} className="flex items-center gap-2 py-2">
-                    <span className="w-6 shrink-0 text-center text-2xs tabular-nums text-ink-ghost">{i + 1}</span>
+                    <Micro as="span" nums className="w-6 shrink-0 text-center text-ink-ghost">
+                      {i + 1}
+                    </Micro>
                     <span
                       title={url}
                       className={`min-w-0 flex-1 truncate text-xs ${i === 0 ? 'text-ink-soft' : 'text-ink-faint'}`}
                     >
                       {url}
                     </span>
-                    {i === 0 && <span className="shrink-0 text-2xs text-ink-faint">优先</span>}
+                    {i === 0 && (
+                      <Micro as="span" className="shrink-0">
+                        {t('settings.primary')}
+                      </Micro>
+                    )}
                     <button
                       type="button"
                       onClick={() => move(id, i, -1)}
                       disabled={i === 0}
-                      aria-label={`将第 ${i + 1} 个节点上移`}
+                      aria-label={t('settings.moveUp', { position: i + 1 })}
                       className={ICON_BTN}
                     >
                       <ChevronUp size={15} />
@@ -113,7 +139,7 @@ export default function SettingsPage({ navigate }) {
                       type="button"
                       onClick={() => move(id, i, 1)}
                       disabled={i === list.length - 1}
-                      aria-label={`将第 ${i + 1} 个节点下移`}
+                      aria-label={t('settings.moveDown', { position: i + 1 })}
                       className={ICON_BTN}
                     >
                       <ChevronDown size={15} />
@@ -121,7 +147,7 @@ export default function SettingsPage({ navigate }) {
                     <button
                       type="button"
                       onClick={() => remove(id, i)}
-                      aria-label={`删除第 ${i + 1} 个节点`}
+                      aria-label={t('settings.removeEndpoint', { position: i + 1 })}
                       className={ICON_BTN}
                     >
                       <Trash size={15} />
@@ -143,13 +169,13 @@ export default function SettingsPage({ navigate }) {
                     add(id);
                   }
                 }}
-                placeholder="https://你的节点地址"
-                aria-label={`为 ${chain?.name ?? id} 添加 RPC 节点`}
+                placeholder={t('settings.endpointPlaceholder')}
+                aria-label={t('settings.addEndpointFor', { chain: name })}
                 className={INPUT}
               />
               <button type="button" onClick={() => add(id)} className={`${BTN_OUTLINE} shrink-0 px-3`}>
                 <Plus size={15} />
-                添加
+                {t('common.add')}
               </button>
             </div>
             {hasCustomRpcs(id) && (
@@ -158,7 +184,7 @@ export default function SettingsPage({ navigate }) {
                 onClick={() => edit(id, defaultRpcs(id))}
                 className="mt-2 text-xs text-ink-faint hover:text-accent transition-colors"
               >
-                恢复此链的默认节点
+                {t('settings.restoreChainDefaults')}
               </button>
             )}
           </section>
@@ -166,9 +192,9 @@ export default function SettingsPage({ navigate }) {
       })}
 
       <section className="mb-10">
-        <SectionHeader label="扫描频率" />
+        <SectionHeader label={t('settings.rescanHeading')} />
         <label className="block max-w-xs">
-          <span className={FIELD_LABEL}>区块链扫描延迟（分钟）</span>
+          <span className={FIELD_LABEL}>{t('settings.rescanLabel')}</span>
           <input
             type="number"
             min="0"
@@ -181,32 +207,26 @@ export default function SettingsPage({ navigate }) {
             className={`${INPUT} tabular-nums`}
           />
         </label>
-        <Note className="mt-2 max-w-2xl">
-          上一次扫描结束后的 N 分钟内，重新打开首页或作者页只显示上次扫到的文章，不再向节点请求新区块；
-          超过之后，下次打开会补扫这段时间新产生的区块。0 = 每次都扫。默认 1 分钟。
-          这只决定「什么时候去读新区块」，不会漏掉任何文章：已经读到的内容是永久缓存的——链上数据不会改变，同一篇文章不会被重复请求。
-        </Note>
+        <Note className="mt-2 max-w-2xl">{t('settings.rescanNote')}</Note>
       </section>
 
       <BackupSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
         <button type="button" onClick={() => resetEndpointConfig()} className={BTN_QUIET}>
-          恢复默认
+          {t('settings.resetAll')}
         </button>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => navigate({})} className={BTN_QUIET}>
-            取消
+            {t('common.cancel')}
           </button>
           <button type="button" onClick={handleSave} disabled={!dirty} className={BTN_PRIMARY}>
-            保存
+            {t('common.save')}
           </button>
         </div>
       </div>
 
-      <Note className="mt-8">
-        节点列表保存在本机浏览器（localStorage）。已扫描的区块范围、正文与图片缓存都按链分别保存，互不污染。
-      </Note>
+      <Note className="mt-8">{t('settings.storageNote')}</Note>
     </div>
   );
 }

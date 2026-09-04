@@ -16,7 +16,7 @@
   --color-ink-faint: #646a73;      /* meta/labels — 5.1:1 (AA) */
   --color-ink-ghost: #9aa0a9;      /* DECORATIVE ONLY (~2.9:1) */
 
-  /* --- 黛蓝 indigo accent (light) — the one special colour, used sparingly.
+  /* --- Indigo accent (light) — the one special colour, used sparingly.
         A vivid royal blue rather than the old ink-navy: it is the mark, the
         wordmark and every link, so it should read as alive. Still AA both
         ways — as text on paper AND as a button ground under paper text. --- */
@@ -53,7 +53,7 @@
 
 /* Dark = token override. Utilities read var() so this flips everything. */
 .dark {
-  --color-paper: #16181c;           /* 墨 cool near-black */
+  --color-paper: #16181c;           /* ink — a cool near-black */
   --color-paper-raised: #1d2025;
   --color-paper-sunken: #101216;
   --color-edge: #2a2e35;
@@ -62,7 +62,7 @@
   --color-ink-soft: #a9aeb6;
   --color-ink-faint: #828892;
   --color-ink-ghost: #565c66;
-  --color-accent: #7aa5ff;          /* 黛蓝, lifted for dark — 7.3:1 */
+  --color-accent: #7aa5ff;          /* the indigo, lifted for dark — 7.3:1 */
   --color-accent-strong: #a5c2ff;   /* 9.9:1 */
   --color-accent-wash: #1b2440;
   --color-success: #84b89a;
@@ -77,7 +77,7 @@
     /* Always reserve the scrollbar's width. Without it a tab whose page is
        short enough not to scroll gives the viewport ~15px back, and every
        centred thing on the page — the masthead above all — jumps sideways
-       as you switch between 读 and 写. */
+       as you switch between the read and write tabs. */
     scrollbar-gutter: stable;
   }
   .dark { color-scheme: dark; }
@@ -103,22 +103,19 @@
   }
 }
 
-/* Article size control (S/M/L) — runtime vars, NOT in @theme */
-:root { --article-size: 1.09375rem; }                  /* M: 17.5px desktop */
-html[data-fontsize='s'] { --article-size: 1rem; }
-html[data-fontsize='l'] { --article-size: 1.21875rem; }
+/* The article body size — a runtime var, NOT in @theme, so the column and
+   the type can be tuned per breakpoint without touching the type scale. */
+:root { --article-size: 1.09375rem; }                  /* 17.5px desktop */
 @media (max-width: 40rem) {
   :root { --article-size: 1.03125rem; }
-  html[data-fontsize='s'] { --article-size: 0.9375rem; }
-  html[data-fontsize='l'] { --article-size: 1.125rem; }
 }
 
 /* The article column — shared by the post header, the body and the loading
    skeleton. It is the same column the feed uses on `/`: the full width of
    <main>, so a post and the list it came from line up.
 
-   Deliberately NOT a function of --article-size. 小/中/大 sets the type size
-   and nothing else; the column staying put is the point of the control. */
+   Deliberately NOT a function of --article-size: the column is fixed, and
+   only the type inside it responds to the breakpoint. */
 .article-column {
   max-width: 64rem; /* = <main>'s max-w-5xl, which already caps it */
   margin-inline: auto;

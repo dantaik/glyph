@@ -1,7 +1,6 @@
-import { chainName } from '../lib/chains';
-import { fmtRelTime, friendlyError } from '../lib/format';
-
-const LINE = 'py-3 text-center text-xs tabular-nums text-ink-ghost';
+import { chainName, fmtRelTime, friendlyError } from '../lib/format';
+import { t } from '../lib/i18n';
+import { Hint } from './Text';
 const ACTION =
   'underline-offset-4 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors';
 
@@ -16,30 +15,33 @@ const ACTION =
  * `variant`: 'feed' (scans) or 'author' (walks).
  */
 export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, variant = 'feed' }) {
-  const names = frontier.leaders.map((l) => chainName(l.chainId)).join('与');
+  const names = frontier.leaders.map((l) => chainName(l.chainId)).join(t('frontier.join'));
   const states = new Set(frontier.leaders.map((l) => l.state));
   let text;
   let action = null;
   if (states.has('error')) {
     const failed = frontier.leaders.find((l) => l.state === 'error');
-    text = `${names} 读取失败：${friendlyError(failed.error)}`;
-    action = { label: '重试', onClick: onRetry };
+    text = t('frontier.readFailed', { names, reason: friendlyError(failed.error) });
+    action = { label: t('common.retry'), onClick: onRetry };
   } else if (states.has('scanning') || states.has('idle')) {
     text =
       variant === 'author'
-        ? `正在读取${names}上的文章，以下暂未包含${names}的文章`
-        : `${names} 正在进行第一次扫描，以下暂未包含${names}的文章`;
+        ? t('frontier.authorScanning', { names })
+        : t('frontier.feedScanning', { names });
   } else {
     const exact = frontier.leaders.every((l) => l.exact);
     const when = Number.isFinite(frontier.ts) ? fmtRelTime(new Date(frontier.ts * 1000), { exact }) : null;
     text =
       variant === 'author'
-        ? `${names}上更早的文章尚未读取`
-        : `以下文章可能不完整：${names} 只扫描到${when ? ` ${when}` : '这里'}`;
-    action = { label: variant === 'author' ? '继续读取' : '继续扫描', onClick: onLoadMore };
+        ? t('frontier.authorIncomplete', { names })
+        : t('frontier.feedIncomplete', { names, when: when ?? t('frontier.here') });
+    action = {
+      label: variant === 'author' ? t('frontier.continueReading') : t('frontier.continueScanning'),
+      onClick: onLoadMore,
+    };
   }
   return (
-    <li className={LINE} data-frontier="">
+    <Hint as="li" nums className="py-3 text-center" data-frontier="">
       <span>{text}</span>
       {action && (
         <>
@@ -49,6 +51,6 @@ export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, va
           </button>
         </>
       )}
-    </li>
+    </Hint>
   );
 }

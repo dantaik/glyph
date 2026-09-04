@@ -102,7 +102,7 @@ describe('AuthorListController — lagging nodes and new posts', () => {
     chain.io.authorPostsInBlock = async (author, block) => (behind ? [] : real(author, block));
     await list.refresh();
     let snap = list.getSnapshot();
-    expect(snap.error).toMatch(/尚未同步到区块 1200/);
+    expect(snap.error).toMatch(/glyph:node-behind 1200/);
     expect(snap.rows).toEqual([]);
     expect(store.authorCoverage(A)).toEqual([]);
     expect(store.authorScanHead(A)).toBeNull();

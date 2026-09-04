@@ -10,7 +10,7 @@
 // down to the bottom of its head-contiguous range; the merged list is
 // complete only above the newest of those bottoms, T*. Rows older than T*
 // are shown under a marker (a chain that stopped above them may still hold
-// posts there), and 加载更早的文章 deepens the chain sitting at T* — the
+// posts there), and "load earlier posts" deepens the chain sitting at T* — the
 // least-read one in time — until the complete zone has grown by a page.
 //
 // A view over ONE chain is the same controller with one chain: the frontier
@@ -23,7 +23,7 @@ import { estimateBlockTime } from './format';
 import { makeRowTimeResolver } from './rowTimes';
 import { compareMerged, countAbove, frontierOf, splitAtFrontier, timeRows, toSec } from './timeline';
 
-/** Sweeps one 加载更早的文章 may run before it settles for what it found. */
+/** Sweeps one "load earlier posts" may run before it settles for what it found. */
 const MAX_SWEEPS_PER_MORE = 3;
 
 export class MergedFeed {

@@ -58,8 +58,8 @@ describe('fixtureWorld', () => {
     expect(new Set(chains).size).toBe(2);
     expect(expectedMergedOrder(worlds, { limit: 3 })).toHaveLength(3);
     const titles = new Set(order.map((p) => p.title));
-    expect(titles.has('鼓声')).toBe(true);
-    expect(titles.has('冬至前的一封信')).toBe(true);
+    expect(titles.has('The drums')).toBe(true);
+    expect(titles.has('A letter before the solstice')).toBe(true);
   });
 
   it('keeps the single-chain QA hooks on Ethereum', () => {
@@ -99,17 +99,22 @@ describe('createFixtureIO', () => {
     expect(await io.blockNumber()).toBe(30_000n);
     const { rows, to } = await io.postsInRange(20_000n, 30_000n);
     expect(to).toBe(30_000n);
-    expect(rows.map((r) => r.title)).toEqual(['给小满的短信', '半夜的雨', '渡口的晨雾', '鼓声']);
+    expect(rows.map((r) => r.title)).toEqual([
+      'A short note to Xiaoman',
+      'Rain at midnight',
+      'Morning fog at the crossing',
+      'The drums',
+    ]);
     expect(rows.every((r) => r.ts === io.world.tsOf(r.block))).toBe(true);
     expect((await io.block(29_000n)).timestamp).toBe(io.world.tsOf(29_000n));
     expect(await io.latestBlock(AUTHORS[3])).toBe(27_400n);
     expect(await io.count(AUTHORS[3])).toBe(3n);
     expect(await io.count(AUTHORS[2])).toBe(0n); // writes on Ethereum only
     const inBlock = await io.authorPostsInBlock(AUTHORS[0], 28_900n);
-    expect(inBlock.map((r) => r.title)).toEqual(['鼓声']);
+    expect(inBlock.map((r) => r.title)).toEqual(['The drums']);
     const [byTx] = await io.postsInTx(inBlock[0].txHash);
-    expect(byTx.title).toBe('鼓声');
-    expect((await io.postBody(inBlock[0].txHash)).markdown).toContain('鼓楼');
+    expect(byTx.title).toBe('The drums');
+    expect((await io.postBody(inBlock[0].txHash)).markdown).toContain('drum tower');
   });
 
   it('legacyRows hands out rows without timestamps', async () => {

@@ -9,6 +9,7 @@
 // spends its budget only on ground no earlier read has touched.
 
 import * as seg from './segments';
+import { NODE_BEHIND_CODE } from './format';
 import { addrKey, feedCompare, isOlder, postId } from './scanStore';
 
 /** Never shrink a getLogs window below this — past it, give up instead. */
@@ -148,9 +149,14 @@ export async function sweepFeed({
 
 // --- Per-author reads: the contract's reverse block-linked list -------
 
-/** A node answering for a block it hasn't seen — the walk fails, and can be retried. */
+/**
+ * A node answering for a block it hasn't seen — the walk fails, and can be
+ * retried. The message is a code rather than a sentence: it travels to the
+ * UI as a bare string (feed.js keeps `err.message`), and only there does
+ * friendlyError turn it into the reader's language.
+ */
 const nodeBehind = (block) =>
-  Object.assign(new Error(`节点尚未同步到区块 ${block}，稍后重试即可`), { nodeBehind: true });
+  Object.assign(new Error(`${NODE_BEHIND_CODE} ${block}`), { nodeBehind: true, block });
 
 /**
  * Rows for one block of `author`'s chain, newest (highest index) first — so

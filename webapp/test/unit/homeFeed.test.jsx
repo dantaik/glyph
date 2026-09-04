@@ -50,8 +50,8 @@ describe('HomeFeed over two chains', () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
 
     // Each row names its chain; the name is the way into that chain's view.
-    const eth = container.querySelectorAll('a[title="只看Ethereum"]');
-    const taiko = container.querySelectorAll('a[title="只看Taiko"]');
+    const eth = container.querySelectorAll('a[title="Ethereum only"]');
+    const taiko = container.querySelectorAll('a[title="Taiko only"]');
     expect(eth.length).toBe(snap.rows.filter((r) => r.chainId === 1).length);
     expect(taiko.length).toBe(snap.rows.filter((r) => r.chainId === 167000).length);
     expect(taiko[0].getAttribute('href')).toBe('/taiko');
@@ -77,10 +77,10 @@ describe('HomeFeed over two chains', () => {
       );
     });
 
-    expect(screen.getByText('来自所有作者 · 2个区块链网络')).toBeTruthy();
+    expect(screen.getByText('All authors · 2 networks')).toBeTruthy();
   });
 
-  it('marks where the merge stops being complete, and 继续扫描 completes it', async () => {
+  it('marks where the merge stops being complete, and keeping on scanning completes it', async () => {
     const view = createView([worldReader(1), worldReader(167000)]);
     const { container } = mount(view);
     await settled(view);
@@ -89,10 +89,10 @@ describe('HomeFeed over two chains', () => {
     // the marker may be missing Taiko posts, and the marker says so.
     const marker = container.querySelector('[data-frontier]');
     expect(marker).not.toBeNull();
-    expect(marker.textContent).toContain('Taiko 只扫描到');
+    expect(marker.textContent).toContain('Taiko has only been scanned back to');
     const before = postHrefs(container).length;
 
-    fireEvent.click(within(marker).getByRole('button', { name: '继续扫描' }));
+    fireEvent.click(within(marker).getByRole('button', { name: 'Keep scanning' }));
     await settled(view);
     expect(container.querySelector('[data-frontier]')).toBeNull();
     expect(view.feed.getSnapshot().frontier).toBeNull();
@@ -102,7 +102,7 @@ describe('HomeFeed over two chains', () => {
     expect(postHrefs(container).length).toBeGreaterThan(before);
   });
 
-  it('keeps one chain\'s rows when the other\'s node fails, and recovers on 重试', async () => {
+  it('keeps one chain\'s rows when the other\'s node fails, and recovers on retry', async () => {
     let restore = null;
     const taiko = worldReader(167000, {
       tweak: (io) => {
@@ -119,16 +119,16 @@ describe('HomeFeed over two chains', () => {
     const { container } = mount(view);
     await settled(view);
 
-    expect(container.querySelectorAll('a[title="只看Ethereum"]').length).toBeGreaterThan(0);
-    expect(container.querySelectorAll('a[title="只看Taiko"]').length).toBe(0);
+    expect(container.querySelectorAll('a[title="Ethereum only"]').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('a[title="Taiko only"]').length).toBe(0);
     const marker = container.querySelector('[data-frontier]');
-    expect(marker.textContent).toContain('Taiko 读取失败');
+    expect(marker.textContent).toContain('Taiko could not be read');
 
     restore();
-    fireEvent.click(within(marker).getByRole('button', { name: '重试' }));
+    fireEvent.click(within(marker).getByRole('button', { name: 'Retry' }));
     await settled(view);
-    expect(container.querySelectorAll('a[title="只看Taiko"]').length).toBeGreaterThan(0);
-    expect(container.querySelector('[data-frontier]')?.textContent ?? '').not.toContain('读取失败');
+    expect(container.querySelectorAll('a[title="Taiko only"]').length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-frontier]')?.textContent ?? '').not.toContain('could not be read');
   });
 
   it('says so when both chains are empty, after scanning them to the ground', async () => {
@@ -143,12 +143,12 @@ describe('HomeFeed over two chains', () => {
 
     // Ethereum is small enough to scan whole; Taiko is not, so the page
     // offers to keep scanning rather than calling the chains empty.
-    expect(screen.getByText('这一段区块里还没有文章')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '继续扫描更早的区块' }));
+    expect(screen.getByText('No posts in the blocks scanned so far')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep scanning earlier blocks' }));
     await settled(view);
     expect(view.feed.getSnapshot().done).toBe(true);
-    expect(screen.getByText('此刻还没有文章')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '写第一篇' }));
+    expect(screen.getByText('Nothing has been published yet')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Write the first one' }));
     expect(onStartWriting).toHaveBeenCalled();
   });
 });
@@ -159,14 +159,14 @@ describe('HomeFeed over one chain', () => {
     const { container, navigate } = mount(view, { currentChain: 167000 });
     await settled(view);
 
-    expect(screen.getByText(/只看Taiko/)).toBeTruthy();
-    const all = screen.getByRole('link', { name: '查看全部' });
+    expect(screen.getByText(/Taiko only/)).toBeTruthy();
+    const all = screen.getByRole('link', { name: 'View all' });
     expect(all.getAttribute('href')).toBe('/');
     fireEvent.click(all);
     expect(navigate).toHaveBeenCalledWith({ chain: null });
 
     // The chain label is just a label here.
-    expect(container.querySelectorAll('a[title="只看Taiko"]').length).toBe(0);
+    expect(container.querySelectorAll('a[title="Taiko only"]').length).toBe(0);
     expect(container.querySelectorAll('[aria-current="true"]').length).toBe(view.feed.getSnapshot().rows.length);
     expect(container.querySelector('[data-frontier]')).toBeNull();
   });

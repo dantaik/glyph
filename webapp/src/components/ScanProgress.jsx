@@ -1,31 +1,39 @@
 import { fmtBlock } from '../lib/format';
+import { t } from '../lib/i18n';
+import { Hint, Micro } from './Text';
 
 /**
  * Live scan status — the scanning label plus, once the reader reports a
  * window, the block range being read, how much of this scan's budget has
  * been used (or the posts found so far, for author-chain walks) and a thin
- * accent bar. Shared by the initial feed scan and both 加载更早的文章 paths.
+ * accent bar. Shared by the initial feed scan and both load-more paths.
  *
  * `progress`: { fromBlock, toBlock, fraction, fetched?, budget?, posts?, target? }
  */
-export default function ScanProgress({ label = '正在扫描…', progress, className = '' }) {
+export default function ScanProgress({ label, progress, className = '' }) {
   const pct = progress ? Math.round((progress.fraction ?? 0) * 100) : 0;
   const sameBlock = progress && String(progress.fromBlock) === String(progress.toBlock);
   return (
     <div role="status" aria-live="polite" className={`text-center ${className}`}>
-      <p className={`text-xs text-ink-ghost ${progress ? '' : 'animate-pulse'}`}>{label}</p>
+      <Hint className={progress ? '' : 'animate-pulse'}>{label ?? t('scanProgress.default')}</Hint>
       {progress && (
         <>
-          <p className="mt-2 text-2xs tabular-nums text-ink-faint">
+          <Micro nums className="mt-2">
             {sameBlock
-              ? `区块 ${fmtBlock(progress.fromBlock)}`
-              : `区块 ${fmtBlock(progress.fromBlock)} 至 ${fmtBlock(progress.toBlock)}`}
+              ? t('scanProgress.block', { block: fmtBlock(progress.fromBlock) })
+              : t('scanProgress.blockRange', {
+                  from: fmtBlock(progress.fromBlock),
+                  to: fmtBlock(progress.toBlock),
+                })}
             {progress.posts != null
-              ? ` · 已找到 ${progress.posts}/${progress.target} 篇`
+              ? t('scanProgress.found', { posts: progress.posts, target: progress.target })
               : progress.fetched != null
-                ? ` · 本次已读 ${fmtBlock(progress.fetched)} / 最多 ${fmtBlock(progress.budget)} 个区块`
-                : ` · 约 ${pct}%`}
-          </p>
+                ? t('scanProgress.read', {
+                    fetched: fmtBlock(progress.fetched),
+                    budget: fmtBlock(progress.budget),
+                  })
+                : t('scanProgress.percent', { percent: pct })}
+          </Micro>
           <div className="mx-auto mt-1.5 h-1 w-44 max-w-full overflow-hidden rounded-full bg-paper-sunken">
             <div
               className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"

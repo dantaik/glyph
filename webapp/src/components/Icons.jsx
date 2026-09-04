@@ -15,7 +15,7 @@ function iconProps(size) {
 }
 
 /**
- * 雪泥 — a simple square seal (印章) stamped with a swallow's footprint:
+ * Glyph's mark — a simple square seal stamped with a swallow's footprint:
  * three toes forward, one behind. The seal face takes the current colour;
  * the print is carved out in the paper tone.
  */
@@ -133,7 +133,8 @@ export function Download({ size, ...rest }) {
 }
 
 /**
- * 雪泥 — a V formation of wild geese with echo arcs trailing the lead
+ * The empty-state mark — a V formation of wild geese with echo arcs
+ * trailing the lead
  * bird. Empty-state placeholder: similar in spirit to the hand-drawn
  * line illustrations other writing products use, but unique to the brand.
  */
@@ -146,7 +147,7 @@ export function GeeseMark({ size, ...rest }) {
       viewBox="0 0 200 100"
       {...rest}
     >
-      {/* 雪泥 — echo arcs left behind by the lead goose */}
+      {/* Echo arcs left behind by the lead goose */}
       <path d="M112 10 A10 10 0 0 0 112 30" />
       <path d="M102 4 A16 16 0 0 0 102 36" />
       {/* lead goose */}
@@ -224,7 +225,7 @@ export function EthereumMark({ size, ...rest }) {
 }
 
 /**
- * Taiko's mark — the three folded planes of the taiko (太鼓) glyph.
+ * Taiko's mark — the three folded planes of the taiko drum glyph.
  * Same treatment as EthereumMark: real geometry, currentColor fill.
  */
 export function TaikoMark({ size, ...rest }) {
@@ -248,6 +249,17 @@ export function ChainMark({ size, ...rest }) {
 }
 
 /** Overflow "⋯" — opens the menu holding the controls a phone has no room for. */
+/** A globe with meridians — the interface language. */
+export function Globe({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+    </svg>
+  );
+}
+
 export function MoreHorizontal({ size, ...rest }) {
   return (
     <svg {...iconProps(size)} {...rest} stroke="none" fill="currentColor">

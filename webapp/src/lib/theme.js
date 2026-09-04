@@ -1,17 +1,14 @@
-// theme.js — theme + article font-size preferences: the setters, and the
-// hooks over them.
+// theme.js — the theme preference: the setter, and the hook over it.
 //
-// Source of truth is the DOM (<html> `.dark` class / `data-fontsize`
-// attribute), seeded before first paint by the inline FOUC script in
-// index.html. Setters persist to localStorage, mutate the DOM, then
-// announce the change on a `glyph:prefs` window event so every hook
-// instance (header toggle, editor, font-size control…) stays in sync —
-// and so a settings file restored on the settings page applies at once.
+// Source of truth is the DOM (the `.dark` class on <html>), seeded before
+// first paint by the inline FOUC script in index.html. The setter persists
+// to localStorage, mutates the DOM, then announces the change on a
+// `glyph:prefs` window event so every hook instance stays in sync — and so
+// a settings file restored on the settings page applies at once.
 
 import { useCallback, useEffect, useState } from 'react';
 
 const THEME_KEY = 'glyph.theme.v1';
-const FONTSIZE_KEY = 'glyph.fontsize.v1';
 const PREFS_EVENT = 'glyph:prefs';
 const META_COLORS = { light: '#f7f8fa', dark: '#16181c' };
 
@@ -47,16 +44,6 @@ function applyTheme(theme) {
     ?.setAttribute('content', dark ? META_COLORS.dark : META_COLORS.light);
 }
 
-function readFontSize() {
-  const f = document.documentElement.dataset.fontsize;
-  return f === 's' || f === 'l' ? f : 'm';
-}
-
-function applyFontSize(size) {
-  if (size === 's' || size === 'l') document.documentElement.dataset.fontsize = size;
-  else delete document.documentElement.dataset.fontsize;
-}
-
 function broadcast() {
   window.dispatchEvent(new CustomEvent(PREFS_EVENT));
 }
@@ -74,20 +61,6 @@ export function setThemePref(theme) {
   const chosen = theme === 'light' || theme === 'dark' ? theme : null;
   lsSet(THEME_KEY, chosen);
   applyTheme(chosen ?? (osPrefersDark() ? 'dark' : 'light'));
-  broadcast();
-}
-
-/** The article font size chosen: 's' | 'm' | 'l' ('m' when none was). */
-export function getFontSizePref() {
-  const f = lsGet(FONTSIZE_KEY);
-  return f === 's' || f === 'l' ? f : 'm';
-}
-
-/** Choose the article font size. Applies at once. */
-export function setFontSizePref(size) {
-  const chosen = size === 's' || size === 'l' ? size : 'm';
-  lsSet(FONTSIZE_KEY, chosen);
-  applyFontSize(chosen);
   broadcast();
 }
 
@@ -119,22 +92,4 @@ export function useTheme() {
   }, []);
 
   return { theme, isDark: theme === 'dark', setTheme };
-}
-
-/**
- * Article font-size hook → `{ size: 's'|'m'|'l', setSize }`.
- * 'm' is the default and clears the html[data-fontsize] attribute.
- */
-export function useFontSize() {
-  const [size, setSizeState] = useState(readFontSize);
-
-  const setSize = useCallback((s) => setFontSizePref(s), []);
-
-  useEffect(() => {
-    const sync = () => setSizeState(readFontSize());
-    window.addEventListener(PREFS_EVENT, sync);
-    return () => window.removeEventListener(PREFS_EVENT, sync);
-  }, []);
-
-  return { size, setSize };
 }

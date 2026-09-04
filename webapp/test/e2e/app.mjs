@@ -55,4 +55,4 @@ export async function postHrefs(page) {
   return [...new Set(hrefs)];
 }
 
-export const chip = (page, name) => page.locator(`main a[title="只看${name}"]`);
+export const chip = (page, name) => page.locator(`main a[title="${name} only"]`);

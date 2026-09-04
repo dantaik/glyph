@@ -115,12 +115,12 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
     async postBody(txHash) {
       await wait();
       const body = bodyByTx.get(txHash);
-      if (!body) throw new Error('演示数据中找不到这笔交易');
+      if (!body) throw new Error('no such transaction in the demo data');
       return { tags: [...body.tags], markdown: body.markdown };
     },
 
     async imageBytes() {
-      throw new Error('演示数据没有链上图片'); // bodies use data: URIs instead
+      throw new Error('the demo data has no on-chain images'); // bodies use data: URIs instead
     },
 
     async ensName() {

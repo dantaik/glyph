@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
-import { chainName } from '../lib/chains';
-import { fmtBlock, friendlyError } from '../lib/format';
+import { chainName, fmtBlock, friendlyError } from '../lib/format';
+import { t } from '../lib/i18n';
 import { useMergedFeed } from '../lib/mergedFeed';
 import { hrefFor } from '../lib/router';
 import { rowKey } from '../lib/timeline';
@@ -12,6 +12,7 @@ import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
 import ScanProgress from './ScanProgress';
 import { ListSkeleton } from './Skeleton';
+import { Hint } from './Text';
 
 /**
  * Home feed: the most recent posts across all authors — and, by default,
@@ -20,8 +21,8 @@ import { ListSkeleton } from './Skeleton';
  * chain's scan is owned by its reader, not by
  * this component: leaving the page doesn't stop it, and coming back shows
  * what it found meanwhile. Rows appear window by window as the scans find
- * them; a marker shows where the merge stops being complete; 加载更早的文章
- * deepens the chain that is furthest behind in time.
+ * them; a marker shows where the merge stops being complete; loading
+ * earlier posts deepens the chain that is furthest behind in time.
  *
  * `currentChain` is the URL's filter (null: all chains); the list header
  * says so and offers the way back.
@@ -39,12 +40,12 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
   const failed = chains.filter((c) => c.error).map(({ chainId, error }) => ({ chainId, error }));
   const gapAfter = (i) => gaps.find((g) => g.after === i);
   const noteText = note
-    ? `在${chainName(note.chainId)}上读取了 ${fmtBlock(note.fetched)} 个区块，没有找到更早的文章，可以继续加载。`
+    ? t('feed.note', { chain: chainName(note.chainId), blocks: fmtBlock(note.fetched) })
     : null;
 
   const subtitle = single ? (
     <>
-      只看{chainName(chains[0].chainId)}
+      {t('footer.onlyChain', { chain: chainName(chains[0].chainId) })}
       <span className="select-none" aria-hidden="true"> · </span>
       <a
         href={hrefFor({ chain: null })}
@@ -54,11 +55,11 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
         }}
         className="hover:text-accent transition-colors"
       >
-        查看全部
+        {t('feed.viewAll')}
       </a>
     </>
   ) : (
-    `来自所有作者 · ${chains.length}个区块链网络`
+    t('feed.subtitleAll', { count: chains.length })
   );
 
   const marker = () =>
@@ -83,7 +84,7 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
 
   return (
     <div>
-      <ListHeader title="最新文章" subtitle={subtitle} />
+      <ListHeader title={t('feed.title')} subtitle={subtitle} />
 
       {loading ? (
         <>
@@ -93,10 +94,10 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
       ) : allErrored && rows.length === 0 ? (
         <ErrorState error={chains[0].error} onRetry={() => view.feed.retry()} />
       ) : rows.length === 0 && done ? (
-        <EmptyState title="此刻还没有文章" actionLabel="写第一篇" onAction={onStartWriting} />
+        <EmptyState title={t('feed.emptyEver')} actionLabel={t('feed.writeFirst')} onAction={onStartWriting} />
       ) : rows.length === 0 ? (
         <>
-          <EmptyState title="这一段区块里还没有文章" />
+          <EmptyState title={t('feed.emptyRange')} />
           <ChainProgress running={running} className="mt-8" />
           <ChainErrors failed={failed} onRetry={(id) => view.feed.retry(id)} />
           <LoadMoreButton
@@ -105,7 +106,7 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
             disabled={job != null}
             hasMore={!done}
             note={noteText}
-            label="继续扫描更早的区块"
+            label={t('feed.scanEarlier')}
           />
         </>
       ) : (
@@ -141,7 +142,7 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
 }
 
 const jobLabel = (job) =>
-  job === 'more' ? '正在扫描更早的文章…' : job === 'gap' ? '正在补扫中间的区块…' : '正在扫描最近区块…';
+  job === 'more' ? t('feed.jobMore') : job === 'gap' ? t('feed.jobGap') : t('feed.jobRefresh');
 
 /** One progress line per chain with a sweep running, named after its chain. */
 function ChainProgress({ running, className = '' }) {
@@ -151,7 +152,7 @@ function ChainProgress({ running, className = '' }) {
       {running.map((c) => (
         <ScanProgress
           key={c.chainId}
-          label={`${chainName(c.chainId)}：${jobLabel(c.job)}`}
+          label={t('common.labelled', { label: chainName(c.chainId), value: jobLabel(c.job) })}
           progress={
             c.progress
               ? {
@@ -176,14 +177,14 @@ function ChainErrors({ failed, onRetry }) {
     <div className="mt-4 space-y-1 text-center text-sm text-danger">
       {failed.map((c) => (
         <p key={c.chainId}>
-          {chainName(c.chainId)} 读取失败：{friendlyError(c.error)}
+          {t('feed.readFailed', { chain: chainName(c.chainId), reason: friendlyError(c.error) })}
           <span className="select-none" aria-hidden="true"> · </span>
           <button
             type="button"
             onClick={() => onRetry(c.chainId)}
             className="underline-offset-4 hover:underline"
           >
-            重试
+            {t('common.retry')}
           </button>
         </p>
       ))}
@@ -201,15 +202,21 @@ function GapMarker({ gap, chain, active, busy, onFill }) {
   const name = chainName(gap.chainId);
   const progress = chain?.progress;
   return (
-    <li className="py-3 text-center text-xs tabular-nums text-ink-ghost">
+    <Hint as="li" nums className="py-3 text-center">
       {active && chain?.job === 'gap' ? (
         <span className="animate-pulse">
-          {name}：正在补扫中间的 {fmtBlock(blocks)} 个区块
-          {progress ? `：已读 ${fmtBlock(progress.fetched)} / 最多 ${fmtBlock(chain.scanBlocks)}` : ''}…
+          {t('feed.gapFilling', { chain: name, blocks: fmtBlock(blocks) })}
+          {progress
+            ? t('feed.gapProgress', {
+                read: fmtBlock(progress.fetched),
+                budget: fmtBlock(chain.scanBlocks),
+              })
+            : ''}
+          …
         </span>
       ) : (
         <>
-          {name}：中间还有 {fmtBlock(blocks)} 个区块未扫描
+          {t('feed.gapPending', { chain: name, blocks: fmtBlock(blocks) })}
           <span className="select-none" aria-hidden="true"> · </span>
           <button
             type="button"
@@ -217,10 +224,10 @@ function GapMarker({ gap, chain, active, busy, onFill }) {
             disabled={busy}
             className="underline-offset-4 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
           >
-            扫描这一段
+            {t('feed.scanThisRange')}
           </button>
         </>
       )}
-    </li>
+    </Hint>
   );
 }

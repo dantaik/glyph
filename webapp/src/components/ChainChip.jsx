@@ -1,4 +1,5 @@
-import { chainName } from '../lib/chains';
+import { chainName } from '../lib/format';
+import { t } from '../lib/i18n';
 import { hrefFor } from '../lib/router';
 
 /**
@@ -7,7 +8,7 @@ import { hrefFor } from '../lib/router';
  * into a single-chain view — a link to `/ethereum` or `/taiko` — so it
  * reads like the author link beside it, not like a button. In a list
  * already filtered to that chain it is the same text without the link
- * (`current`): the way out is the list header's 查看全部.
+ * (`current`): the way out is the list header's "view all".
  */
 export default function ChainChip({ chainId, navigate, current = false, className = '' }) {
   const name = chainName(chainId);
@@ -25,7 +26,7 @@ export default function ChainChip({ chainId, navigate, current = false, classNam
         e.preventDefault();
         navigate?.({ chain: chainId });
       }}
-      title={`只看${name}`}
+      title={t('footer.onlyChain', { chain: name })}
       className={`hover:text-accent transition-colors ${className}`}
     >
       {name}

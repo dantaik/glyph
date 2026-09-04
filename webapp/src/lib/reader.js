@@ -213,7 +213,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
 
   /**
    * Load a post body ({ tags, markdown }) plus whether it came from the
-   * local IndexedDB cache, so the UI can label 来自本地缓存.
+   * local IndexedDB cache, so the UI can label it as coming from there.
    */
   function loadPostBody(txHash) {
     if (bodies.has(txHash)) return bodies.get(txHash);

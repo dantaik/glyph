@@ -1,0 +1,311 @@
+// zh.js — 中文界面。
+//
+// The Chinese the app was originally written in, key for key with en.js.
+// Where a sentence puts its parts in a different order — a chain name, a
+// block count — the entry is a function of those parts rather than a
+// template glued together at the call site.
+
+export default {
+  // --- 页眉与外壳 ----------------------------------------------------------
+  'brand.wordmark': '雪泥',
+  'brand.title': '雪泥',
+  'nav.read': '读',
+  'nav.write': '写',
+  'nav.home': '回到首页',
+  'nav.toggleTheme': '切换深色模式',
+  'nav.settings': '节点设置',
+  'nav.more': '更多',
+  'nav.lightMode': '浅色模式',
+  'nav.darkMode': '深色模式',
+  'nav.switchLanguage': ({ name }) => `切换到${name}`,
+  'app.fixtures': '演示数据',
+
+  // --- 页脚 ----------------------------------------------------------------
+  'footer.onlyChain': ({ chain }) => `只看${chain}`,
+  'footer.scanRanges': '查看扫描范围',
+  'footer.scanned': '已扫描区块',
+  'footer.scanning': '扫描中',
+  'footer.segments': ({ count }) => `${count} 段`,
+
+  // --- 通用词汇 ------------------------------------------------------------
+  'common.retry': '重试',
+  'common.cancel': '取消',
+  'common.save': '保存',
+  'common.apply': '应用',
+  'common.add': '添加',
+  'common.back': '返回',
+  'common.loading': '加载中…',
+  'common.untitled': '无标题',
+  'common.technicalDetails': '技术细节',
+  'common.loadFailed': '加载失败',
+  'common.backToFeed': '返回首页',
+  'common.labelled': ({ label, value }) => `${label}：${value}`,
+  'common.joinAnd': '和',
+  'common.period': '。',
+
+  // --- 首页流 --------------------------------------------------------------
+  'feed.title': '最新文章',
+  'feed.subtitleAll': ({ count }) => `来自所有作者 · ${count}个区块链网络`,
+  'feed.viewAll': '查看全部',
+  'feed.emptyEver': '此刻还没有文章',
+  'feed.writeFirst': '写第一篇',
+  'feed.emptyRange': '这一段区块里还没有文章',
+  'feed.scanEarlier': '继续扫描更早的区块',
+  'feed.note': ({ chain, blocks }) =>
+    `在${chain}上读取了 ${blocks} 个区块，没有找到更早的文章，可以继续加载。`,
+  'feed.jobMore': '正在扫描更早的文章…',
+  'feed.jobGap': '正在补扫中间的区块…',
+  'feed.jobRefresh': '正在扫描最近区块…',
+  'feed.readFailed': ({ chain, reason }) => `${chain} 读取失败：${reason}`,
+  'feed.gapFilling': ({ chain, blocks }) => `${chain}：正在补扫中间的 ${blocks} 个区块`,
+  'feed.gapProgress': ({ read, budget }) => `：已读 ${read} / 最多 ${budget}`,
+  'feed.gapPending': ({ chain, blocks }) => `${chain}：中间还有 ${blocks} 个区块未扫描`,
+  'feed.scanThisRange': '扫描这一段',
+
+  // --- 翻页 ----------------------------------------------------------------
+  'loadMore.label': '加载更早的文章',
+  'loadMore.loading': '正在加载…',
+  'loadMore.noMore': '没有更多文章',
+
+  // --- 合并流的边界 --------------------------------------------------------
+  'frontier.readFailed': ({ names, reason }) => `${names} 读取失败：${reason}`,
+  'frontier.authorScanning': ({ names }) => `正在读取${names}上的文章，以下暂未包含${names}的文章`,
+  'frontier.feedScanning': ({ names }) => `${names} 正在进行第一次扫描，以下暂未包含${names}的文章`,
+  'frontier.authorIncomplete': ({ names }) => `${names}上更早的文章尚未读取`,
+  'frontier.feedIncomplete': ({ names, when }) => `以下文章可能不完整：${names} 只扫描到${when}`,
+  'frontier.here': '这里',
+  'frontier.continueReading': '继续读取',
+  'frontier.continueScanning': '继续扫描',
+  'frontier.join': '与',
+
+  // --- 扫描进度 ------------------------------------------------------------
+  'scanProgress.default': '正在扫描…',
+  'scanProgress.block': ({ block }) => `区块 ${block}`,
+  'scanProgress.blockRange': ({ from, to }) => `区块 ${from} 至 ${to}`,
+  'scanProgress.found': ({ posts, target }) => ` · 已找到 ${posts}/${target} 篇`,
+  'scanProgress.read': ({ fetched, budget }) => ` · 本次已读 ${fetched} / 最多 ${budget} 个区块`,
+  'scanProgress.percent': ({ percent }) => ` · 约 ${percent}%`,
+
+  // --- 作者页 --------------------------------------------------------------
+  'author.postsByPrefix': '',
+  'author.postsBySuffix': ' 的文章',
+  'author.total': ({ count }) => `共 ${count} 篇`,
+  'author.empty': '该地址没发表过文章',
+  'author.jobMore': '正在扫描更早的文章…',
+  'author.jobRefresh': '正在读取文章列表…',
+
+  // --- 单篇文章 ------------------------------------------------------------
+  'post.by': '作者：',
+  'post.loadFailed': ({ reason }) => `加载失败：${reason}`,
+  'post.block': ({ block }) => `区块 ${block}`,
+  'post.transaction': '交易',
+  'post.fromCache': '来自本地缓存',
+  'post.notFound': '没有找到这篇文章',
+  'post.notFoundBody': '这笔交易里没有发布记录，或交易哈希有误。',
+  'post.notFoundOnChains': ({ names }) => `在${names}上都没有找到这笔交易的发布记录，或交易哈希有误。`,
+  'post.locating': '正在查找这笔交易…',
+  'post.prev': '上一篇',
+  'post.next': '下一篇',
+  'post.navLabel': '前后篇',
+  'post.index': ({ index }) => `第 ${index} 篇`,
+  'post.titleSuffix': ({ title }) => `${title} · 雪泥`,
+
+
+  // --- 扫描范围页（/scan） -------------------------------------------------
+  'scan.title': '扫描范围',
+  'scan.subtitle': '本机缓存的区块覆盖范围',
+  'scan.intro':
+    '为了在公共 RPC 上增量读取链上文章，浏览器会在本地记录已经扫描过的区块范围，刷新后只拉取新出现的区块，不再重复请求。记录的是多段范围而不是一整段：先扫过 1–100、后来扫过 200–300，再往前翻时只会补上中间的 101–199。每条链各自记录，互不影响；两条链同时扫描，离开页面后正在进行的扫描也会在后台继续完成并缓存结果。全局流最多缓存 300 篇、每位作者最多缓存最近 200 篇标题；缓存被裁剪时对应的范围也会一并收回，避免「以为扫过」而漏掉文章。',
+  'scan.outro':
+    '记录保存在本机浏览器（localStorage），按链分开，只用于避免重复的链上请求；清除浏览器数据后会自动重新扫描。同一篇文章在一次会话里只会向节点请求一次，正文与图片缓存另存于浏览器 IndexedDB（同样按链区分）。',
+  'scan.backgroundScanning': '后台扫描中',
+  'scan.budget': ({ blocks }) => `每次扫描（打开首页、点一次「加载更早的文章」）最多向节点读取 ${blocks} 个区块`,
+  'scan.floor': ({ block }) => `；合约部署于区块 ${block}，不会读取更早的区块`,
+  'scan.globalHeading': '全局扫描（首页流）',
+  'scan.authorHeading': '作者扫描',
+  'scan.range': ({ from, to }) => `区块 ${from} 至 ${to}`,
+  'scan.rangeBlocks': ({ blocks }) => ` · ${blocks} 个区块`,
+  'scan.moreRanges': ({ count }) => `…另有 ${count} 段更早的范围`,
+  'scan.summary': ({ segments, blocks, cached }) => `${segments} 段 · 共 ${blocks} 个区块 · 缓存 ${cached} 篇`,
+  'scan.syncedTo': ({ block }) => ` · 已同步至区块 ${block}`,
+  'scan.scanningNow': ({ from, to, fetched, budget }) =>
+    `正在扫描区块 ${from} 至 ${to}，本次已读 ${fetched} / 最多 ${budget}`,
+  'scan.firstScan': '正在进行第一次扫描…',
+  'scan.noRanges': '还没有扫描记录——打开首页后自动记录。',
+  'scan.noAuthors': '还没有作者记录——打开某位作者的文章页后自动记录。',
+  'scan.authorRange': ({ from, to }) => `区块 ${from} 至 ${to}`,
+  'scan.authorSummary': ({ segments, count }) => ` · ${segments} 段 · ${count} 篇`,
+  'scan.authorNoRange': '未记录范围',
+  'scan.authorCached': ({ count }) => ` · 缓存 ${count} 篇`,
+
+  // --- 设置页（/settings） -------------------------------------------------
+  'settings.title': '设置',
+  'settings.customized': '已自定义',
+  'settings.defaults': '使用默认配置',
+  'settings.intro': ({ address }) =>
+    `合约通过 CREATE2 部署，在每条链上都是同一个地址（${address}），所以两条链读的是同一本刊物：首页把两条链上的文章按时间合在一起。每条链可以配置多个 RPC 节点：按顺序使用第一个，失败时自动回退到下一个。保存后立即生效，不刷新页面；正在进行的扫描会从下一次请求起使用新的节点。`,
+  'settings.noEndpoints': '没有节点，保存后将使用内置默认节点。',
+  'settings.primary': '优先',
+  'settings.moveUp': ({ position }) => `将第 ${position} 个节点上移`,
+  'settings.moveDown': ({ position }) => `将第 ${position} 个节点下移`,
+  'settings.removeEndpoint': ({ position }) => `删除第 ${position} 个节点`,
+  'settings.endpointPlaceholder': 'https://你的节点地址',
+  'settings.addEndpointFor': ({ chain }) => `为 ${chain} 添加 RPC 节点`,
+  'settings.restoreChainDefaults': '恢复此链的默认节点',
+  'settings.rescanHeading': '扫描频率',
+  'settings.rescanLabel': '区块链扫描延迟（分钟）',
+  'settings.rescanNote':
+    '上一次扫描结束后的 N 分钟内，重新打开首页或作者页只显示上次扫到的文章，不再向节点请求新区块；超过之后，下次打开会补扫这段时间新产生的区块。0 = 每次都扫。默认 1 分钟。这只决定「什么时候去读新区块」，不会漏掉任何文章：已经读到的内容是永久缓存的——链上数据不会改变，同一篇文章不会被重复请求。',
+  'settings.languageHeading': '语言',
+  'settings.languageLabel': '界面语言',
+  'settings.languageNote':
+    '界面默认英文，可切换为中文。选择立即生效并保存在本机浏览器；这只改变界面，文章仍以写作时的语言存在链上。',
+  'settings.resetAll': '恢复默认',
+  'settings.storageNote':
+    '节点列表保存在本机浏览器（localStorage）。已扫描的区块范围、正文与图片缓存都按链分别保存，互不污染。',
+  'settings.chainLabel': ({ chain, id }) => `${chain} · ${id}`,
+
+  // --- 备份与恢复 ----------------------------------------------------------
+  'backup.heading': '备份与恢复',
+  'backup.note':
+    '把这一页的全部设置——各链的节点列表、扫描延迟、发布目标、界面语言、主题、正文字号、控制台日志——存成一个 JSON 文件，换浏览器、换电脑时再导入。导入前会先列出将要改动的项目，确认后才生效，无需刷新。',
+  'backup.export': '导出设置',
+  'backup.import': '导入设置…',
+  'backup.pickFile': '选择设置文件',
+  'backup.exported': ({ name }) => `已导出 ${name}`,
+  'backup.applied': ({ name }) => `已应用 ${name} 里的设置`,
+  'backup.reviewFrom': ({ name }) => `来自 ${name}`,
+  'backup.reviewWill': '，应用后将：',
+  'backup.reviewColon': '：',
+  'backup.unreadable': '无法读取这个文件。',
+
+  // --- 写作页的钱包与网络 --------------------------------------------------
+  'wallet.heading': '钱包与网络',
+  'wallet.myPosts': '查看我的文章',
+  'wallet.connected': '已连接',
+  'wallet.connect': '连接钱包',
+  'wallet.connecting': '连接中…',
+  'wallet.connectFailed': '连接失败',
+  'wallet.publishTo': '发布到',
+  'wallet.cancelled': '已取消',
+  'wallet.switchFailed': '切换失败，请在钱包中手动切换',
+  'wallet.switch': '切换钱包网络',
+  'wallet.switching': '切换中…',
+  'wallet.mismatch': ({ walletChain, walletChainId, targetChain }) =>
+    `钱包在${walletChain}（ID ${walletChainId}），发布目标是${targetChain}。`,
+  'wallet.onTarget': ({ chain }) => `钱包已在${chain}上。`,
+  'wallet.followingWallet': ({ chain }) => `钱包已在${chain}上；发布目标跟随钱包所在的网络。`,
+  'wallet.willConnect': '发布时会请求连接钱包；文章会永久写入所选网络上的合约。',
+  'wallet.none': '未检测到钱包，请安装 MetaMask 等浏览器钱包。',
+
+  // --- 写作与发布 ----------------------------------------------------------
+  'publish.placeholderBody': `# 小标题
+
+写点什么...
+
+把图片拖入下方区域或点击上传；点击图片或名称即可复制引用，粘贴到正文。`,
+  'publish.titleHeading': '标题',
+  'publish.titlePlaceholder': '我想表达什么',
+  'publish.titleTooLong': '标题太长，无法编码为 bytes32',
+  'publish.tagsHeading': '标签',
+  'publish.tagsPlaceholder': '回车或逗号分隔',
+  'publish.removeTag': ({ tag }) => `移除标签 ${tag}`,
+  'publish.bodyHeading': '正文',
+  'publish.editorView': '编辑器视图',
+  'publish.edit': '编辑',
+  'publish.preview': '预览',
+  'publish.refHintPrefix': '引用另一篇文章：',
+  'publish.refHintSuffix': '；序号是该交易内的第几篇，可省略；文字留空则自动显示对方标题。',
+  'publish.refExample': '[文字](0x交易哈希/0)',
+  'publish.imagesHeading': '图片',
+  'publish.costHeading': '预估成本',
+  'publish.permanentNotice': '一经发布，文章将永久公开发布于区块链；不可修改、不可删除。',
+  'publish.button': '发布到链上',
+  'publish.uploadingImages': '正在上传图片…',
+  'publish.confirmInWallet': '请在钱包中确认…',
+  'publish.compressing': '正在压缩正文…',
+  'publish.uploadingToChain': '正在上传图片到链上…',
+  'publish.uploadProgress': ({ index, total, key }) => `正在上传图片（${index}/${total}）：${key}`,
+  'publish.done': '发布成功！',
+  'publish.failed': '发布失败',
+  'publish.noWalletConnected': '未连接钱包',
+  'publish.missingImages': ({ keys }) => `图片未上传: ${keys}`,
+  'publish.bodyTooBig': ({ size, limit }) =>
+    `正文压缩后 ${size}，超过单笔交易上限 ${limit}。请精简正文，或拆成多篇发布。`,
+  'publish.publishedTo': ({ chain }) => `已发布到${chain}`,
+  'publish.waitForBlock': '等待区块确认后即可在列表中看到',
+  'publish.writeAnother': '再写一封',
+
+  // --- 图片上传 ------------------------------------------------------------
+  'image.hint': '图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。',
+  'image.copyRef': ({ key }) => `复制引用 ${key}`,
+  'image.copyRefTitle': '点击复制引用',
+  'image.copied': '已复制引用',
+  'image.remove': ({ key }) => `移除图片 ${key}`,
+  'image.unreferenced': ' · 未引用',
+  'image.upload': '上传图片',
+  'image.dropHint': '拖入图片或点击上传，最大长边 1600px',
+
+  // --- 成本面板 ------------------------------------------------------------
+  'cost.loading': '正在获取 gas 价格…',
+  'cost.noUsd': ' · 美元价格不可用',
+  'cost.body': ({ bytes }) => `正文（~${bytes} B 压缩后）`,
+  'cost.image': ({ key }) => `图片 ${key}`,
+  'cost.nearLimit': ({ limit }) =>
+    `正文接近单笔交易上限（约 ${limit} KB 压缩后）。超出时发布会被节点拒绝，请精简正文或拆成多篇。`,
+  'cost.total': '合计',
+
+  // --- 出错时 --------------------------------------------------------------
+  'error.nodeBehind': ({ block }) => `节点尚未同步到区块 ${block}，稍后重试即可`,
+  'error.rateLimit': '节点请求过于频繁，请稍后重试，或到右上角设置更换 RPC 节点。',
+  'error.unsupported': '当前 RPC 节点不支持这类查询，请到右上角设置更换节点。',
+  'error.unavailable': 'RPC 节点暂时无法响应，请稍后重试。',
+  'error.network': '网络连接出现问题，请检查网络后重试。',
+  'error.generic': '节点暂时不可用，请稍后重试。',
+  'error.noCanvasContext': '无法创建画布上下文',
+  'error.noWebp': '当前浏览器不支持 WebP 编码，请换用 Chrome / Firefox。',
+  'error.imageTooBig': ({ size, limit }) =>
+    `压缩到最低画质后仍有 ${size}，超过单笔交易上限 ${limit}，请改用尺寸更小的图片。`,
+  'error.imageNamed': ({ key, message }) => `图片 ${key}：${message}`,
+  'boundary.title': '页面出错了',
+  'boundary.reload': '重新加载',
+
+  // --- 时间 ----------------------------------------------------------------
+  'time.justNow': '刚刚',
+  'time.about': ({ time }) => `约 ${time}`,
+
+  // --- 读取设置文件 --------------------------------------------------------
+  'settingsFile.notJson': '不是有效的 JSON 文件。',
+  'settingsFile.notObject': '文件内容不是一个设置对象。',
+  'settingsFile.notGlyph': '这不是雪泥的设置文件（缺少 glyph.settings 标记）。',
+  'settingsFile.badFormat': ({ format, supported }) =>
+    `设置文件格式版本 ${format} 不受支持（本版本支持 ${supported}）。`,
+  'settingsFile.rpcsShape': 'rpcs 应是按链 ID 分组的节点列表。',
+  'settingsFile.unknownChain': ({ id }) => `跳过未知的链 ID ${id}。`,
+  'settingsFile.chainListShape': ({ chain }) => `${chain} 的节点列表应是数组。`,
+  'settingsFile.droppedEndpoints': ({ chain, count }) => `${chain}：忽略 ${count} 个不是 http(s) 地址的节点。`,
+  'settingsFile.customEndpoints': ({ chain, count }) => `${chain}：${count} 个自定义节点`,
+  'settingsFile.defaultEndpoints': ({ chain }) => `${chain}：默认节点`,
+  'settingsFile.rescanDelay': ({ minutes }) => `扫描延迟：${minutes} 分钟`,
+  'settingsFile.rescanShape': 'rescanDelayMinutes 应是不小于 0 的数字。',
+  'settingsFile.publishFollowsWallet': '发布到：跟随钱包所在的网络',
+  'settingsFile.publishChain': ({ chain }) => `发布到：${chain}`,
+  'settingsFile.publishShape': ({ value }) => `publishChain ${value} 不是已知的链。`,
+  'settingsFile.theme': ({ theme }) => `主题：${theme}`,
+  'settingsFile.themeDark': '深色',
+  'settingsFile.themeLight': '浅色',
+  'settingsFile.themeSystem': '跟随系统',
+  'settingsFile.themeShape': 'theme 应是 light、dark 或 null（跟随系统）。',
+  'settingsFile.lang': ({ lang }) => `界面语言：${lang}`,
+  'settingsFile.langShape': 'lang 应是 en 或 zh。',
+  'settingsFile.log': ({ state }) => `控制台日志：${state}`,
+  'settingsFile.on': '开',
+  'settingsFile.off': '关',
+  'settingsFile.logShape': 'log 应是 true 或 false。',
+  'settingsFile.nothing': '文件里没有可应用的设置。',
+
+  // --- 链名 ----------------------------------------------------------------
+  'chain.unknown': ({ id }) => `链 ${id}`,
+  'chain.sepolia': 'Sepolia 测试网',
+  'chain.taikoHoodi': 'Taiko Hoodi 测试网',
+};

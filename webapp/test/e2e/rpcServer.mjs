@@ -261,10 +261,18 @@ function answer(c, method, params) {
 
 // --- The oracle: what the pages must show --------------------------------------
 
-/** A few characters of prose from a body, to find on the rendered page. */
+/**
+ * A few words of prose from a body, to find on the rendered page. Letters
+ * and single spaces only, in whichever script the post is written in, so
+ * the probe survives markdown rendering untouched. Falls back to the title
+ * for a body with no prose in it.
+ */
 function probeOf(body, title) {
-  const m = (body?.markdown ?? '').match(/[一-鿿]{4,}/);
-  return m ? m[0].slice(0, 6) : title;
+  const markdown = body?.markdown ?? '';
+  const cjk = markdown.match(/[\u4e00-\u9fff]{4,}/u);
+  if (cjk) return cjk[0].slice(0, 6);
+  const words = markdown.match(/\p{L}{3,}(?: \p{L}{3,}){2,}/u);
+  return words ? words[0].slice(0, 24) : title;
 }
 
 function oracleOf(s) {

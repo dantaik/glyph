@@ -1,101 +1,164 @@
-# 雪泥 · Glyph
+# Glyph · 雪泥
 
-完全存在以太坊上的多作者写作系统（取自"雪泥鸿爪"）。**一份不可升级、无所有者的智能合约**，任意钱包都是它自己的作者（`msg.sender`）。文字、标题、标签、图片全部存于 L1 calldata，零链下依赖。
+A multi-author writing system that lives entirely on Ethereum (the Chinese name, 雪泥, comes
+from the idiom 雪泥鸿爪 — the prints a wild goose leaves in the snow). **One non-upgradeable,
+ownerless smart contract**, in which every wallet is its own author (`msg.sender`). Text,
+titles, tags and images all live in L1 calldata, with no off-chain dependencies.
 
-技术方案：[`glyph-spec.md`](./glyph-spec.md)
+The interface reads in **English by default and can be switched to Chinese** at any time.
 
-## 快速开始
+Technical design: [`glyph-spec.md`](./glyph-spec.md)
 
-合约已部署，地址（CREATE2，所有链相同）与各链的默认 RPC 节点都内置在前端里——
-克隆即可运行，**无需任何配置**：
+## Quick start
+
+The contract is deployed, and both its address (the same on every chain, via CREATE2) and each
+chain's default RPC endpoints are built into the front end — clone and run, **no configuration
+needed**:
 
 ```bash
 cd webapp && npm install && npm run dev
 ```
 
-部署到 Vercel / Netlify 等静态托管同样零配置：`vercel.json` 已就绪，直接导入仓库即可。
-`npm run build` 的产物在 `dist/`。
+Deploying to a static host such as Vercel or Netlify is equally configuration-free: `vercel.json`
+is ready, so import the repository as it is. `npm run build` puts the output in `dist/`.
 
-**可选——自己部署一份合约**（任何人都可以部署；部署者无任何特权）：
+**Optional — deploy your own copy of the contract** (anyone may; the deployer holds no privilege):
 
 ```bash
 cd contracts && forge install foundry-rs/forge-std
 forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
-  --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY 经环境变量传入（脚本用 vm.envUint 读取）
+  --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY comes from the environment (the script reads it with vm.envUint)
 
-# 让前端指向自己那份。Vite 在构建时内联这些变量，改动后必须重新构建
+# Point the front end at your own copy. Vite inlines these at build time, so a
+# change here means rebuilding.
 cat > webapp/.env.local <<EOF
-VITE_GLYPH_ADDRESS=0x你自己部署的地址
+VITE_GLYPH_ADDRESS=0xYourDeployedAddress
 VITE_RPC_URL=https://eth.drpc.org
 VITE_CHAIN_ID=1
 EOF
 ```
 
-**阅读**：访问 `/`（以太坊 + Taiko 两条链上的最新文章，按区块时间合并倒序）、`/ethereum` 或 `/taiko`（只看一条链）、`/author/0x作者地址`（该作者两条链上的文章合并；`/taiko/author/0x…` 只看一条）、`/taiko/tx/0x交易哈希/0`（单篇文章，路径里带链，末尾是交易内的事件序号；没有链的旧链接会在两条链上查找后跳转）、`/scan`（本机增量扫描已覆盖的多段区块范围，页脚可直达）。
-**写作**：「写」tab 顶部的「钱包与网络」——连接钱包、选「发布到」哪条链（默认跟随钱包所在的网络，选过就记住）、钱包不在目标链上时一键切换 → 标题（最多 32 字节）+ 标签 + Markdown 正文（CodeMirror 编辑 / 全宽预览）→ 发布。正文引用另一篇文章用 `[文字](0x交易哈希/0)`（规范见 glyph-spec §8.1）。
-**翻页**：首页与作者页底部的「加载更早的文章」按段向前扫描——已经扫过的区块范围直接命中本地缓存，不再重复请求。首页两段扫描范围之间若有未扫的区块，会在列表中间标出，可单独补扫。
-**网络**：合约在以太坊主网与 Taiko 主网是同一个地址，前端把两条链当成同一本刊物：首页与作者页同时读两条链，每篇文章标出所在网络（点它进入只看该链的视图，列表头有「查看全部」回来）。每条链各自扫描；扫得慢的那条链只扫到的时间点会在列表里标出（「以下文章可能不完整：Taiko 只扫描到 …」），「继续扫描 / 加载更早的文章」优先补扫落后的那条。每条链的扫描范围、标题、正文与图片缓存各自独立，页脚每条链一行。
-**扫描**：首页流按区块范围倒序扫描，每扫完一段（一次 `eth_getLogs`）就立刻显示找到的文章，不必等整次扫描结束；离开首页（打开文章、作者页、设置）扫描也不会中断。每次扫描（打开首页、点一次「加载更早的文章」）最多向节点读取 `scanBlocks` 个区块（默认 270,000，见 `webapp/src/lib/chains.js`），已扫过的范围不计入；从合约部署区块（`deployBlock`）再往前一律不读。页面上的扫描进度、`/scan` 页和控制台都会写明这个上限。
-**RPC 节点**：右上角 ⚙ 进入 `/settings`（手机上收在 ⋯ 菜单里），每条链可配置多个节点并排序——按顺序使用第一个，失败时自动回退到下一个（失败的节点会被短暂搁置，不会每次请求都重试）。保存立即生效，不刷新页面。
-**扫描延迟与缓存**：同页 `/settings` 可设「区块链扫描延迟」——上一次扫描结束后的这段时间内重新打开首页或作者页，直接显示上次扫到的文章，不再向节点要新区块（默认 1 分钟，0 = 每次都扫）。这只决定什么时候去读新区块，不会漏文章。已经读到的内容是**永久缓存**的：链上数据不会改变，同一篇文章的元数据、标题、正文与图片都不会被重复请求。
-**备份与恢复**：`/settings` 的「导出设置」把节点列表、扫描延迟、发布目标、主题、字号、日志开关存成一个 JSON 文件；「导入设置」先列出将要改动的项目，确认后即时生效，不刷新。
-**界面**：作者用地址生成的 blockies 图标 + 地址末 6 位表示（合约与交易哈希仍用 `0x1234…abcd`）。窄屏下主题与设置收进 ⋯ 菜单，其余控件留在同一行。
-**控制台**：每次向节点请求、每次命中本地缓存都会在浏览器控制台留一行日志（标注链名）；`?log=0` 关闭。
-**成本估算**：发布前实时显示 gas（节点）+ ETH/USD（CoinGecko）估算。
+**Reading**: visit `/` (the newest posts from both Ethereum and Taiko, merged newest-first by block
+time), `/ethereum` or `/taiko` (one chain only), `/author/0xAUTHOR` (that author's posts from both
+chains merged; `/taiko/author/0x…` for one chain), `/taiko/tx/0xTXHASH/0` (a single post — the path
+names the chain, and the trailing number is the event's index within the transaction; an older link
+without a chain is looked up on both chains and then redirected), or `/scan` (the multi-segment block
+ranges this browser has scanned so far, reachable from the footer).
+**Writing**: the "Wallet and network" panel at the top of the Write tab — connect a wallet, choose which
+chain to publish to (it follows the wallet's own network until you pick one, and then it is remembered),
+and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
+most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
+post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Paging**: "Load earlier posts" at the foot of the feed and author pages scans backwards a segment at a
+time — a block range already scanned is answered from the local cache and never requested again. When the
+feed has unscanned blocks between two scanned segments, it says so in the middle of the list and offers to
+fill just that gap.
+**Networks**: the contract sits at the same address on Ethereum mainnet and Taiko mainnet, and the front
+end treats the two as one journal: the feed and author pages read both at once, and each post is labelled
+with its network (click it for a single-chain view; the list header has "View all" to come back). Each
+chain scans independently, and where the slower one has only reached is marked in the list ("The posts
+below may be incomplete: Taiko has only been scanned back to …"); "Keep scanning" / "Load earlier posts"
+deepens whichever chain is furthest behind. Scan ranges, titles, bodies and image caches are separate per
+chain, and the footer gives each chain a line.
+**Scanning**: the feed scans block ranges newest-first, and every finished segment (one `eth_getLogs`)
+shows its posts immediately rather than waiting for the whole scan; leaving the feed (to open a post, an
+author or the settings) does not interrupt it. Each scan (opening the feed, one click of "Load earlier
+posts") reads at most `scanBlocks` blocks from the node (270,000 by default, see
+`webapp/src/lib/chains.js`), with already-scanned ranges not counting towards it; nothing below the
+contract's deployment block (`deployBlock`) is ever read. That ceiling is spelled out in the on-page scan
+progress, on `/scan`, and in the console.
+**RPC endpoints**: the ⚙ in the top right opens `/settings` (folded into the ⋯ menu on a phone), where each
+chain can hold several endpoints in order — the first is used, and a failure falls back to the next (a
+failed endpoint is set aside briefly rather than retried on every request). Saving takes effect at once,
+without a reload.
+**Rescan delay and caching**: the same `/settings` page sets the "blockchain rescan delay" — within that
+long after a scan finishes, reopening the feed or an author page shows what the last scan found instead of
+asking the node for new blocks (1 minute by default; 0 scans every time). It only decides when new blocks
+are read, and never misses a post. What has already been read is cached **permanently**: on-chain data
+does not change, so one post's metadata, title, body and images are never requested twice.
+**Language**: the interface is in English by default and switches to Chinese from the header (the EN/中
+button, or the ⋯ menu on a phone) or from `/settings`. The choice applies immediately, is kept in this
+browser, and travels in the settings file. It changes the interface only — a post stays on-chain in the
+language it was written in.
+**Backup and restore**: "Export settings" on `/settings` writes the endpoint lists, rescan delay, publish
+target, language, theme, text size and log switch to one JSON file; "Import settings" lists what it would
+change first and applies it on confirmation, with no reload.
+**Interface**: an author is shown as a blockies icon generated from their address plus the last 6
+characters of it (contracts and transaction hashes still use `0x1234…abcd`). On a narrow screen the
+language, theme and settings controls fold into the ⋯ menu and everything else stays on one row.
+**Console**: every node request and every local cache hit writes one console line, labelled with the chain;
+`?log=0` turns it off.
+**Cost estimate**: gas (from the node) plus ETH/USD (from CoinGecko) shown live before publishing.
 
-## 测试
+## Testing
 
 ```bash
 cd webapp
-npm test            # vitest：数据层（扫描、缓存、合并流、路由、配置）与组件
-npm run build       # 构建网站到 dist/
-npm run test:e2e    # Playwright（Chromium）：构建产物 + 本地 JSON-RPC mock 节点（双链）
-npm run check       # 以上三步
+npm test            # vitest: the data layer (scanning, caching, merged feeds, routing, config) and components
+npm run build       # build the site into dist/
+npm run test:e2e    # Playwright (Chromium): the built output + a local JSON-RPC mock node (both chains)
+npm run check       # all three
 ```
 
-e2e 的 mock 节点（`webapp/test/e2e/rpcServer.mjs`）把演示世界（`src/lib/fixtureWorld.js`）按真实合约的部署高度以 JSON-RPC 提供：`eth_getLogs` 返回 ABI 编码的 Post 事件，正文是 brotli 压缩后的 `publish()` calldata，所以 viem、chainIO 与 brotli WASM 都是真跑。开发时 `npm run dev` 后访问 `/?fixtures=1` 可在内存里看同一套演示数据。GitHub Actions（`.github/workflows/ci.yml`）在每个 PR 上跑全部三步。
+The e2e mock node (`webapp/test/e2e/rpcServer.mjs`) serves the demo world (`src/lib/fixtureWorld.js`) over
+JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-encoded Post events whose
+bodies are brotli-compressed `publish()` calldata, so viem, chainIO and the brotli WASM all really run.
+During development, `npm run dev` and then `/?fixtures=1` shows the same demo data from memory. GitHub
+Actions (`.github/workflows/ci.yml`) runs all three steps on every PR.
 
-## 确定性部署（CREATE2 · 全网同一地址）
+Most of the demo world is written in English. Two of its posts are deliberately left in Chinese: they are
+the multi-byte-title fixtures — one title is exactly 27 bytes of UTF-8, the other is a `bytes32` title cut
+mid-character and ending in U+FFFD — and neither case can be reproduced with ASCII. They double as
+something real to look at in the bilingual reader.
 
-Glyph 通过 canonical deterministic deployment proxy（Arachnid，
-`0x4e59b44847b379578588920cA78FbF26c0B4956C`）以 CREATE2 部署。CREATE2 地址只由
-`(deployer, salt, init-code hash)` 决定；代理本身可在任何 EVM 链上用一笔可重放交易
-（one-time-account）部署到同一地址，因此 **Glyph 在所有 EVM 链上的地址相同**：
+## Deterministic deployment (CREATE2 · the same address everywhere)
+
+Glyph is deployed with CREATE2 through the canonical deterministic deployment proxy (Arachnid,
+`0x4e59b44847b379578588920cA78FbF26c0B4956C`). A CREATE2 address is decided only by
+`(deployer, salt, init-code hash)`, and the proxy itself can be deployed to the same address on any EVM
+chain with one replayable transaction (a one-time account) — so **Glyph has the same address on every EVM
+chain**:
 
 ```
-合约地址:       0x000000AE2f2249c497cfc5F262dd1491634C361C   （6 个前导零）
-salt:           0x00436d208c20757dde791d2c0c0909a2c8ea61482d3fa516692d9ee5244440f1
-部署器 (proxy): 0x4e59b44847b379578588920cA78FbF26c0B4956C
-init code hash: 0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402b5cb
+contract address: 0x000000AE2f2249c497cfc5F262dd1491634C361C   (6 leading zeros)
+salt:             0x00436d208c20757dde791d2c0c0909a2c8ea61482d3fa516692d9ee5244440f1
+deployer (proxy): 0x4e59b44847b379578588920cA78FbF26c0B4956C
+init code hash:   0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402b5cb
 ```
 
-- **部署脚本**：`script/Create2Deploy.s.sol`，幂等（地址已有代码则校验后退出），任何人可跑，部署者无特权。
-- **代理缺失的链**：先向一次性签名账户 `0x3fab184622dc19b6109349b94811493bf2a45362` 转入 ≥ 0.01 ETH（100,000 gas × 100 gwei），然后重放 Arachnid 仓库 `output/deployment.json` 中的原始签名交易（在任何链上重放都产生同一代理地址）：
+- **The deploy script**: `script/Create2Deploy.s.sol`, idempotent (if the address already holds code it
+  verifies and exits). Anyone may run it, and the deployer holds no privilege.
+- **Chains where the proxy is missing**: first send ≥ 0.01 ETH (100,000 gas × 100 gwei) to the one-time
+  signing account `0x3fab184622dc19b6109349b94811493bf2a45362`, then replay the raw signed transaction from
+  `output/deployment.json` in Arachnid's repository (replaying it on any chain produces the same proxy
+  address):
 
   ```bash
   cast publish 0xf8a58085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf31ba02222222222222222222222222222222222222222222222222222222222222222a02222222222222222222222222222222222222222222222222222222222222222
   ```
 
-- **字节码漂移**：`Blog.sol` 的任何改动都会改变 init code hash，进而改变地址。此时重新挖盐并更新 `Create2Deploy.s.sol` 里的三个常量：
+- **Bytecode drift**: any change to `Blog.sol` changes the init code hash, and therefore the address. Mine a
+  new salt and update the three constants in `Create2Deploy.s.sol`:
 
   ```bash
   cast create2 --starts-with 000000 --init-code $(forge inspect src/Blog.sol:Glyph bytecode)
   ```
 
-- **合约验证**：`forge verify-contract 0x000000AE2f2249c497cfc5F262dd1491634C361C src/Blog.sol:Glyph --chain <chainid> --etherscan-api-key $KEY`
-- **普通部署**（地址随链而变）：`forge script script/Deploy.s.sol:DeployBlog --rpc-url $ETH_RPC --broadcast`
+- **Verifying the contract**: `forge verify-contract 0x000000AE2f2249c497cfc5F262dd1491634C361C src/Blog.sol:Glyph --chain <chainid> --etherscan-api-key $KEY`
+- **An ordinary deployment** (the address then varies by chain): `forge script script/Deploy.s.sol:DeployBlog --rpc-url $ETH_RPC --broadcast`
 
-## 部署记录
+## Deployment record
 
-合约地址（所有链相同）：`0x000000AE2f2249c497cfc5F262dd1491634C361C`
+Contract address (identical on every chain): `0x000000AE2f2249c497cfc5F262dd1491634C361C`
 
-| 链 | Chain ID | 部署交易 | 部署者 | 日期 | 验证 |
+| Chain | Chain ID | Deployment tx | Deployer | Date | Verified |
 |---|---|---|---|---|---|
 | Ethereum mainnet | 1 | [0x5f16…ce9a](https://etherscan.io/tx/0x5f16b4d2375109968578502bdf899ded4cc7fc6c2608bbb738ffa7dbdc3bce9a) | `0x327f…c458` | 2026-09-02 | ✅ [Etherscan](https://etherscan.io/address/0x000000AE2f2249c497cfc5F262dd1491634C361C#code) |
 | Taiko mainnet | 167000 | [0x6c66…dae7](https://taikoscan.io/tx/0x6c6645e2258432d01fae5e9e0f6b5c33bccade234a9628afced413e600e0dae7) | `0x327f…c458` | 2026-09-02 | ✅ [Taikoscan](https://taikoscan.io/address/0x000000AE2f2249c497cfc5F262dd1491634C361C#code) |
 
-部署者地址 `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` 对合约没有任何特权（合约无所有者、不可升级）。
+The deployer address `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` holds no privilege over the contract,
+which has no owner and cannot be upgraded.
 
-## 许可
+## License
 
 MIT
