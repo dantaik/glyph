@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      // Theme, article size and interface language, before the first paint:
+      // Theme and interface language, before the first paint:
       // the stored language decides <html lang> and the tab title, so a
       // reader who chose 中文 never sees a flash of the English default.
       (function () {
@@ -15,8 +15,6 @@
           d.classList.toggle('dark', dark);
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute('content', dark ? '#16181c' : '#f7f8fa');
-          var f = localStorage.getItem('glyph.fontsize.v1');
-          if (f === 's' || f === 'l') d.dataset.fontsize = f;
           if (localStorage.getItem('glyph.lang.v1') === 'zh') {
             d.lang = 'zh-CN';
             document.title = '\u96EA\u6CE5';

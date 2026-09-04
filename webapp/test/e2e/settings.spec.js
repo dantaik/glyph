@@ -16,7 +16,7 @@ test.describe('settings', () => {
     const doc = JSON.parse(readFileSync(await download.path(), 'utf8'));
     expect(doc.glyph).toEqual({ settings: 1 });
     expect(doc.rpcs['167000']).toEqual(rpcLists('default')[167000]);
-    expect(doc).toMatchObject({ rescanDelayMinutes: 1, lang: 'en', theme: null, fontSize: 'm', log: false });
+    expect(doc).toMatchObject({ rescanDelayMinutes: 1, lang: 'en', theme: null, log: false });
 
     // Add a second Taiko node, a delay and a theme through a file.
     const edited = {

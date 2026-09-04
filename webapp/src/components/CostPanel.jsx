@@ -1,13 +1,14 @@
 import { t } from '../lib/i18n';
 import { fmtEth, fmtUsd, fmtGwei } from '../lib/price';
+import { Body, Meta, Micro } from './Text';
 
 /** Live cost breakdown for the current draft (body + images + total). */
 export default function CostPanel({ estimate, market, chainId }) {
   if (!estimate) {
     return (
-      <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4 text-xs text-ink-faint">
+      <Meta as="div" className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
         {t('cost.loading')}
-      </div>
+      </Meta>
     );
   }
   const { postCost, imageCosts, totalCost, estCompressed, limitBytes, nearLimit } = estimate;
@@ -16,18 +17,18 @@ export default function CostPanel({ estimate, market, chainId }) {
   return (
     <div className="rounded-xl border border-edge bg-paper-sunken px-5 py-4">
       <div className="mb-3 flex justify-end">
-        <span className="text-2xs tabular-nums text-ink-faint">
+        <Micro as="span" nums>
           {fmtGwei(market.gasPriceWei)}
           {usdAvailable && market.ethUsd != null ? (
             <> · ETH ${market.ethUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}</>
           ) : (
             <>{t('cost.noUsd')}</>
           )}
-        </span>
+        </Micro>
       </div>
 
-      <ul className="space-y-1.5 text-sm">
-        <li className="flex items-baseline justify-between gap-4 text-ink-soft">
+      <ul className="space-y-1.5">
+        <Body as="li" className="flex items-baseline justify-between gap-4">
           <span>{t('cost.body', { bytes: estCompressed })}</span>
           <span className="tabular-nums text-right">
             {fmtEth(postCost.eth)}
@@ -35,12 +36,9 @@ export default function CostPanel({ estimate, market, chainId }) {
               <span className="ml-2 text-ink-faint">{fmtUsd(postCost.usd)}</span>
             )}
           </span>
-        </li>
+        </Body>
         {imageCosts.map((c) => (
-          <li
-            key={c.key}
-            className="flex items-baseline justify-between gap-4 text-sm text-ink-soft"
-          >
+          <Body as="li" key={c.key} className="flex items-baseline justify-between gap-4">
             <span className="truncate">{t('cost.image', { key: c.key })}</span>
             <span className="tabular-nums text-right shrink-0">
               {fmtEth(c.eth)}
@@ -48,7 +46,7 @@ export default function CostPanel({ estimate, market, chainId }) {
                 <span className="ml-2 text-ink-faint">{fmtUsd(c.usd)}</span>
               )}
             </span>
-          </li>
+          </Body>
         ))}
       </ul>
 

@@ -1,4 +1,5 @@
 import { t } from '../lib/i18n';
+import { Hint, Meta } from './Text';
 
 /**
  * Text control that pages a list towards older posts. Shared by the home
@@ -18,7 +19,7 @@ export default function LoadMoreButton({
   if (!hasMore) {
     return (
       <div className="mt-8 text-center">
-        <p className="text-xs text-ink-ghost">{t('loadMore.noMore')}</p>
+        <Hint>{t('loadMore.noMore')}</Hint>
       </div>
     );
   }
@@ -32,7 +33,7 @@ export default function LoadMoreButton({
       >
         {loading ? (loadingLabel ?? t('loadMore.loading')) : (label ?? t('loadMore.label'))}
       </button>
-      {note && !loading && <p className="mt-2 text-xs text-ink-ghost">{note}</p>}
+      {note && !loading && <Meta className="mt-2">{note}</Meta>}
     </div>
   );
 }

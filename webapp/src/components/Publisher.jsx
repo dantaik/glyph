@@ -18,7 +18,8 @@ import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
 import WalletPanel from './WalletPanel';
-import { SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { BTN_PRIMARY, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { Body, Meta, Micro } from './Text';
 import {
   getMarketState,
   estimatePublishGas,
@@ -293,15 +294,12 @@ export default function Publisher() {
           placeholder={t('publish.titlePlaceholder')}
           aria-invalid={titleOver}
           aria-describedby="post-title-bytes"
-          className={`w-full bg-transparent pb-2.5 text-2xl font-bold border-0 border-b
-                     focus:outline-none placeholder:text-ink-ghost transition-colors
+          className={`w-full border-0 border-b bg-transparent pb-2.5 text-display transition-colors
+                     placeholder:text-ink-ghost focus:outline-none
                      ${titleOver ? 'border-danger' : 'border-edge-strong focus:border-accent'}`}
         />
         {titleOver && (
-          <div
-            id="post-title-bytes"
-            className="text-2xs mt-1 tabular-nums text-danger"
-          >
+          <div id="post-title-bytes" className="mt-1 text-2xs tabular-nums text-danger">
             {t('publish.titleTooLong')}
           </div>
         )}
@@ -378,13 +376,13 @@ export default function Publisher() {
           />
         </Suspense>
       </div>
-      <p className="mb-10 -mt-6 text-xs text-ink-ghost">
+      <Meta className="-mt-6 mb-10">
         {t('publish.refHintPrefix')}
-        <code className="rounded bg-paper-sunken px-1 py-0.5 text-2xs text-ink-soft">
+        <Micro as="code" className="rounded bg-paper-sunken px-1 py-0.5">
           {t('publish.refExample')}
-        </code>
+        </Micro>
         {t('publish.refHintSuffix')}
-      </p>
+      </Meta>
 
       <SectionHeader label={t('publish.imagesHeading')} />
       <div className="mb-10">
@@ -404,12 +402,12 @@ export default function Publisher() {
       </div>
 
       <div className="pt-6">
-        <p className="mb-4 text-xs text-ink-faint">{t('publish.permanentNotice')}</p>
+        <Meta className="mb-4">{t('publish.permanentNotice')}</Meta>
         <div className="flex flex-wrap items-center justify-between gap-4">
           {status === 'processing' && statusMsg && (
-            <span role="status" className="text-sm text-ink-faint">
+            <Body as="span" role="status">
               {statusMsg}
-            </span>
+            </Body>
           )}
           <button
             onClick={handlePublish}
@@ -419,9 +417,7 @@ export default function Publisher() {
               status === 'signing' ||
               chainMismatch
             }
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm
-                       font-medium text-paper hover:bg-accent-strong disabled:opacity-40
-                       disabled:cursor-not-allowed transition-colors"
+            className={BTN_PRIMARY}
           >
             {(status === 'processing' || status === 'signing') && (
               <span

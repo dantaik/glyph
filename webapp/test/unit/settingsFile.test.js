@@ -13,7 +13,7 @@ import {
 import { getLang, setLang } from '../../src/lib/i18n';
 import * as rpcLog from '../../src/lib/rpcLog';
 import { applySettings, collectSettings, parseSettingsFile, serializeSettings, settingsFileName } from '../../src/lib/settingsFile';
-import { getFontSizePref, getThemePref, setFontSizePref, setThemePref } from '../../src/lib/theme';
+import { getThemePref, setThemePref } from '../../src/lib/theme';
 
 const doc = (body) => JSON.stringify({ glyph: { settings: 1 }, ...body });
 
@@ -22,7 +22,6 @@ describe('settingsFile', () => {
     localStorage.clear();
     setLang('en');
     setThemePref(null);
-    setFontSizePref('m');
   });
 
   it('collects every preference as it stands', () => {
@@ -33,7 +32,6 @@ describe('settingsFile', () => {
       publishChain: null,
       lang: 'en',
       theme: null,
-      fontSize: 'm',
       log: true,
     });
     expect(settingsFileName(new Date('2026-09-03T10:00:00Z'))).toBe('glyph-settings-2026-09-03.json');
@@ -45,14 +43,12 @@ describe('settingsFile', () => {
     savePublishChainId(167000);
     setLang('zh');
     setThemePref('dark');
-    setFontSizePref('l');
     rpcLog.setEnabled(false);
     const text = serializeSettings();
 
     localStorage.clear();
     setLang('en');
     setThemePref(null);
-    setFontSizePref('m');
     const { settings, problems, summary } = parseSettingsFile(text);
     expect(problems).toEqual([]);
     // Read back in English — the language the reader is in now, not the one
@@ -64,7 +60,6 @@ describe('settingsFile', () => {
       'Publish to: Taiko',
       'Language: 中文',
       'Theme: dark',
-      'Body text size: L',
       'Console log: off',
     ]);
     applySettings(settings);
@@ -76,8 +71,6 @@ describe('settingsFile', () => {
     expect(getPublishChainId()).toBe(167000);
     expect(getThemePref()).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(getFontSizePref()).toBe('l');
-    expect(document.documentElement.dataset.fontsize).toBe('l');
     expect(rpcLog.isEnabled()).toBe(false);
   });
 
@@ -99,7 +92,6 @@ describe('settingsFile', () => {
         publishChain: 5,
         lang: 'fr',
         theme: 'blue',
-        fontSize: 'xl',
         log: 'yes',
         somethingElse: true,
       }),
@@ -114,7 +106,6 @@ describe('settingsFile', () => {
       'publishChain 5 is not a known chain.',
       'lang should be en or zh.',
       'theme should be light, dark or null (follow the system).',
-      'fontSize should be s, m or l.',
       'log should be true or false.',
     ]);
   });

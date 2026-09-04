@@ -103,22 +103,19 @@
   }
 }
 
-/* Article size control (S/M/L) — runtime vars, NOT in @theme */
-:root { --article-size: 1.09375rem; }                  /* M: 17.5px desktop */
-html[data-fontsize='s'] { --article-size: 1rem; }
-html[data-fontsize='l'] { --article-size: 1.21875rem; }
+/* The article body size — a runtime var, NOT in @theme, so the column and
+   the type can be tuned per breakpoint without touching the type scale. */
+:root { --article-size: 1.09375rem; }                  /* 17.5px desktop */
 @media (max-width: 40rem) {
   :root { --article-size: 1.03125rem; }
-  html[data-fontsize='s'] { --article-size: 0.9375rem; }
-  html[data-fontsize='l'] { --article-size: 1.125rem; }
 }
 
 /* The article column — shared by the post header, the body and the loading
    skeleton. It is the same column the feed uses on `/`: the full width of
    <main>, so a post and the list it came from line up.
 
-   Deliberately NOT a function of --article-size. S/M/L sets the type size
-   and nothing else; the column staying put is the point of the control. */
+   Deliberately NOT a function of --article-size: the column is fixed, and
+   only the type inside it responds to the breakpoint. */
 .article-column {
   max-width: 64rem; /* = <main>'s max-w-5xl, which already caps it */
   margin-inline: auto;

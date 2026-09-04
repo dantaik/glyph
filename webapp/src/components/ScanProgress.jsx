@@ -1,5 +1,6 @@
 import { fmtBlock } from '../lib/format';
 import { t } from '../lib/i18n';
+import { Hint, Micro } from './Text';
 
 /**
  * Live scan status — the scanning label plus, once the reader reports a
@@ -14,12 +15,10 @@ export default function ScanProgress({ label, progress, className = '' }) {
   const sameBlock = progress && String(progress.fromBlock) === String(progress.toBlock);
   return (
     <div role="status" aria-live="polite" className={`text-center ${className}`}>
-      <p className={`text-xs text-ink-ghost ${progress ? '' : 'animate-pulse'}`}>
-        {label ?? t('scanProgress.default')}
-      </p>
+      <Hint className={progress ? '' : 'animate-pulse'}>{label ?? t('scanProgress.default')}</Hint>
       {progress && (
         <>
-          <p className="mt-2 text-2xs tabular-nums text-ink-faint">
+          <Micro nums className="mt-2">
             {sameBlock
               ? t('scanProgress.block', { block: fmtBlock(progress.fromBlock) })
               : t('scanProgress.blockRange', {
@@ -34,7 +33,7 @@ export default function ScanProgress({ label, progress, className = '' }) {
                     budget: fmtBlock(progress.budget),
                   })
                 : t('scanProgress.percent', { percent: pct })}
-          </p>
+          </Micro>
           <div className="mx-auto mt-1.5 h-1 w-44 max-w-full overflow-hidden rounded-full bg-paper-sunken">
             <div
               className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"

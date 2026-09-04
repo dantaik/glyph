@@ -8,6 +8,7 @@ import AddressLabel from './Address';
 import ChainIcon from './ChainIcon';
 import SectionHeader from './SectionHeader';
 import { BTN_PILL, SEGMENT_GROUP, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { Body, Meta, Note } from './Text';
 
 /**
  * Wallet and network — the write tab's own wallet corner: who is writing,
@@ -57,33 +58,34 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
         label={t('wallet.heading')}
         right={
           account ? (
-            <button
+            <Meta
+              as="button"
               type="button"
               onClick={() => navigate({ author: account })}
-              className="text-xs text-ink-faint hover:text-accent transition-colors"
+              className="hover:text-accent transition-colors"
             >
               {t('wallet.myPosts')}
-            </button>
+            </Meta>
           ) : undefined
         }
       />
       <div className="rounded-lg border border-edge bg-paper-raised px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
           {account ? (
-            <span className="inline-flex items-center gap-2 text-sm text-ink-soft" title={account}>
+            <Body as="span" className="inline-flex items-center gap-2" title={account}>
               <AddressLabel address={account} size={16} tailClassName="text-xs" />
-              <span className="text-xs text-ink-faint">{t('wallet.connected')}</span>
-            </span>
+              <Meta as="span">{t('wallet.connected')}</Meta>
+            </Body>
           ) : hasProvider ? (
             <button type="button" onClick={handleConnect} disabled={isConnecting} className={BTN_PILL}>
               {isConnecting ? t('wallet.connecting') : t('wallet.connect')}
             </button>
           ) : (
-            <span className="max-w-md text-xs leading-relaxed text-ink-faint">{t('wallet.none')}</span>
+            <Note as="span" className="max-w-md">{t('wallet.none')}</Note>
           )}
 
           <div role="group" aria-label={t('wallet.publishTo')} className="inline-flex items-center gap-2">
-            <span className="text-xs text-ink-faint">{t('wallet.publishTo')}</span>
+            <Meta as="span">{t('wallet.publishTo')}</Meta>
             <div className={SEGMENT_GROUP}>
               {READ_CHAIN_IDS.map((id) => (
                 <button
@@ -119,13 +121,13 @@ export default function WalletPanel({ chainId, picked, disabled = false }) {
             </button>
           </p>
         ) : account && walletChainId != null ? (
-          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+          <Note className="mt-3">
             {picked
               ? t('wallet.onTarget', { chain: chainName(chainId) })
               : t('wallet.followingWallet', { chain: chainName(chainId) })}
-          </p>
+          </Note>
         ) : !account ? (
-          <p className="mt-3 text-xs leading-relaxed text-ink-faint">{t('wallet.willConnect')}</p>
+          <Note className="mt-3">{t('wallet.willConnect')}</Note>
         ) : null}
         {error && (
           <p role="alert" className="mt-2 text-xs text-danger">

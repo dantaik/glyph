@@ -1,9 +1,8 @@
 // settingsFile.js — the reader's preferences as one file, out and back in.
 //
 // Everything the settings page can change — the endpoint lists per chain,
-// the rescan delay, the publish chain, the interface language, the theme,
-// the article font size, the console log switch — collected into one small
-// JSON document, and
+// the rescan delay, the publish chain, the interface language, the theme
+// and the console log switch — collected into one small JSON document, and
 // read back with every value checked before any of it is applied.
 // Applying goes through the same setters the page uses, so a restored
 // file takes effect at once, with no reload, and nothing here knows how
@@ -23,7 +22,7 @@ import {
   saveRescanDelay,
   saveRpcUrls,
 } from './config';
-import { getFontSizePref, getThemePref, setFontSizePref, setThemePref } from './theme';
+import { getThemePref, setThemePref } from './theme';
 import { LANG_NAMES, getLang, isLang, setLang, t } from './i18n';
 import * as rpcLog from './rpcLog';
 
@@ -31,7 +30,6 @@ export const SETTINGS_FORMAT = 1;
 
 const isHttpUrl = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
 const sameList = (a, b) => a.length === b.length && a.every((u, i) => u === b[i]);
-const FONT_SIZES = ['s', 'm', 'l'];
 
 /** Every preference, as it stands. */
 export function collectSettings() {
@@ -45,7 +43,6 @@ export function collectSettings() {
     publishChain: getPublishChainId(),
     lang: getLang(),
     theme: getThemePref(),
-    fontSize: getFontSizePref(),
     log: rpcLog.isEnabled(),
   };
 }
@@ -161,14 +158,6 @@ export function parseSettingsFile(text) {
       problems.push(t('settingsFile.themeShape'));
     }
   }
-  if (doc.fontSize != null) {
-    if (FONT_SIZES.includes(doc.fontSize)) {
-      settings.fontSize = doc.fontSize;
-      summary.push(t('settingsFile.fontSize', { size: t(`fontSize.${doc.fontSize}`) }));
-    } else {
-      problems.push(t('settingsFile.fontSizeShape'));
-    }
-  }
   if (doc.log != null) {
     if (typeof doc.log === 'boolean') {
       settings.log = doc.log;
@@ -195,6 +184,5 @@ export function applySettings(settings) {
   if ('publishChain' in settings) savePublishChainId(settings.publishChain);
   if (settings.lang != null) setLang(settings.lang);
   if ('theme' in settings) setThemePref(settings.theme);
-  if (settings.fontSize != null) setFontSizePref(settings.fontSize);
   if (settings.log != null) rpcLog.setEnabled(settings.log);
 }

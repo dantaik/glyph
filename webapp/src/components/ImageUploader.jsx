@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../lib/i18n';
 import { Check, AlertCircle, Close, Plus } from './Icons';
+import { Micro } from './Text';
 
 /**
  * Copy text to the clipboard. Secure contexts use the async Clipboard API;
@@ -108,7 +109,7 @@ export default function ImageUploader({
       )}
 
       {Object.keys(files).length > 0 && (
-        <p className="mt-2 text-2xs text-ink-ghost">{t('image.hint')}</p>
+        <Micro className="mt-2">{t('image.hint')}</Micro>
       )}
 
       <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -153,10 +154,10 @@ export default function ImageUploader({
             >
               <Close size={12} />
             </button>
-            <span className="block text-2xs text-ink-faint mt-0.5 truncate">
+            <Micro as="span" className="mt-0.5 block truncate">
               {key} · {(file.size / 1024).toFixed(0)}KB
               {!used.has(key) && <span className="text-ink-ghost">{t('image.unreferenced')}</span>}
-            </span>
+            </Micro>
           </div>
         ))}
 
@@ -197,9 +198,9 @@ export default function ImageUploader({
           >
             <Plus size={36} className="text-ink-ghost group-hover:text-accent transition-colors" />
           </div>
-          <span className="block text-2xs text-ink-ghost mt-0.5 text-center">
+          <Micro as="span" className="mt-0.5 block text-center">
             {t('image.dropHint')}
-          </span>
+          </Micro>
           <input
             ref={fileInputRef}
             type="file"

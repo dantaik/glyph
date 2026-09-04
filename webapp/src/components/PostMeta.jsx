@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { estimateBlockTime, fmtAbsTime, fmtRelTime } from '../lib/format';
 import ChainChip from './ChainChip';
+import { Meta } from './Text';
 
 /**
  * The shared meta line for article rows and the featured entry:
@@ -37,15 +38,13 @@ export default function PostMeta({
     rel && <span title={exact ? fmtAbsTime(ts) : undefined}>{rel}</span>,
   ].filter(Boolean);
   return (
-    <span
-      className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint tabular-nums ${className}`}
-    >
+    <Meta as="span" nums className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>
       {parts.map((part, i) => (
         <Fragment key={i}>
           {i > 0 && <span className="select-none" aria-hidden="true">·</span>}
           {part}
         </Fragment>
       ))}
-    </span>
+    </Meta>
   );
 }

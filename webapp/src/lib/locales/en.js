@@ -118,11 +118,6 @@ export default {
   'post.index': ({ index }) => `#${index}`,
   'post.titleSuffix': ({ title }) => `${title} · Glyph`,
 
-  // --- Reading comfort -----------------------------------------------------
-  'fontSize.label': 'Body text size',
-  'fontSize.s': 'S',
-  'fontSize.m': 'M',
-  'fontSize.l': 'L',
 
   // --- The scan page (/scan) ----------------------------------------------
   'scan.title': 'Scanned ranges',
@@ -318,8 +313,6 @@ Drop images into the area below or click to upload; click an image or its name t
   'settingsFile.themeLight': 'light',
   'settingsFile.themeSystem': 'follow the system',
   'settingsFile.themeShape': 'theme should be light, dark or null (follow the system).',
-  'settingsFile.fontSize': ({ size }) => `Body text size: ${size}`,
-  'settingsFile.fontSizeShape': 'fontSize should be s, m or l.',
   'settingsFile.lang': ({ lang }) => `Language: ${lang}`,
   'settingsFile.langShape': 'lang should be en or zh.',
   'settingsFile.log': ({ state }) => `Console log: ${state}`,

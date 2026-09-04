@@ -12,6 +12,7 @@ import ListHeader from './ListHeader';
 import LoadMoreButton from './LoadMoreButton';
 import ScanProgress from './ScanProgress';
 import { ListSkeleton } from './Skeleton';
+import { Hint } from './Text';
 
 /**
  * Home feed: the most recent posts across all authors — and, by default,
@@ -201,7 +202,7 @@ function GapMarker({ gap, chain, active, busy, onFill }) {
   const name = chainName(gap.chainId);
   const progress = chain?.progress;
   return (
-    <li className="py-3 text-center text-xs tabular-nums text-ink-ghost">
+    <Hint as="li" nums className="py-3 text-center">
       {active && chain?.job === 'gap' ? (
         <span className="animate-pulse">
           {t('feed.gapFilling', { chain: name, blocks: fmtBlock(blocks) })}
@@ -227,6 +228,6 @@ function GapMarker({ gap, chain, active, busy, onFill }) {
           </button>
         </>
       )}
-    </li>
+    </Hint>
   );
 }

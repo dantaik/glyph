@@ -1,7 +1,6 @@
 import { chainName, fmtRelTime, friendlyError } from '../lib/format';
 import { t } from '../lib/i18n';
-
-const LINE = 'py-3 text-center text-xs tabular-nums text-ink-ghost';
+import { Hint } from './Text';
 const ACTION =
   'underline-offset-4 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors';
 
@@ -42,7 +41,7 @@ export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, va
     };
   }
   return (
-    <li className={LINE} data-frontier="">
+    <Hint as="li" nums className="py-3 text-center" data-frontier="">
       <span>{text}</span>
       {action && (
         <>
@@ -52,6 +51,6 @@ export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, va
           </button>
         </>
       )}
-    </li>
+    </Hint>
   );
 }

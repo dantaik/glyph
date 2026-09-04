@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAsync } from '../lib/hooks';
 import { t } from '../lib/i18n';
+import { Body } from './Text';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PostPage from './PostPage';
@@ -16,9 +17,9 @@ export default function PostRoute({ reader, txHash, eventIndex, navigate }) {
   if (meta.error) return <ErrorState error={meta.error} onRetry={meta.retry} />;
   if (meta.loading) {
     return (
-      <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">
+      <Body as="div" className="animate-pulse py-20 text-center">
         {t('common.loading')}
-      </div>
+      </Body>
     );
   }
   if (meta.value === null) {

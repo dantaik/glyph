@@ -47,10 +47,10 @@ describe('SettingsPage — backup and restore', () => {
 
   it('a partly usable file applies its good part and lists the rest', async () => {
     render(<SettingsPage navigate={vi.fn()} />);
-    pickFile(file({ glyph: { settings: 1 }, rpcs: { 1: ['https://eth.example', 'nope'] }, fontSize: 'huge' }));
+    pickFile(file({ glyph: { settings: 1 }, rpcs: { 1: ['https://eth.example', 'nope'] }, theme: 'blue' }));
     expect(await screen.findByText('Ethereum: 1 custom endpoints')).toBeTruthy();
     expect(screen.getByText('Ethereum: ignoring 1 entries that are not http(s) URLs.')).toBeTruthy();
-    expect(screen.getByText('fontSize should be s, m or l.')).toBeTruthy();
+    expect(screen.getByText('theme should be light, dark or null (follow the system).')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(hasCustomRpcs(1)).toBe(true);
     expect(getRpcUrls(1)).toEqual(['https://eth.example']);
@@ -80,7 +80,6 @@ describe('SettingsPage — backup and restore', () => {
       glyph: { settings: 1 },
       rescanDelayMinutes: 1,
       lang: 'en',
-      fontSize: 'm',
     });
     expect(screen.getByRole('status').textContent).toMatch(/Exported glyph-settings-/);
   });

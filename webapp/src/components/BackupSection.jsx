@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { t as translateNow, useT } from '../lib/i18n';
 import { applySettings, parseSettingsFile, serializeSettings, settingsFileName } from '../lib/settingsFile';
 import { Download } from './Icons';
-import Note from './Note';
 import SectionHeader from './SectionHeader';
+import { Body, Note } from './Text';
 import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET } from './formStyles';
 
 /**
@@ -80,10 +80,10 @@ export default function BackupSection() {
 
       {review && (
         <div className="mt-4 rounded-lg border border-edge bg-paper-raised px-4 py-3" data-settings-review="">
-          <p className="text-sm text-ink-soft">
+          <Body>
             {t('backup.reviewFrom', { name: review.name })}
             {review.summary.length ? t('backup.reviewWill') : t('backup.reviewColon')}
-          </p>
+          </Body>
           {review.summary.length > 0 && (
             <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-ink-soft">
               {review.summary.map((line) => (

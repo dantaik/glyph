@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight } from './Icons';
 import { fmtTitle } from '../lib/format';
 import { t } from '../lib/i18n';
+import { Meta } from './Text';
 
 const CARD =
   'group block rounded-xl border border-edge px-5 py-4 hover:border-accent hover:bg-paper-raised transition-colors w-full text-left';
@@ -29,9 +30,7 @@ function NeighborCard({ side, meta, onGo }) {
       onClick={() => onGo(meta)}
       className={`${CARD}${next ? ' sm:col-start-2' : ''}`}
     >
-      <span
-        className={`flex items-center gap-1.5 text-xs text-ink-faint${next ? ' justify-end' : ''}`}
-      >
+      <Meta as="span" className={`flex items-center gap-1.5${next ? ' justify-end' : ''}`}>
         {next ? (
           <>
             {t('post.next')}
@@ -43,7 +42,7 @@ function NeighborCard({ side, meta, onGo }) {
             {t('post.prev')}
           </>
         )}
-      </span>
+      </Meta>
       <span className="mt-1 text-base leading-snug text-ink group-hover:text-accent line-clamp-2">
         {fmtTitle(meta.title) || t('common.untitled')}
       </span>

@@ -1,5 +1,7 @@
 import { Component } from 'react';
 import { t } from '../lib/i18n';
+import { BTN_OUTLINE_PILL } from './formStyles';
+import { Body, Title } from './Text';
 
 /**
  * Last-resort boundary: the app decodes untrusted on-chain bytes (brotli,
@@ -25,14 +27,14 @@ export default class ErrorBoundary extends Component {
       return (
         <div className="flex min-h-dvh items-center justify-center p-6">
           <div className="max-w-sm py-20 text-center">
-            <h1 className="text-lg text-ink-soft">{t('boundary.title')}</h1>
-            <p className="mt-2 break-all text-sm leading-relaxed text-ink-faint">
+            <Title as="h1">{t('boundary.title')}</Title>
+            <Body className="mt-2 break-all leading-relaxed">
               {String(this.state.error?.message || this.state.error)}
-            </p>
+            </Body>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 rounded-full border border-edge-strong px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors"
+              className={`mt-6 ${BTN_OUTLINE_PILL}`}
             >
               {t('boundary.reload')}
             </button>

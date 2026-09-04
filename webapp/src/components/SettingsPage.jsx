@@ -7,8 +7,8 @@ import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
 import BackupSection from './BackupSection';
 import ListHeader from './ListHeader';
-import Note from './Note';
 import SectionHeader from './SectionHeader';
+import { Micro, Note } from './Text';
 import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, FIELD_LABEL, ICON_BTN, INPUT, SEGMENT_GROUP, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 
 const chainIds = READ_CHAIN_IDS;
@@ -112,7 +112,9 @@ export default function SettingsPage({ navigate }) {
               <ol className="mb-3 divide-y divide-edge border-y border-edge">
                 {list.map((url, i) => (
                   <li key={`${url}-${i}`} className="flex items-center gap-2 py-2">
-                    <span className="w-6 shrink-0 text-center text-2xs tabular-nums text-ink-ghost">{i + 1}</span>
+                    <Micro as="span" nums className="w-6 shrink-0 text-center text-ink-ghost">
+                      {i + 1}
+                    </Micro>
                     <span
                       title={url}
                       className={`min-w-0 flex-1 truncate text-xs ${i === 0 ? 'text-ink-soft' : 'text-ink-faint'}`}
@@ -120,7 +122,9 @@ export default function SettingsPage({ navigate }) {
                       {url}
                     </span>
                     {i === 0 && (
-                      <span className="shrink-0 text-2xs text-ink-faint">{t('settings.primary')}</span>
+                      <Micro as="span" className="shrink-0">
+                        {t('settings.primary')}
+                      </Micro>
                     )}
                     <button
                       type="button"

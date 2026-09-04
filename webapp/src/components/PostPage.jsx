@@ -17,7 +17,8 @@ import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
 import AddressLabel from './Address';
 import BackButton from './BackButton';
-import FontSizeControl from './FontSizeControl';
+import { BTN_OUTLINE_PILL } from './formStyles';
+import { ArticleTitle, Meta, Micro } from './Text';
 import PostNav from './PostNav';
 import { ArticleSkeleton } from './Skeleton';
 
@@ -119,17 +120,16 @@ export default function PostPage({
 
   return (
     <article>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8">
         <BackButton onClick={onBack} />
-        <FontSizeControl />
       </div>
 
       <header className="mb-10">
         <div className="article-column text-center">
-        <h1 className="text-display font-black sm:text-jumbo">
+        <ArticleTitle>
           {title || <span className="text-ink-ghost">{t('common.untitled')}</span>}
-        </h1>
-        <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+        </ArticleTitle>
+        <Meta as="div" nums className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
           <span className="flex items-center gap-1">
             <span>{t('post.by')}</span>
             <a
@@ -155,7 +155,7 @@ export default function PostPage({
               </>
             )}
           </span>
-        </div>
+        </Meta>
         </div>
       </header>
 
@@ -168,17 +168,17 @@ export default function PostPage({
             <p>{t('post.loadFailed', { reason: friendlyError(error) })}</p>
           </div>
           <details className="mt-3">
-            <summary className="cursor-pointer select-none text-xs text-ink-faint hover:text-accent transition-colors">
+            <Meta as="summary" className="cursor-pointer select-none hover:text-accent transition-colors">
               {t('common.technicalDetails')}
-            </summary>
-            <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-paper-sunken p-3 text-2xs leading-relaxed text-ink-faint whitespace-pre-wrap break-all">
+            </Meta>
+            <Micro as="pre" className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-paper-sunken p-3 leading-relaxed">
               {error}
-            </pre>
+            </Micro>
           </details>
           <button
             type="button"
             onClick={load}
-            className="mt-4 rounded-full border border-edge-strong px-5 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent transition-colors"
+            className={`mt-4 ${BTN_OUTLINE_PILL}`}
           >
             {t('common.retry')}
           </button>
@@ -211,7 +211,7 @@ export default function PostPage({
 
       {loaded && (
         <footer className="mt-14 text-center">
-          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-ink-faint tabular-nums">
+          <Meta nums className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
             <span>{t('post.block', { block: fmtBlock(meta.block) })}</span>
             <span className="select-none" aria-hidden="true">·</span>
             <a
@@ -228,7 +228,7 @@ export default function PostPage({
                 <span>{t('post.fromCache')}</span>
               </>
             )}
-          </p>
+          </Meta>
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
               {body.tags.map((tag) => (

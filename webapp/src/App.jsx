@@ -10,6 +10,7 @@ import { t, useLang } from './lib/i18n';
 import { lowest, highest } from './lib/segments';
 import { hrefFor, useUrlState } from './lib/router';
 import { getAllChainsView } from './lib/view';
+import { Micro } from './components/Text';
 
 export default function App() {
   const [tab, setTab] = useState('read'); // 'read' | 'write'
@@ -57,9 +58,9 @@ export default function App() {
       </main>
       <Footer navigate={navigate} />
       {FIXTURES_MODE && (
-        <div className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1 text-2xs text-ink-ghost">
+        <Micro as="div" className="fixed bottom-3 right-3 z-50 rounded-full bg-paper-sunken px-2.5 py-1">
           {t('app.fixtures')}
-        </div>
+        </Micro>
       )}
     </div>
   );
@@ -87,11 +88,11 @@ function Footer({ navigate }) {
 
   return (
     <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
-      <ul className="space-y-1 text-2xs text-ink-faint tabular-nums">
+      <Micro as="ul" nums className="space-y-1">
         {feed.chains.map((c) => (
           <ChainLine key={c.chainId} chainId={c.chainId} span={scanSpan(c.coverage)} scanning={c.job != null} go={go} />
         ))}
-      </ul>
+      </Micro>
     </footer>
   );
 }

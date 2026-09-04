@@ -9,6 +9,7 @@ import AddressLabel from './Address';
 import BackButton from './BackButton';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
+import { Body, Hint, Meta, Note } from './Text';
 
 /** How many global segments to spell out before collapsing the rest. */
 const MAX_SHOWN = 8;
@@ -29,13 +30,13 @@ export default function ScanPage({ navigate }) {
 
       <ListHeader title={t('scan.title')} subtitle={t('scan.subtitle')} />
 
-      <p className="mb-8 max-w-2xl text-xs leading-relaxed text-ink-ghost">{t('scan.intro')}</p>
+      <Note className="mb-8 max-w-2xl">{t('scan.intro')}</Note>
 
       {READ_CHAIN_IDS.map((id) => (
         <ChainScan key={id} chainId={id} navigate={navigate} />
       ))}
 
-      <p className="text-xs leading-relaxed text-ink-ghost">{t('scan.outro')}</p>
+      <Note>{t('scan.outro')}</Note>
     </div>
   );
 }
@@ -60,17 +61,17 @@ function ChainScan({ chainId, navigate }) {
         label={t('settings.chainLabel', { chain: chainName(chainId), id: chainId })}
         right={
           feed.job ? (
-            <span className="animate-pulse text-xs text-ink-ghost">{t('scan.backgroundScanning')}</span>
+            <Hint as="span" className="animate-pulse">{t('scan.backgroundScanning')}</Hint>
           ) : undefined
         }
       />
-      <p className="mb-4 text-xs tabular-nums text-ink-ghost">
+      <Meta nums className="mb-4">
         {t('scan.budget', { blocks: fmtBlock(feed.scanBlocks) })}
         {feed.floor > 0n && t('scan.floor', { block: fmtBlock(feed.floor) })}
         {t('common.period')}
-      </p>
+      </Meta>
 
-      <h3 className="mb-2 text-xs tracking-label text-ink-faint">{t('scan.globalHeading')}</h3>
+      <Meta as="h3" className="mb-2 tracking-label">{t('scan.globalHeading')}</Meta>
       {segments.length > 0 ? (
         <>
           <ul className="mb-2 space-y-1">
@@ -78,18 +79,16 @@ function ChainScan({ chainId, navigate }) {
               .reverse()
               .slice(0, MAX_SHOWN)
               .map(([from, to]) => (
-                <li key={`${from}-${to}`} className="text-sm tabular-nums text-ink-soft">
+                <Body as="li" nums key={`${from}-${to}`}>
                   {t('scan.range', { from: fmtBlock(from), to: fmtBlock(to) })}
                   <span className="text-ink-ghost">{t('scan.rangeBlocks', { blocks: fmtBlock(to - from + 1n) })}</span>
-                </li>
+                </Body>
               ))}
           </ul>
           {segments.length > MAX_SHOWN && (
-            <p className="mb-2 text-xs text-ink-ghost">
-              {t('scan.moreRanges', { count: segments.length - MAX_SHOWN })}
-            </p>
+            <Hint className="mb-2">{t('scan.moreRanges', { count: segments.length - MAX_SHOWN })}</Hint>
           )}
-          <p className="mb-6 text-xs tabular-nums text-ink-ghost">
+          <Hint nums className="mb-6">
             {t('scan.summary', {
               segments: segments.length,
               blocks: fmtBlock(blockCount(segments)),
@@ -109,15 +108,13 @@ function ChainScan({ chainId, navigate }) {
                 </span>
               </>
             )}
-          </p>
+          </Hint>
         </>
       ) : (
-        <p className="mb-6 text-sm text-ink-ghost">
-          {feed.job ? t('scan.firstScan') : t('scan.noRanges')}
-        </p>
+        <Body className="mb-6">{feed.job ? t('scan.firstScan') : t('scan.noRanges')}</Body>
       )}
 
-      <h3 className="mb-2 text-xs tracking-label text-ink-faint">{t('scan.authorHeading')}</h3>
+      <Meta as="h3" className="mb-2 tracking-label">{t('scan.authorHeading')}</Meta>
       {authors.length > 0 ? (
         <ul className="divide-y divide-edge">
           {authors.map((a) => (
@@ -137,7 +134,7 @@ function ChainScan({ chainId, navigate }) {
                 <AddressLabel address={a.address} size={14} tailClassName="text-xs" />
               </a>
               {a.segments.length > 0 ? (
-                <span className="text-sm tabular-nums text-ink-faint">
+                <Body as="span" nums>
                   {t('scan.authorRange', {
                     from: fmtBlock(lowest(a.segments)),
                     to: fmtBlock(highest(a.segments)),
@@ -145,18 +142,18 @@ function ChainScan({ chainId, navigate }) {
                   <span className="text-ink-ghost">
                     {t('scan.authorSummary', { segments: a.segments.length, count: a.count })}
                   </span>
-                </span>
+                </Body>
               ) : (
-                <span className="text-sm text-ink-ghost">
+                <Body as="span">
                   {t('scan.authorNoRange')}
                   {a.count > 0 ? t('scan.authorCached', { count: a.count }) : ''}
-                </span>
+                </Body>
               )}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink-ghost">{t('scan.noAuthors')}</p>
+        <Body>{t('scan.noAuthors')}</Body>
       )}
     </section>
   );

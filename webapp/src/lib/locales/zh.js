@@ -110,11 +110,6 @@ export default {
   'post.index': ({ index }) => `第 ${index} 篇`,
   'post.titleSuffix': ({ title }) => `${title} · 雪泥`,
 
-  // --- 阅读设置 ------------------------------------------------------------
-  'fontSize.label': '正文字号',
-  'fontSize.s': '小',
-  'fontSize.m': '中',
-  'fontSize.l': '大',
 
   // --- 扫描范围页（/scan） -------------------------------------------------
   'scan.title': '扫描范围',
@@ -301,8 +296,6 @@ export default {
   'settingsFile.themeLight': '浅色',
   'settingsFile.themeSystem': '跟随系统',
   'settingsFile.themeShape': 'theme 应是 light、dark 或 null（跟随系统）。',
-  'settingsFile.fontSize': ({ size }) => `正文字号：${size}`,
-  'settingsFile.fontSizeShape': 'fontSize 应是 s、m 或 l。',
   'settingsFile.lang': ({ lang }) => `界面语言：${lang}`,
   'settingsFile.langShape': 'lang 应是 en 或 zh。',
   'settingsFile.log': ({ state }) => `控制台日志：${state}`,

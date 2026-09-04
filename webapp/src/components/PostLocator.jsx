@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { chainName } from '../lib/format';
 import { useAsync } from '../lib/hooks';
 import { t } from '../lib/i18n';
+import { Body } from './Text';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 
@@ -20,7 +21,11 @@ export default function PostLocator({ view, txHash, eventIndex, navigate }) {
 
   if (hit.error) return <ErrorState error={hit.error} onRetry={hit.retry} />;
   if (hit.loading || hit.value) {
-    return <div className="py-20 text-center text-sm text-ink-ghost animate-pulse">{t('post.locating')}</div>;
+    return (
+      <Body as="div" className="animate-pulse py-20 text-center">
+        {t('post.locating')}
+      </Body>
+    );
   }
   const names = view.chainIds.map(chainName).join(t('common.joinAnd'));
   return (
