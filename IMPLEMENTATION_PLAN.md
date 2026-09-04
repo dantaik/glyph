@@ -9,7 +9,7 @@
 ## 0. How to use this plan
 
 1. **One phase at a time, one pull request per phase.** Phases are numbered 0 to
-   13 and ordered by dependency. Do not start a phase before the previous one is
+   14 and ordered by dependency. Do not start a phase before the previous one is
    merged into `main`. Each phase is its own branch and its own pull request
    against `main`. If your environment dictates the branch name, use that name;
    the one-phase-per-PR rule still holds.
@@ -17,19 +17,23 @@
    check locally before it is opened: `cd webapp && npm run check` (unit tests,
    production build, Playwright end-to-end tests over the mock node). From
    Phase 12 on, `cd cli && npm test` as well. CI (`.github/workflows/ci.yml`)
-   runs the same steps; a red CI is yours to fix in the same PR.
+   runs the same steps; a red CI is yours to fix in the same PR. Phase 13 adds
+   a second workflow, `desktop.yml`, that builds the macOS app; it must be
+   green on that phase's PR and on every later one that touches it.
 3. **Update the progress table** in section 1 in every phase PR: tick the phase,
    write the PR number, and note any decision you had to make that this plan
    did not settle (keep such notes short and put them under the table).
 4. **Documentation is part of every phase.** Each phase says which parts of
    `README.md`, `glyph-spec.md`, the two locale files and `.codewhale/instructions.md`
    change. A phase whose docs are not updated is not done.
-5. **Ask a human only at the marked checkpoints.** There is exactly one:
-   Phase 2 needs a WalletConnect project ID from the repository owner. Every
-   other decision is settled here. If something in this plan turns out to be
+5. **Ask a human only at the marked checkpoints.** There are three, all
+   about credentials or rights the session cannot create itself: Phase 2
+   needs a WalletConnect project ID from the repository owner; Phase 13 needs
+   that ID as a repository secret, optionally Apple signing secrets, and a
+   release tag pushed on `main`. Every other decision is settled here. If something in this plan turns out to be
    impossible as written, choose the closest thing that keeps the stated
    behaviour, do it, and record the deviation under the progress table.
-6. **Phase 13 deletes this file.** When every phase is merged and the closing
+6. **Phase 14 deletes this file.** When every phase is merged and the closing
    sweep is done, remove `IMPLEMENTATION_PLAN.md` in the final PR. Nothing may
    reference it afterwards (grep for the file name before you open that PR).
 
@@ -54,7 +58,8 @@ never delete or skip a test to get there.
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☐ | | |
 | 11 | Archive bundles: export and import | ☐ | | |
 | 12 | The command-line tool | ☐ | | |
-| 13 | Closing sweep and deletion of this plan | ☐ | | |
+| 13 | The macOS desktop app | ☐ | | |
+| 14 | Closing sweep and deletion of this plan | ☐ | | |
 
 Deviations and decisions made during implementation (append here, newest last):
 
@@ -182,9 +187,11 @@ explanatory comments in full sentences.
   `npm ci`). Prefer browser and Node built-ins (WebCrypto, `<dialog>`,
   `CompressionStream`, `node:zlib`, `node:util` `parseArgs`).
 - **No new servers, indexers or content CDNs.** The reader must keep working
-  from a static host with nothing but RPC endpoints. The two exceptions already
-  accepted: CoinGecko (price, optional) and, from Phase 2, the WalletConnect
-  relay (wallet transport only, opt-in via a build-time variable).
+  from a static host with nothing but RPC endpoints. The exceptions already
+  accepted: CoinGecko (price, optional); from Phase 2, the WalletConnect relay
+  (wallet transport only, opt-in via a build-time variable); and, in the
+  desktop app only, a once-a-day GitHub Releases lookup for a newer version
+  (Phase 13).
 - **Do not touch `contracts/src/Blog.sol` or the CREATE2 constants.** Any change
   moves the deployed address. The contract is out of scope for this plan.
 - **Do not reintroduce the single-file offline build** (removed on purpose in
@@ -209,6 +216,7 @@ orientation, new ones marked with the phase that adds them):
 | `glyph.images.v1` | image reuse ledger `{ [chainId]: { [sha256hex]: txHash } }` | 4 |
 | `glyph.following.v1` | `{ addresses: string[] }` (lowercase) | 8 |
 | `glyph.followingSeen.v1` | `{ ts: number }` newest row time seen on the following page | 8 |
+| `glyph.desktop.updateSeen.v1` | the release version whose update notice was dismissed (desktop app only) | 13 |
 
 **IndexedDB** database `glyph-cache`: version 1 has stores `bodies` and
 `images`, keyed `"<chainId>:<txhash lowercase>"`. Phase 1 bumps the version to
@@ -1375,18 +1383,181 @@ modules are plain JavaScript already; only the wallet layer is browser-bound.
 
 ---
 
-## Phase 13 · Closing sweep and deletion of this plan
+## Phase 13 · The macOS desktop app
+
+**Goal.** Ship Xueni as a downloadable macOS application built from the same
+web app, with the build in CI, releases on GitHub, and a download link in the
+README. The reader is a single-page app with no server, so a desktop version
+is a thin shell around `webapp/dist`.
+
+**Decision: Tauri 2, not Electron.** Tauri wraps the system WebKit view in a
+small Rust shell: the download is around ten megabytes instead of the two
+hundred an Electron app carries, there is no bundled browser to keep patched,
+and `tauri-apps/tauri-action` builds, signs and publishes to GitHub Releases
+from a macOS runner. The price is two WebKit gaps the shell has to fill, both
+handled below: WebKit cannot encode WebP from a canvas, and a WKWebView does
+not honour `<a download>`. Electron would avoid both but contradicts the
+project's preference for small, long-lived things. Windows and Linux builds
+are out of scope for this phase; with Tauri they are a CI matrix change later.
+
+**Human checkpoints.**
+- The desktop build needs `WALLETCONNECT_PROJECT_ID` as a repository secret
+  (the same ID as Phase 2). Inside the app there is no browser extension, so
+  WalletConnect is the only way to sign. Without the secret the app still
+  builds and reads; the write tab says that this build cannot publish.
+- Signing and notarisation need an Apple Developer ID and the secrets
+  `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+  `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID`. They are optional: without
+  them the DMG is ad-hoc signed, Gatekeeper warns on first launch, and the
+  README explains right-click → Open. Ask the owner whether they exist, and do
+  not wait for them.
+- The first release tag (`v0.1.0`) is pushed on `main` after this phase's PR
+  is merged, so that the README link resolves. Push it if you have the rights;
+  otherwise ask the owner to.
+
+### 13.1 Behaviour
+
+- A universal (Apple Silicon and Intel) `.dmg` for macOS 13 or later, app name
+  "Xueni", the icon from `webapp/public/icon.svg`, a standard macOS menu, a
+  1100×800 window that remembers its size and position, following the system
+  appearance as the web app does.
+- Everything the web app does works in the app: reading both chains, the
+  caches (IndexedDB and localStorage persist in the app's WebKit data store),
+  settings, import and export, and writing through WalletConnect, with the QR
+  code scanned by a mobile wallet. Publishing images works because the shell
+  transcodes to WebP natively (13.2).
+- Links to other sites (explorers, ENS profile URLs) open in the default
+  browser, never inside the app. Every download the web app offers (the
+  Phase 5 `.md`, Phase 11 archives, the settings export) opens a native save
+  dialog.
+- Reloading (⌘R) on any route, and quitting on a post page and reopening, land
+  on a working page: the shell serves `index.html` for every path that is not
+  a bundled file, the rule `vercel.json` and `test/e2e/serve.mjs` implement.
+- Once a day the app asks GitHub for the latest release
+  (`https://api.github.com/repos/dantaik/glyph/releases/latest`) and, when it
+  is newer than the running version, shows a quiet dismissible line in the
+  footer: "Xueni <version> is available · Download". Best effort: a failure
+  shows nothing. A dismissal is remembered per version
+  (`glyph.desktop.updateSeen.v1`). This is the one desktop-only network call
+  outside RPC, listed among the accepted exceptions in section 2.2.
+
+### 13.2 Implementation
+
+- New top-level directory `desktop/`:
+  - `desktop/package.json` (private; scripts `dev`, `build`, `icon`; the only
+    devDependency is `@tauri-apps/cli` 2.x). `desktop/src-tauri/` holds
+    `Cargo.toml`, `tauri.conf.json`, `capabilities/default.json`, `icons/`
+    (generated by `npm run icon` from `webapp/public/icon.svg`), and
+    `src/main.rs` with `src/lib.rs`.
+  - `tauri.conf.json`: `productName` "Xueni", `identifier` `xyz.xueni.app`,
+    `build.beforeBuildCommand` `cd ../webapp && npm run build`,
+    `build.frontendDist` `../webapp/dist`, `build.devUrl` the Vite dev server,
+    `app.withGlobalTauri: true` so the web app reaches the shell through
+    `window.__TAURI__` and adds no npm dependency, one window as above, and
+    the macOS bundle settings (`minimumSystemVersion` "13.0", the DMG target).
+  - Rust: plugins `tauri-plugin-opener` (external links), `tauri-plugin-dialog`
+    and `tauri-plugin-fs` (save dialog and file write), `tauri-plugin-window-state`
+    (window size and position); one command
+    `transcode_image(bytes, max_edge, quality) -> Vec<u8>` that decodes and
+    resizes with the `image` crate (longest edge to `max_edge`, Lanczos3) and
+    encodes lossy WebP at `quality` (0 to 100) with the `webp` crate (libwebp);
+    and a custom URI scheme protocol, or the equivalent asset-resolver hook,
+    that answers `index.html` for any path that is not a bundled file.
+    Capabilities grant only what these plugins and this command need.
+- Web app changes, all feature-detected so the website is unaffected:
+  - New `webapp/src/lib/platform.js`: `isDesktop()` (true when
+    `window.__TAURI__` exists), `invoke(cmd, args)`, `openExternal(url)`,
+    `saveFile(name, blob)` (dialog then fs), `desktopVersion()`; every one a
+    no-op or null on the web.
+  - `download.js` (Phase 5): `downloadText` and `downloadBlob` call `saveFile`
+    when `isDesktop()`, else the anchor path.
+  - `publish.js` `processImage`: after the canvas encode, check `blob.type`.
+    A browser that cannot encode WebP returns PNG bytes under the type it was
+    asked for, which today would be uploaded as if they were WebP: on the web,
+    throw the existing `error.noWebp` when the type is not `image/webp`. On
+    desktop, skip the canvas and call `invoke('transcode_image', …)` inside
+    the same size loop (lower the quality until the bytes fit, stop at 30).
+  - `App.jsx`: one delegated click handler that, when `isDesktop()`, sends
+    any `http(s)` link to another origin through `openExternal`; in-app links
+    keep going through the router.
+  - `WalletPanel`: when `isDesktop()` and no provider is available, say that
+    publishing from the app uses WalletConnect, and when the build carries no
+    project ID, that this build cannot publish. Reading is unaffected.
+  - `components/UpdateNotice.jsx` in the footer, desktop only (13.1), reading
+    the running version through `desktopVersion()`.
+- CI: new `.github/workflows/desktop.yml`:
+  - Triggers: push of tags `v*` (a release); pushes to `main` and pull requests
+    that touch `desktop/**` or the workflow file (build only, the DMG uploaded
+    as a workflow artifact); `workflow_dispatch`.
+  - One job on `macos-latest`: checkout; Node 22 with the npm cache keyed on
+    `webapp/package-lock.json`; `npm ci` in `webapp` and in `desktop`; stable
+    Rust with the targets `aarch64-apple-darwin` and `x86_64-apple-darwin`
+    (`dtolnay/rust-toolchain`); `Swatinem/rust-cache` for `desktop/src-tauri`;
+    `cargo test` in `desktop/src-tauri`; `tauri-apps/tauri-action@v0` with
+    `projectPath: desktop` and `args: --target universal-apple-darwin`, the
+    environment `VITE_WALLETCONNECT_PROJECT_ID: ${{ secrets.WALLETCONNECT_PROJECT_ID }}`
+    and the Apple signing variables from secrets (empty when unset, which
+    tauri-action treats as "do not sign"); on a tag, `tagName: ${{ github.ref_name }}`,
+    `releaseName: Xueni ${{ github.ref_name }}`, release notes from the tag
+    message, not a draft. A final tag-only step copies the built DMG to
+    `Xueni-macOS.dmg` and uploads it to the same release
+    (`gh release upload <tag> Xueni-macOS.dmg --clobber`), so the README link
+    never changes between versions.
+  - A guard step on tags: the tag equals `v` followed by the `version` in
+    `tauri.conf.json` and in `desktop/package.json`, or the job fails before
+    building.
+  - `ci.yml` is unchanged: the fast checks stay fast.
+- The release procedure, documented in `desktop/README.md`: bump the version
+  in both files, commit, tag `v<version>`, push the tag; the workflow
+  publishes the release in about fifteen minutes.
+
+### 13.3 Tests
+
+- Unit (`platform.test.js`, jsdom): the web no-ops; with a fake
+  `window.__TAURI__`, `saveFile` opens the dialog and writes, `openExternal`
+  calls the opener. `download.test.js` and `publish.test.js` cover the desktop
+  branches and the new `blob.type` check (a PNG-typed blob throws
+  `error.noWebp` on the web).
+- Rust (`cargo test` in `desktop/src-tauri`, run by the workflow before the
+  build): `transcode_image` turns a generated 3000×2000 PNG into WebP bytes
+  (`RIFF….WEBP` header) no wider than `max_edge`, and a lower quality yields
+  fewer bytes.
+- Smoke test in the workflow after the build: mount the DMG (`hdiutil attach`),
+  assert `Xueni.app` exists, `codesign -dv` succeeds, and `lipo -archs` on the
+  binary lists both architectures. WebDriver-driven end-to-end testing of
+  Tauri apps is not available on macOS; the web behaviour is covered by the
+  existing Playwright suite.
+
+### 13.4 Docs and done
+
+- README: a "Download for macOS" paragraph near the top with the stable link
+  `https://github.com/dantaik/glyph/releases/latest/download/Xueni-macOS.dmg`,
+  the requirements (macOS 13 or later, Apple Silicon and Intel), how the
+  current build is signed and what to do when Gatekeeper warns, and a pointer
+  to `desktop/README.md` for building locally. Spec §9 gains a sentence: the
+  desktop app carries the same permanent caches, so it is one more place a
+  reader's copy lives; §10 row "Desktop app". `.codewhale/instructions.md`:
+  the `desktop/` path and the workflow.
+- Locale keys under `desktop.*` (`updateAvailable`, `download`, `dismiss`,
+  `walletConnectOnly`, `noPublishInThisBuild`).
+- Done when a tag push produces a GitHub Release with a universal DMG, the
+  README link downloads it, the app reads both chains and publishes a post
+  with an image through WalletConnect, and the web build is unchanged.
+
+---
+
+## Phase 14 · Closing sweep and deletion of this plan
 
 **Goal.** Leave the repository consistent, documented, and free of this plan.
 
 1. **Documentation sweep.** Read `README.md` and `glyph-spec.md` end to end
-   against the app as it now is. Every feature added by phases 1 to 12 is
+   against the app as it now is. Every feature added by phases 1 to 13 is
    described where a reader would look for it; the design decision record
    (§10) has one row per decision this plan made (drafts, wallet transport,
    cost history, image ledger, raw view and round trip, relations, local
-   search, following, identity, archive, CLI). The table of contents matches
-   the headings. `.codewhale/instructions.md` lists every new module and the
-   `cli/` package.
+   search, following, identity, archive, CLI, desktop app). The table of
+   contents matches the headings. `.codewhale/instructions.md` lists every new
+   module, the `cli/` package and the `desktop/` shell.
 2. **Locale sweep.** `locales.test.js` is green; read both dictionaries once
    for wording consistency (English sentences in the style of the existing
    ones; Chinese that says the same thing).
@@ -1394,14 +1565,14 @@ modules are plain JavaScript already; only the wallet layer is browser-bound.
    plan replaced (for example `window.ethereum` outside `wallet.js`, the moved
    `copyToClipboard`, `splitFrontMatter` in `payload.js`) and remove them.
 4. **Full verification.** `cd webapp && npm run check` and `cd cli && npm test`
-   green; a production build; a manual pass over every page in DEV fixtures
+   green; the last run of the desktop workflow green; a production build; a manual pass over every page in DEV fixtures
    mode (`npm run dev` then `/?fixtures=1`) in both languages and both themes,
    on a narrow viewport too.
 5. **Delete this file.** Remove `IMPLEMENTATION_PLAN.md`. Grep the repository
    for `IMPLEMENTATION_PLAN` and remove any mention (the PR that added the
    plan may have left one in the README or `.codewhale/instructions.md`).
 6. **The final PR** describes what the whole programme delivered, links the
-   thirteen merged PRs, and states the test counts before and after.
+   fourteen merged PRs, and states the test counts before and after.
 
 ---
 
@@ -1410,8 +1581,9 @@ modules are plain JavaScript already; only the wallet layer is browser-bound.
 `draft.*` (1) · `wallet.*` additions (2) · `cost.*` additions (3) · `image.*`
 additions (4) · `raw.*`, `export.*` (5) · `relations.*` (6) · `tag.*`,
 `search.*` (7) · `following.*`, `settingsFile.following` (8) · `ens.*`,
-`profile.*` (9) · `share.*`, `lightbox.*` (10) · `archive.*` (11). The CLI has
-its own English-only messages in `cli/src/messages.js`.
+`profile.*` (9) · `share.*`, `lightbox.*` (10) · `archive.*` (11) ·
+`desktop.*` (13). The CLI has its own English-only messages in
+`cli/src/messages.js`.
 
 ## Appendix B · New modules by phase
 
@@ -1430,12 +1602,16 @@ its own English-only messages in `cli/src/messages.js`.
 | 10 | | `Lightbox.jsx`, `ShareMenu.jsx` | print CSS |
 | 11 | `archive.js`, `base64.js` | `ArchiveSection.jsx` | |
 | 12 | | | `cli/` package, CI job |
+| 13 | `platform.js` (`download.js`, `publish.js` extended) | `UpdateNotice.jsx` | `desktop/` Tauri shell, `.github/workflows/desktop.yml` |
 
 ## Appendix C · Things this plan deliberately leaves out
 
 - Any change to `contracts/src/Blog.sol`, the CREATE2 salt, or the deployed
   address. The repository owner decided the contract stays as it is.
 - A server, an indexer, a relay for content, or a PWA/offline build.
+- Windows and Linux desktop builds, and the Tauri auto-updater (it needs
+  signing keys and an update manifest); the macOS app only notices that a
+  newer release exists.
 - Automatic publishing when gas is cheap (a wallet must sign at send time; the
   cost history informs the writer instead).
 - Image transcoding in the CLI (no canvas in Node; the web app transcodes).
