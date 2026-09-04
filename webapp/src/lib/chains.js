@@ -1,4 +1,4 @@
-// chains.js — the chains Glyph is deployed on, and how to reach them.
+// chains.js — the chains Xueni is deployed on, and how to reach them.
 //
 // The contract is CREATE2-deployed to the SAME address on every EVM chain,
 // so a chain is fully described by its id, its explorer, an ordered list of
@@ -102,7 +102,7 @@ export const CHAINS = {
 };
 
 /**
- * The chains Glyph is actually deployed and read on — read together by the
+ * The chains Xueni is actually deployed and read on — read together by the
  * feed, offered as publish targets, listed on the settings page. The
  * testnets above stay resolvable (VITE_CHAIN_ID, an older stored
  * preference) without cluttering any of that.

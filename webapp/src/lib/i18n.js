@@ -1,6 +1,6 @@
 // i18n.js — the interface language: the store, and the lookup over it.
 //
-// Glyph is read in English by default and can be switched to Chinese; both
+// Xueni is read in English by default and can be switched to Chinese; both
 // dictionaries live in ./locales and carry the same keys. A key is looked
 // up in the chosen language and falls back to English, so a missing
 // translation degrades to readable text instead of a blank.

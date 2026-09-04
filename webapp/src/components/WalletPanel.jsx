@@ -17,7 +17,7 @@ import { Body, Meta, Note } from './Text';
  * mode the whole app is in.
  *
  * `chainId` is the resolved publish chain (config.resolvePublishChain):
- * the one picked here, else the wallet's own when Glyph reads it, else
+ * the one picked here, else the wallet's own when Xueni reads it, else
  * Ethereum. `picked` says whether it was chosen here. A wallet on some
  * other chain is told so, with the switch offered right there — the
  * publish button stays off until the two agree.

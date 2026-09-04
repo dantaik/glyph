@@ -19,7 +19,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('Glyph crashed:', error, info);
+    console.error('Xueni crashed:', error, info);
   }
 
   render() {

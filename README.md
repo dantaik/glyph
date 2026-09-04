@@ -1,7 +1,7 @@
-# Glyph · 雪泥
+# Xueni · 雪泥
 
-A multi-author writing system that lives entirely on Ethereum (the Chinese name, 雪泥, comes
-from the idiom 雪泥鸿爪 — the prints a wild goose leaves in the snow). **One non-upgradeable,
+A multi-author writing system that lives entirely on Ethereum (**Xueni** is the pinyin of 雪泥, from
+the idiom 雪泥鸿爪 — the prints a wild goose leaves in the snow). **One non-upgradeable,
 ownerless smart contract**, in which every wallet is its own author (`msg.sender`). Text,
 titles, tags and images all live in L1 calldata, with no off-chain dependencies.
 
@@ -113,10 +113,10 @@ something real to look at in the bilingual reader.
 
 ## Deterministic deployment (CREATE2 · the same address everywhere)
 
-Glyph is deployed with CREATE2 through the canonical deterministic deployment proxy (Arachnid,
+Xueni is deployed with CREATE2 through the canonical deterministic deployment proxy (Arachnid,
 `0x4e59b44847b379578588920cA78FbF26c0B4956C`). A CREATE2 address is decided only by
 `(deployer, salt, init-code hash)`, and the proxy itself can be deployed to the same address on any EVM
-chain with one replayable transaction (a one-time account) — so **Glyph has the same address on every EVM
+chain with one replayable transaction (a one-time account) — so **Xueni has the same address on every EVM
 chain**:
 
 ```
@@ -125,6 +125,9 @@ salt:             0x00436d208c20757dde791d2c0c0909a2c8ea61482d3fa516692d9ee52444
 deployer (proxy): 0x4e59b44847b379578588920cA78FbF26c0B4956C
 init code hash:   0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402b5cb
 ```
+
+The Solidity contract itself is still named `Glyph`: the name is part of the compiled metadata, so the
+init code hash — and with it the address the contract already lives at on every chain — depends on it.
 
 - **The deploy script**: `script/Create2Deploy.s.sol`, idempotent (if the address already holds code it
   verifies and exits). Anyone may run it, and the deployer holds no privilege.

@@ -59,7 +59,7 @@ export default function Publisher() {
   useLang(); // the phrases below are read at render time
   const { account, chainId: walletChainId, connect } = useWallet();
   // The chain to publish on: the one picked here, else the wallet's own
-  // when Glyph is read on it, else Ethereum (config.js). Reading and
+  // when Xueni is read on it, else Ethereum (config.js). Reading and
   // writing are separate things: the feed shows every chain, a post goes
   // to one.
   const pickedChain = usePublishChainId();

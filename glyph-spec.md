@@ -1,12 +1,13 @@
-# Glyph — a writing system that lives entirely on Ethereum
+# Xueni — a writing system that lives entirely on Ethereum
 
 > Technical design and reference implementation · 2026-06
 >
 > A multi-author blog that keeps all of its content — text and images — in
 > Ethereum L1 calldata. No off-chain dependencies, designed to outlive its
 > authors and still be readable by their children decades from now.
-> Product name: **Glyph** (in Chinese, **雪泥**, from the idiom 雪泥鸿爪 —
-> the prints a wild goose leaves in the snow).
+> Product name: **雪泥**, written **Xueni** in English (from the idiom 雪泥鸿爪 —
+> the prints a wild goose leaves in the snow). The Solidity contract keeps its
+> original name, `Glyph` — renaming it would move its deterministic address.
 
 ---
 

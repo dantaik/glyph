@@ -15,7 +15,7 @@ function iconProps(size) {
 }
 
 /**
- * Glyph's mark — a simple square seal stamped with a swallow's footprint:
+ * Xueni's mark — a simple square seal stamped with a swallow's footprint:
  * three toes forward, one behind. The seal face takes the current colour;
  * the print is carved out in the paper tone.
  */
