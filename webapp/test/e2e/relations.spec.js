@@ -85,7 +85,10 @@ test.describe('what a post says about other posts', () => {
     const post = posts.find((p) => p.chainId === 1);
 
     await page.goto(post.href);
-    await page.getByRole('button', { name: 'Reply', exact: true }).click();
+    // Reply is one of the ways a post leaves this page, so it lives with the
+    // others in the share menu.
+    await page.getByRole('button', { name: 'Share this post' }).click();
+    await page.getByRole('menuitem', { name: 'Reply' }).click();
 
     await expect(page.locator('#post-title')).toBeVisible();
     const relations = page.locator('[data-relations-fields]');

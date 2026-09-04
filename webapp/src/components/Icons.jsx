@@ -278,3 +278,16 @@ export function MoreHorizontal({ size, ...rest }) {
     </svg>
   );
 }
+
+/** Share: a node joined to two others — the shape every platform settled on. */
+export function Share({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <circle cx="18" cy="5" r="2.5" />
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="19" r="2.5" />
+      <path d="M8.2 10.8 15.8 6.4" />
+      <path d="M8.2 13.2 15.8 17.6" />
+    </svg>
+  );
+}

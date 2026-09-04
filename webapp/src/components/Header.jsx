@@ -65,7 +65,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-edge bg-paper/85 backdrop-blur">
+    <header data-noprint="" className="sticky top-0 z-40 border-b border-edge bg-paper/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
         {/* Brand — the way back to the front page from anywhere. */}
         <a

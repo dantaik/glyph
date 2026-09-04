@@ -5,6 +5,7 @@ import ChainChip from './ChainChip';
 import { hrefFor } from '../lib/router';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
+  chainName,
   fmtBlock,
   fmtIndex,
   fmtTitle,
@@ -21,10 +22,12 @@ import { AlertCircle } from './Icons';
 import AddressLabel, { Identicon } from './Address';
 import BackButton from './BackButton';
 import FollowButton from './FollowButton';
+import Lightbox from './Lightbox';
 import { BTN_OUTLINE_PILL } from './formStyles';
 import { ArticleTitle, Meta, Micro } from './Text';
 import PostNav from './PostNav';
 import RawView from './RawView';
+import ShareMenu from './ShareMenu';
 import { RelationsAbove, RelationsBelow, SupersededNotice } from './RelationsPanel';
 import { ArticleSkeleton } from './Skeleton';
 
@@ -64,6 +67,8 @@ export default function PostPage({
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  // The image the reader clicked, shown at the size it was paid for.
+  const [zoomed, setZoomed] = useState(null);
   // The tab title is written imperatively, so it needs the language as a
   // dependency of its own — a re-render alone would not rewrite it.
   const lang = useLang();
@@ -163,6 +168,27 @@ export default function PostPage({
     [index, meta.author, body?.meta?.series, indexVersion],
   );
   const supersededBy = backlinks.filter((b) => b.kind === 'supersedes');
+
+  // --- Reading with the keyboard ---------------------------------------
+  //
+  // The previous and next post of this author are already resolved for the
+  // cards at the foot, so the arrow keys cost nothing extra. Ignored while
+  // the reader is typing, or while the lightbox has the screen: an arrow key
+  // in a search box means "move the caret", and nothing else.
+  useEffect(() => {
+    if (headless) return undefined;
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (zoomed || isTyping(e.target)) return;
+      const to = e.key === 'ArrowLeft' ? neighbors?.prev : neighbors?.next;
+      if (!to) return;
+      e.preventDefault();
+      onNavigate?.(to);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [headless, zoomed, neighbors?.prev, neighbors?.next, onNavigate]);
 
   // A relation is learnt from a body, which can be read long before anything
   // says who wrote it — a body cached on an earlier visit, above all. The
@@ -316,6 +342,12 @@ export default function PostPage({
             // — route them instead of reloading the page. The chain segment
             // is optional here so a ref written before the prefix, or by
             // hand, still lands somewhere sensible: this post's own chain.
+            // An image is worth looking at properly: it was paid for by the
+            // byte, and the column is narrower than it is.
+            if (e.target.tagName === 'IMG' && !e.target.closest?.('a[href]')) {
+              setZoomed({ src: e.target.getAttribute('src'), alt: e.target.getAttribute('alt') ?? '' });
+              return;
+            }
             const href = e.target.closest?.('a[href]')?.getAttribute('href');
             const m = href?.match(
               /^#?\/(?:([^/]+)\/)?tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/,
@@ -358,14 +390,21 @@ export default function PostPage({
             <button type="button" onClick={download} className="hover:text-accent transition-colors">
               {t('export.download')}
             </button>
-            {onStartWriting && (
-              <>
-                <Dot />
-                <button type="button" onClick={reply} className="hover:text-accent transition-colors">
-                  {t('relations.reply')}
-                </button>
-              </>
-            )}
+            <Dot />
+            <ShareMenu
+              chainId={reader.chainId}
+              txHash={meta.txHash}
+              eventIndex={eventIndex}
+              title={title}
+              onReply={onStartWriting ? reply : null}
+            />
+          </Meta>
+          {/* On paper a link is not a link, so the anchor is printed in
+              full: the chain and the transaction that holds these words. */}
+          <Meta nums data-printonly="" className="mt-2 break-all">
+            {chainName(reader.chainId)}
+            <span className="select-none" aria-hidden="true"> · </span>
+            {meta.txHash}
           </Meta>
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -414,6 +453,8 @@ export default function PostPage({
           onGo={onNavigate}
         />
       )}
+
+      <Lightbox src={zoomed?.src} alt={zoomed?.alt} onClose={() => setZoomed(null)} />
     </article>
   );
 }
@@ -425,4 +466,13 @@ function Dot() {
       ·
     </span>
   );
+}
+
+/**
+ * Is the reader typing? An arrow key in a field means "move the caret", and
+ * nothing this page has any business overriding.
+ */
+function isTyping(el) {
+  if (!el || typeof el.closest !== 'function') return false;
+  return Boolean(el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], dialog'));
 }

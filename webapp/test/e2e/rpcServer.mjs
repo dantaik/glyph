@@ -394,6 +394,8 @@ function oracleOf(s) {
       href: `/${CHAINS[p.chainId].slug}/tx/${p.txHash}/0`,
       probe: probeOf(c.bodies.get(p.txHash), p.title),
       tags: [...(c.bodies.get(p.txHash)?.tags ?? [])],
+      // How many images the body carries, so a spec can find one that has any.
+      images: (c.bodies.get(p.txHash)?.markdown ?? '').match(/!\[[^\]]*\]\(/g)?.length ?? 0,
       meta: { ...(c.bodies.get(p.txHash)?.meta ?? {}) },
     };
   });

@@ -93,7 +93,7 @@ function Footer({ navigate }) {
   };
 
   return (
-    <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
+    <footer data-noprint="" className="border-t border-edge px-4 py-10 text-center sm:px-6">
       <Micro as="ul" nums className="space-y-1">
         {feed.chains.map((c) => (
           <ChainLine key={c.chainId} chainId={c.chainId} span={scanSpan(c.coverage)} scanning={c.job != null} go={go} />

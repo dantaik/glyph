@@ -297,6 +297,17 @@ Drop images into the area below or click to upload; click an image or its name t
   'profile.twitter': 'On X',
   'profile.github': 'On GitHub',
 
+  // --- Getting one post out of this page -----------------------------------
+  'share.label': 'Share',
+  'share.menu': 'Share this post',
+  'share.copyLink': 'Copy link',
+  'share.share': 'Share…',
+  'share.copyEmbed': 'Copy embed code',
+  'share.copyRef': 'Copy reference',
+  'share.copied': 'Copied',
+  'lightbox.close': 'Close',
+  'lightbox.image': 'Image from this post',
+
   // --- Finding things among what this browser has read ---------------------
   'tag.title': ({ tag }) => `Tagged ${tag}`,
   'tag.scope': ({ count }) => `Among the ${count} posts this browser has read`,
@@ -444,6 +455,19 @@ Drop images into the area below or click to upload; click an image or its name t
   'settingsFile.off': 'off',
   'settingsFile.logShape': 'log should be true or false.',
   'settingsFile.nothing': 'The file holds no settings that can be applied.',
+
+  // --- The desktop app -----------------------------------------------------
+  'desktop.updateAvailable': ({ version }) => `Xueni ${version} is available`,
+  'desktop.download': 'Download',
+  'desktop.dismiss': 'Dismiss',
+  'desktop.walletConnectOnly':
+    'There are no browser extensions inside the app, so publishing signs through ' +
+    'WalletConnect: connecting shows a QR code to scan with a wallet on your phone. ' +
+    'Reading needs no wallet at all.',
+  'desktop.noPublishInThisBuild':
+    'This build cannot publish: it was made without a WalletConnect project id, and ' +
+    'there is no browser extension inside the app to sign with instead. Reading works ' +
+    'as it does everywhere.',
 
   // --- Chain names that are not proper nouns ------------------------------
   'chain.unknown': ({ id }) => `Chain ${id}`,

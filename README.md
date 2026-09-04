@@ -47,7 +47,8 @@ ranges this browser has scanned so far, reachable from the footer). Add `?headle
 (`/taiko/tx/0xTXHASH/0?headless=1`) to get that post with no app around it — no masthead, no site
 footer, no back button and no previous/next cards, just the letter, its byline and its provenance —
 for embedding one in an iframe or a preview pane. It applies to post URLs only and to that page
-alone: a link followed out of it lands in the ordinary interface.
+alone: a link followed out of it lands in the ordinary interface. "Copy embed code" in the share menu
+writes that snippet for you.
 **Writing**: the "Wallet and network" panel at the top of the Write tab — connect a wallet, choose which
 chain to publish to (it follows the wallet's own network until you pick one, and then it is remembered),
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
@@ -59,6 +60,12 @@ a substring, so Chinese works without word splitting. Both cover the posts this 
 so in their subtitle, and offer the ordinary "read earlier posts" as the way to cover more. Neither
 asks anything of a server: no node can filter on the inside of compressed calldata, and an index that
 went looking would be a crawler.
+**Reading a post**: `←` and `→` move to the author's previous and next post on the same chain, unless
+you are typing. Clicking an image opens it full size with its alt text as the caption, so a picture that
+cost gas by the byte can actually be looked at. Printing takes the app away and leaves the letter, black
+on white, with the chain and the full transaction hash under it, because on paper a link is not a link.
+The "Share" menu in the provenance line copies the canonical link, an `<iframe>` snippet for the headless
+view, or the Markdown reference `[title](0xTXHASH)` that quotes this post from inside another one.
 **Names**: an author who has an ENS name is shown by it — in bylines, on their own page, and at
 `/author/xiaoman.eth`, which resolves the name and shows their posts. Their ENS avatar replaces the
 identicon once it has loaded, and their `description`, `url`, `com.twitter` and `com.github` records

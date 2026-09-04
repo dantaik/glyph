@@ -280,6 +280,17 @@ export default {
   'profile.twitter': 'X',
   'profile.github': 'GitHub',
 
+  // --- 把一篇文章带出这个页面 -----------------------------------------------
+  'share.label': '分享',
+  'share.menu': '分享这篇文章',
+  'share.copyLink': '复制链接',
+  'share.share': '分享……',
+  'share.copyEmbed': '复制嵌入代码',
+  'share.copyRef': '复制引用',
+  'share.copied': '已复制',
+  'lightbox.close': '关闭',
+  'lightbox.image': '文章中的图片',
+
   // --- 在已读过的文章里查找 -------------------------------------------------
   'tag.title': ({ tag }) => `标签：${tag}`,
   'tag.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,
@@ -420,6 +431,17 @@ export default {
   'settingsFile.off': '关',
   'settingsFile.logShape': 'log 应是 true 或 false。',
   'settingsFile.nothing': '文件里没有可应用的设置。',
+
+  // --- 桌面应用 ------------------------------------------------------------
+  'desktop.updateAvailable': ({ version }) => `雪泥 ${version} 已经发布`,
+  'desktop.download': '下载',
+  'desktop.dismiss': '不再提示',
+  'desktop.walletConnectOnly':
+    '应用内没有浏览器钱包扩展，发布时通过 WalletConnect 签名：连接后会出现二维码，' +
+    '用手机上的钱包扫描即可。阅读完全不需要钱包。',
+  'desktop.noPublishInThisBuild':
+    '此版本无法发布：构建时没有提供 WalletConnect 项目 id，而应用内也没有可以用来签名的' +
+    '浏览器扩展。阅读一切照常。',
 
   // --- 链名 ----------------------------------------------------------------
   'chain.unknown': ({ id }) => `链 ${id}`,

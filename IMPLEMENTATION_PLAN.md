@@ -55,7 +55,7 @@ never delete or skip a test to get there.
 | 7 | Tags and search over what this browser has read | ☑ | #16 | |
 | 8 | The following feed | ☑ | #16 | |
 | 9 | ENS identity: names in URLs, avatars, profiles | ☑ | #16 | |
-| 10 | Reader polish: keyboard, lightbox, print, share and embed | ☐ | | |
+| 10 | Reader polish: keyboard, lightbox, print, share and embed | ☑ | #16 | |
 | 11 | Archive bundles: export and import | ☐ | | |
 | 12 | The command-line tool | ☑ | #16 | |
 | 13 | The macOS desktop app | ☐ | | |
@@ -127,6 +127,14 @@ Deviations and decisions made during implementation (append here, newest last):
   demo and the end-to-end mock agree about who is called what. No
   `useEnsProfile` hook was added: `AuthorName.jsx` is the component that
   needed one, and a component reads better than a hook with a view in it.
+- **Phase 10.** The share menu replaced the bare "Reply" button in the
+  provenance line rather than sitting beside it: Reply is one of the ways a
+  post leaves the page, and two controls for the same idea is one too many.
+  The oracle gained an `images` count per post, because no spec could
+  otherwise say "the letter with drawings in it" without hard-coding a title.
+  The locale files in this commit already carry Phase 13's `desktop.*` keys,
+  which the parallel session was writing at the time; they are inert strings
+  until that phase wires them, and both dictionaries stay in step.
 
 ## 2. What Xueni is, in one page
 
