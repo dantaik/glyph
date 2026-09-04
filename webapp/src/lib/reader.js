@@ -234,6 +234,26 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     return promise;
   }
 
+  /**
+   * The post body INCLUDING `text`, the exact document the chain holds.
+   *
+   * Bodies cached before the text was kept hold only the parsed fields, and
+   * the raw view, a `.md` download and an archive all need the bytes as
+   * written. Such a record is re-read once and rewritten, so the upgrade
+   * happens at most once per post per browser; everything else is answered
+   * from the cache like any other body.
+   * @returns {Promise<{ meta, tags, markdown, text, compressedBytes }>}
+   */
+  async function loadPostText(txHash) {
+    const { body } = await loadPostBody(txHash);
+    if (body?.text != null) return body;
+    const fresh = await io.postBody(txHash);
+    if (!io.ephemeral) setCachedBody(id, txHash, fresh).catch(() => {});
+    // Whoever asks next gets the upgraded record, not the one without text.
+    bodies.set(txHash, Promise.resolve({ body: fresh, fromCache: false }));
+    return fresh;
+  }
+
   // --- Image resolution — with permanent IndexedDB cache ---------------
   //
   // We cache Blobs (not object URLs): each caller mints fresh URLs from the
@@ -296,6 +316,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     blockTime,
     ensName,
     loadPostBody,
+    loadPostText,
     resolveGlyphRefs,
     resolveImages,
   };

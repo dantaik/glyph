@@ -37,6 +37,7 @@ import {
 import { abi } from '../../src/lib/abi.js';
 import { CHAINS } from '../../src/lib/chains.js';
 import { AUTHORS, buildWorlds, expectedMergedOrder } from '../../src/lib/fixtureWorld.js';
+import { buildPayloadText } from '../../src/lib/payloadText.js';
 
 const PORT = Number(process.argv[2] || process.env.GLYPH_RPC_PORT || 8545);
 const GLYPH = '0x000000ae2f2249c497cfc5f262dd1491634c361c';
@@ -181,7 +182,10 @@ function txOf(c, p) {
   const key = p.txHash.toLowerCase();
   if (c.txCache.has(key)) return c.txCache.get(key);
   const body = c.bodies.get(p.txHash) ?? { tags: [], markdown: p.title };
-  const text = body.tags?.length ? `---\ntags: ${body.tags.join(', ')}\n---\n\n${body.markdown}` : body.markdown;
+  const text = buildPayloadText({
+    markdown: body.markdown,
+    meta: { ...(body.meta ?? {}), tags: body.tags },
+  });
   const payload = brotliCompressSync(Buffer.from(text, 'utf8'), {
     params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
   });

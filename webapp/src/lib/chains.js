@@ -18,6 +18,15 @@ const taikoHoodi = {
   testnet: true,
 };
 
+/**
+ * The canonical CREATE2 deployment — identical on every EVM chain, so it is
+ * a constant rather than configuration. It lives here, in the registry that
+ * plain Node can load (the e2e mock node and the command-line tool both
+ * import this file); config.js re-exports it and applies the build-time
+ * override for a private redeploy.
+ */
+export const DEFAULT_GLYPH_ADDRESS = '0x000000AE2f2249c497cfc5F262dd1491634C361C';
+
 export const CHAINS = {
   1: {
     id: 1,

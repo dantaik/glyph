@@ -17,7 +17,9 @@ See `README.md` and `glyph-spec.md`.
   chain), scanner (traversal rules), scanStore (what has been read, one store per chain:
   session + localStorage), segments (block-range algebra), feed / authorList
   (background scan jobs with progressive results), reader (per-chain facade: data.js
-  hands them out), payload (brotli), publish, cache (IndexedDB, chain-scoped), wallet,
+  hands them out), payloadText (front-matter + Markdown as text, importable by
+  plain Node), payload (brotli over it), limits (per-tx byte ceilings),
+  clipboard, publish, cache (IndexedDB, chain-scoped), wallet,
   price, fixtures (DEV: an in-memory chain behind the same I/O surface),
   i18n + locales/{en,zh} (the interface language store and its dictionaries;
   `t()` outside React, `useT()` / `useLang()` inside it)

@@ -45,7 +45,7 @@ never delete or skip a test to get there.
 
 | Phase | Title | Status | PR | Notes |
 |---|---|---|---|---|
-| 0 | Groundwork: shared refactors and two doc fixes | ☐ | | |
+| 0 | Groundwork: shared refactors and two doc fixes | ☑ | #16 | |
 | 1 | Draft autosave | ☐ | | |
 | 2 | Wallets: EIP-6963 discovery, optional WalletConnect | ☐ | | |
 | 3 | Cost awareness: base-fee history and both chains side by side | ☐ | | |
@@ -63,7 +63,18 @@ never delete or skip a test to get there.
 
 Deviations and decisions made during implementation (append here, newest last):
 
-- (none yet)
+- **One branch, one pull request, a commit per phase.** The implementing
+  session is pinned to the branch `claude/interesting-features-flz4rr` and may
+  not push to another, so the phases arrive as separate commits on that one
+  branch and its pull request (#16) rather than as fourteen pull requests.
+  Everything else about the rule holds: a phase is finished, green on
+  `npm run check`, and committed on its own before the next one starts.
+- **Phase 0.** `brotli-wasm` cannot initialise under Vitest's node
+  environment (it takes its browser path and throws "not implemented"), which
+  is why no unit test had ever decoded a real payload. The new `chainIO` body
+  test therefore stubs the compression boundary and is about chainIO's own
+  wiring; real brotli is exercised end to end by the Playwright suite against
+  the mock node, which compresses with `node:zlib`.
 
 ## 2. What Xueni is, in one page
 

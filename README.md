@@ -85,7 +85,7 @@ button, or the ⋯ menu on a phone) or from `/settings`. The choice applies imme
 browser, and travels in the settings file. It changes the interface only — a post stays on-chain in the
 language it was written in.
 **Backup and restore**: "Export settings" on `/settings` writes the endpoint lists, rescan delay, publish
-target, language, theme, text size and log switch to one JSON file; "Import settings" lists what it would
+target, language, theme and log switch to one JSON file; "Import settings" lists what it would
 change first and applies it on confirmation, with no reload.
 **Interface**: an author is shown as a blockies icon generated from their address plus the last 6
 characters of it (contracts and transaction hashes still use `0x1234…abcd`). On a narrow screen the

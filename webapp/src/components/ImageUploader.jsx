@@ -1,35 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { copyToClipboard } from '../lib/clipboard';
 import { t } from '../lib/i18n';
 import { Check, AlertCircle, Close, Plus } from './Icons';
 import { Micro } from './Text';
-
-/**
- * Copy text to the clipboard. Secure contexts use the async Clipboard API;
- * falls back to a hidden textarea + execCommand for everything else.
- * @returns {Promise<boolean>} whether the copy succeeded
- */
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try {
-      ok = document.execCommand('copy');
-    } catch {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
 
 
 /**

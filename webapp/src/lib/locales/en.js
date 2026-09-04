@@ -178,7 +178,7 @@ export default {
   // --- Backup and restore --------------------------------------------------
   'backup.heading': 'Backup and restore',
   'backup.note':
-    'Save everything on this page — each chain’s endpoint list, the rescan delay, the publish target, the language, the theme, the body text size and the console log switch — as one JSON file, and import it on another browser or machine. An import lists what it would change first, and applies only once confirmed, with no reload.',
+    'Save everything on this page — each chain’s endpoint list, the rescan delay, the publish target, the language, the theme and the console log switch — as one JSON file, and import it on another browser or machine. An import lists what it would change first, and applies only once confirmed, with no reload.',
   'backup.export': 'Export settings',
   'backup.import': 'Import settings…',
   'backup.pickFile': 'Choose a settings file',

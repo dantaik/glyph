@@ -192,7 +192,11 @@ export function createChainIO(chainId, log) {
       );
     },
 
-    /** `{ number, timestamp }` of a block, by height or `'latest'`. */
+    /**
+     * `{ number, timestamp, baseFeePerGas }` of a block, by height or
+     * `'latest'`. The base fee is what the gas history samples (gasHistory.js);
+     * it is null on a chain, or from a node, that does not report one.
+     */
     async block(which) {
       const args = which === 'latest' ? { blockTag: 'latest' } : { blockNumber: BigInt(which) };
       const b = await log.fromNode(
@@ -201,7 +205,11 @@ export function createChainIO(chainId, log) {
         () => client().getBlock(args),
         (out) => `block ${log.b(out.number)} @ ${out.timestamp}`,
       );
-      return { number: b.number, timestamp: Number(b.timestamp) };
+      return {
+        number: b.number,
+        timestamp: Number(b.timestamp),
+        baseFeePerGas: b.baseFeePerGas == null ? null : BigInt(b.baseFeePerGas),
+      };
     },
 
     /**
@@ -347,7 +355,12 @@ export function createChainIO(chainId, log) {
       }));
     },
 
-    /** `{ tags, markdown }` decoded from a publish() transaction's calldata. */
+    /**
+     * The body of a post, decoded from its publish() transaction's calldata:
+     * `{ meta, tags, markdown, text, compressedBytes }`. `text` is the exact
+     * document the chain holds (the raw view, a `.md` download and an archive
+     * all carry it verbatim) and `compressedBytes` is what it cost to store.
+     */
     async postBody(txHash) {
       const tx = await log.fromNode(
         'eth_getTransactionByHash',
@@ -356,7 +369,9 @@ export function createChainIO(chainId, log) {
         (t) => `${log.b((t.input.length - 2) / 2)} bytes calldata`,
       );
       const decoded = decodeFunctionData({ abi, data: tx.input });
-      return decodePayload(hexToBytes(decoded.args[1]));
+      const bytes = hexToBytes(decoded.args[1]);
+      const body = await decodePayload(bytes);
+      return { ...body, compressedBytes: bytes.length };
     },
 
     /** The raw bytes an image transaction carries as calldata. */

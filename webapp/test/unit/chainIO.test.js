@@ -4,7 +4,29 @@ import { silentLog } from './helpers';
 
 // chainIO talks to viem through clients.js; the fake client below answers
 // exactly the calls it makes and counts them.
-const fake = { calls: [], logs: [], blocks: new Map(), failBlocks: false };
+const fake = {
+  calls: [],
+  logs: [],
+  blocks: new Map(),
+  failBlocks: false,
+  baseFee: 7n,
+  txInput: new Map(),
+};
+
+// brotli-wasm needs a browser to initialise, so the compression boundary is
+// stubbed: a "payload" here is its plain UTF-8 text. What is under test is
+// chainIO — that it decodes the calldata, takes the payload argument,
+// measures it, and passes the decoded document through. Real brotli runs in
+// the e2e suite, in a real browser, against the mock node.
+vi.mock('../../src/lib/payload', async () => {
+  const { parsePayloadText } = await import('../../src/lib/payloadText');
+  return {
+    decodePayload: async (bytes) => {
+      const text = new TextDecoder().decode(bytes);
+      return { ...parsePayloadText(text), text };
+    },
+  };
+});
 
 vi.mock('../../src/lib/clients', () => ({
   getClient: () => ({
@@ -15,11 +37,19 @@ vi.mock('../../src/lib/clients', () => ({
     async getBlock({ blockNumber }) {
       fake.calls.push(`getBlock:${blockNumber}`);
       if (fake.failBlocks) throw new Error('header unavailable');
-      return { number: blockNumber, timestamp: BigInt(fake.blocks.get(String(blockNumber)) ?? 0) };
+      return {
+        number: blockNumber,
+        timestamp: BigInt(fake.blocks.get(String(blockNumber)) ?? 0),
+        baseFeePerGas: fake.baseFee,
+      };
     },
     async getLogs({ fromBlock, toBlock }) {
       fake.calls.push(`getLogs:${fromBlock}-${toBlock}`);
       return fake.logs.filter((l) => l.blockNumber >= fromBlock && l.blockNumber <= toBlock);
+    },
+    async getTransaction({ hash }) {
+      fake.calls.push('getTransaction');
+      return { input: fake.txInput.get(hash) };
     },
     async getTransactionReceipt({ hash }) {
       fake.calls.push(`getTransactionReceipt`);
@@ -128,5 +158,47 @@ describe('chainIO timestamps', () => {
     const io = createChainIO(1, silentLog());
     const rows = await io.authorPostsInBlock(AUTHOR, 700n);
     expect(rows[0].ts).toBe(1_700_002_400);
+  });
+});
+
+describe('what a body and a header carry', () => {
+  it('a header carries its base fee, or null when the node reports none', async () => {
+    const io = createChainIO(1, silentLog());
+    fake.blocks.set('500', 1_700_000_000);
+    fake.baseFee = 12_345n;
+    expect(await io.block(500n)).toEqual({
+      number: 500n,
+      timestamp: 1_700_000_000,
+      baseFeePerGas: 12_345n,
+    });
+    fake.baseFee = undefined; // a chain, or a node, that reports no base fee
+    expect((await io.block(500n)).baseFeePerGas).toBeNull();
+    fake.baseFee = 7n;
+  });
+
+  it('a body carries the exact on-chain text and what it cost to store', async () => {
+    const { encodeFunctionData, toHex, pad, stringToHex } = await import('viem');
+    const { abi } = await import('../../src/lib/abi');
+
+    const text = '---\ntags: letters home, 冬\nlang: zh\n---\n\n# 冬至\n\n正文。';
+    const payload = new TextEncoder().encode(text);
+    fake.txInput.set(
+      TX1,
+      encodeFunctionData({
+        abi,
+        functionName: 'publish',
+        args: [pad(stringToHex('冬至'), { dir: 'right', size: 32 }), toHex(payload)],
+      }),
+    );
+
+    const io = createChainIO(1, silentLog());
+    const body = await io.postBody(TX1);
+    // The document as the chain holds it, byte for byte — what the raw view
+    // shows and what a .md download and an archive carry.
+    expect(body.text).toBe(text);
+    expect(body.markdown).toBe('# 冬至\n\n正文。');
+    expect(body.tags).toEqual(['letters home', '冬']);
+    expect(body.meta.lang).toBe('zh');
+    expect(body.compressedBytes).toBe(payload.length);
   });
 });

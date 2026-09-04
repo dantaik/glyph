@@ -15,6 +15,7 @@
 // at a time; `?fixtures=1&window=700&log=1` shows it in the console.
 
 import { buildWorld } from './fixtureWorld';
+import { buildPayloadText, parsePayloadText } from './payloadText';
 
 const DELAY_MIN_MS = 350;
 const DELAY_SPAN_MS = 250;
@@ -77,7 +78,8 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
     async block(which) {
       await wait();
       const number = which === 'latest' ? world.head : BigInt(which);
-      return { number, timestamp: world.tsOf(number) };
+      // A constant base fee: the demo is about the reader, not the market.
+      return { number, timestamp: world.tsOf(number), baseFeePerGas: 1n };
     },
 
     async postsInRange(from, to) {
@@ -116,7 +118,17 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
       await wait();
       const body = bodyByTx.get(txHash);
       if (!body) throw new Error('no such transaction in the demo data');
-      return { tags: [...body.tags], markdown: body.markdown };
+      // Built and re-parsed through the real text layer, so the demo body
+      // carries the same `text` and front-matter the chain would.
+      const text = buildPayloadText({
+        markdown: body.markdown,
+        meta: { ...(body.meta ?? {}), tags: body.tags },
+      });
+      return {
+        ...parsePayloadText(text),
+        text,
+        compressedBytes: Math.ceil(new TextEncoder().encode(text).length * 0.45),
+      };
     },
 
     async imageBytes() {

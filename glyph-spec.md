@@ -191,6 +191,13 @@ The body…
 
 **With no tags, the payload is pure Markdown** — no wrapper at all, maximising "any editor, decades later, opens it directly". The payload finally published is `brotli(q11)(utf8(text))`.
 
+The text layer — building that document and taking it apart — lives in
+`payloadText.js`, which imports nothing, so plain Node shares it: the e2e mock
+node builds bodies with it and the command-line tool encodes with it.
+`payload.js` is only the brotli boundary on top, and what it hands back
+includes `text`, the exact document the chain holds, so the raw view, a `.md`
+download and an archive bundle can all carry it byte for byte.
+
 **Why front-matter rather than a custom binary format?**
 - It has been a stable, universal convention for 15 years (Jekyll, Hugo, Obsidian and every static-site generator understand it), and does not depend on this app.
 - Decompressed, it is directly readable by a person — which is the core principle.
@@ -378,9 +385,9 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
 
 What is stored is Markdown, but only a **small, safe subset** — what is cut down is the feature set, not the characters. (Do not minify: brotli already squeezes whitespace to almost nothing, and minifying would destroy the core value that anyone can read the stored text directly.)
 
-**Supported**: headings `# ## ###` · `**bold**` `*italic*` · links `[text](url)` (including cross-article references `[text](0x<txhash>/<n>)`, see §8.1) · images `![alt](eth:0x<txhash>)` · lists, `-` and `1.` · blockquotes `>` · inline and fenced code · paragraphs separated by blank lines.
+**Supported**: headings `# ## ###` · `**bold**` `*italic*` · links `[text](url)` (including cross-article references `[text](0x<txhash>/<n>)`, see §8.1) · images `![alt](eth:0x<txhash>)` · lists, `-` and `1.` · blockquotes `>` · inline and fenced code · tables (GFM pipe syntax) · paragraphs separated by blank lines.
 
-**Cut**: raw HTML (which also removes XSS), tables, footnotes, reference-style links, definition lists.
+**Cut**: raw HTML (which also removes XSS), footnotes, reference-style links, definition lists.
 
 **Render order**: `loadTitleList` → the user clicks → `loadPostBody` (cache-first) → `resolveGlyphRefs` (0x… → a /tx/ path, taking the target's title when the link text is empty) → `resolveImages` (eth: → blob) → the restricted parser renders → sanitize.
 
