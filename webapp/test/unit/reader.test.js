@@ -145,3 +145,42 @@ describe('reader caches', () => {
     expect(asks).toBe(1);
   });
 });
+
+describe('loadPostText — the exact document, even for a body cached without it', () => {
+  it('upgrades a record that predates the text being kept, once', async () => {
+    const chain = fakeChain({ chainId: 1, head: 1000, posts });
+    const reader = ioReader(1, chain.io);
+    const hash = chain.hashOf(A, 1);
+    let reads = 0;
+    chain.io.postBody = async () => {
+      reads += 1;
+      // The first read stands in for a record cached before `text` existed.
+      return reads === 1
+        ? { tags: ['t'], markdown: 'body' }
+        : { tags: ['t'], markdown: 'body', text: '---\ntags: t\n---\n\nbody', compressedBytes: 20 };
+    };
+
+    expect((await reader.loadPostBody(hash)).body.text).toBeUndefined();
+    const full = await reader.loadPostText(hash);
+    expect(full.text).toBe('---\ntags: t\n---\n\nbody');
+    expect(reads).toBe(2);
+
+    // The upgrade sticks: nothing asks the node a third time, and whoever
+    // loads the body next gets the record that carries the text.
+    expect(await reader.loadPostText(hash)).toBe(full);
+    expect((await reader.loadPostBody(hash)).body).toBe(full);
+    expect(reads).toBe(2);
+  });
+
+  it('costs nothing extra when the body already carries its text', async () => {
+    const chain = fakeChain({ chainId: 1, head: 1000, posts });
+    const reader = ioReader(1, chain.io);
+    let reads = 0;
+    chain.io.postBody = async () => {
+      reads += 1;
+      return { tags: [], markdown: 'body', text: 'body', compressedBytes: 4 };
+    };
+    expect((await reader.loadPostText(chain.hashOf(A, 1))).text).toBe('body');
+    expect(reads).toBe(1);
+  });
+});

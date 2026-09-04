@@ -58,7 +58,7 @@ function NeighborCard({ side, meta, onGo }) {
 export default function PostNav({ prev, next, onGo }) {
   if (prev === null && next === null) return null;
   return (
-    <nav aria-label={t('post.navLabel')} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10">
+    <nav aria-label={t('post.navLabel')} data-noprint="" className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10">
       {prev === undefined ? (
         <SkeletonCard side="prev" />
       ) : prev ? (

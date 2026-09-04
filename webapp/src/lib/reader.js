@@ -16,13 +16,22 @@ import * as scanner from './scanner';
 import * as rpcLog from './rpcLog';
 import { makeForeverCache, makeTtlCache } from './ttlCache';
 import { createChainIO } from './chainIO';
+import { baseFeeHistory } from './gasHistory';
 import { FeedController } from './feed';
 import { AuthorListController } from './authorList';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
 import { createRefResolver } from './glyphRefs';
+import { getBodyIndex } from './bodyIndex';
+import { createEns } from './ens';
+
+/** An `![alt](eth:0x…)` image reference: what a body says an image is. */
+const IMAGE_REF_RE = /!\[([^\]]*)\]\(eth:(0x[0-9a-fA-F]{64})[^)]*\)/g;
 
 /** Posts per page, on the feed and on author lists. */
 export const PAGE_SIZE = 20;
+
+/** How long the base-fee history is held before it is sampled again. */
+const GAS_HISTORY_TTL_MS = 10 * 60_000;
 
 /** Blocks between the two samples the chain clock measures block time over. */
 const CLOCK_SAMPLE = 1000n;
@@ -52,6 +61,8 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
   // `volatile` holds the two answers that really do move — the head block
   // and an author's post count — for a short fixed window.
   const forever = makeForeverCache();
+  // What the bodies read on this chain say — tags, relations, series.
+  const index = getBodyIndex(id);
   const volatile = makeTtlCache(() => VOLATILE_TTL_MS);
 
   const feed = new FeedController({
@@ -170,6 +181,16 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
 
   const count = (author) => volatile(`count:${addrKey(author)}`, () => io.count(author));
 
+  // The last day of base fees, sampled from block headers. Held for ten
+  // minutes: the shape of a day does not change by the minute, and this is
+  // two dozen header reads.
+  const gasHistory = makeTtlCache(() => GAS_HISTORY_TTL_MS);
+  const readerFacade = {};
+  const baseFees = (opts = {}) =>
+    gasHistory(`baseFees:${opts.hours ?? 24}:${opts.samples ?? 25}`, () =>
+      baseFeeHistory(readerFacade, opts),
+    );
+
   /** Rewrite `0x<txhash>/<n>` article refs to in-app links (glyphRefs.js). */
   const resolveGlyphRefs = createRefResolver(findMetaByTx, id);
 
@@ -193,18 +214,11 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
       return { block: latest.number, ts: latest.timestamp, secondsPerBlock };
     });
 
-  // --- ENS names — cached; null when the address has none, or when the
-  //     chain doesn't host ENS (only Ethereum mainnet does). -------------
+  // --- ENS — names, avatars and profiles; all null when the address has
+  //     none, or when the chain doesn't host ENS (only mainnet does). ----
 
-  const ens = new Map(); // address (lowercase) -> Promise<string | null>
-
-  function ensName(address) {
-    const key = addrKey(address);
-    if (ens.has(key)) return ens.get(key);
-    const promise = io.ensName(address).catch(() => null); // RPC hiccup → no name
-    ens.set(key, promise);
-    return promise;
-  }
+  const ens = createEns(io);
+  const { ensName, resolveEnsName, ensProfile } = ens;
 
   // --- Post body (tags + markdown) — fetched on demand from tx calldata,
   //     with IndexedDB permanent cache (posts are immutable on-chain). ---
@@ -229,9 +243,34 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
       if (!io.ephemeral) setCachedBody(id, txHash, body).catch(() => {});
       return { body, fromCache: false };
     })();
+    // Whatever the body turns out to say is filed as soon as it is known,
+    // whether it came from the node or from the cache.
+    promise
+      .then(({ body }) => index.add(store.knownPostByTx(txHash, 0), { ...body, txHash }))
+      .catch(() => {});
     promise.catch(() => bodies.delete(txHash));
     bodies.set(txHash, promise);
     return promise;
+  }
+
+  /**
+   * The post body INCLUDING `text`, the exact document the chain holds.
+   *
+   * Bodies cached before the text was kept hold only the parsed fields, and
+   * the raw view, a `.md` download and an archive all need the bytes as
+   * written. Such a record is re-read once and rewritten, so the upgrade
+   * happens at most once per post per browser; everything else is answered
+   * from the cache like any other body.
+   * @returns {Promise<{ meta, tags, markdown, text, compressedBytes }>}
+   */
+  async function loadPostText(txHash) {
+    const { body } = await loadPostBody(txHash);
+    if (body?.text != null) return body;
+    const fresh = await io.postBody(txHash);
+    if (!io.ephemeral) setCachedBody(id, txHash, fresh).catch(() => {});
+    // Whoever asks next gets the upgraded record, not the one without text.
+    bodies.set(txHash, Promise.resolve({ body: fresh, fromCache: false }));
+    return fresh;
   }
 
   // --- Image resolution — with permanent IndexedDB cache ---------------
@@ -259,13 +298,29 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
   }
 
   /**
+   * The bytes of an image, cache-first — what the archive needs, since a
+   * bundle carries the image itself rather than a reference to it.
+   */
+  async function loadImageBytes(hash) {
+    const blob = await loadImageBlob(hash);
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  /**
+   * Every image an article refers to, as `0x…` transaction hashes.
+   * Deliberately the same pattern `resolveImages` matches, so what an
+   * archive carries is exactly what a rendered post would ask for.
+   */
+  const imageRefsIn = (markdown) =>
+    [...new Set([...String(markdown ?? '').matchAll(IMAGE_REF_RE)].map((m) => m[2].toLowerCase()))];
+
+  /**
    * Resolve `eth:0x<txhash>` image refs to blob URLs.
    * @returns {Promise<{ markdown: string, urls: string[] }>} rewritten
    *   markdown plus the fresh object URLs — the caller must revoke them.
    */
   async function resolveImages(markdown) {
-    const re = /!\[([^\]]*)\]\(eth:(0x[0-9a-fA-F]{64})[^)]*\)/g;
-    const matches = [...markdown.matchAll(re)];
+    const matches = [...markdown.matchAll(IMAGE_REF_RE)];
     // Settled, not all: an image the node can't serve must not take the whole
     // article down with it — its ref is left alone and renders as alt text.
     const results = await Promise.allSettled(matches.map((m) => loadImageBlob(m[2])));
@@ -281,7 +336,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     return { markdown: out, urls };
   }
 
-  return {
+  return Object.assign(readerFacade, {
     chainId: id,
     chain,
     store,
@@ -295,8 +350,16 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     clock,
     blockTime,
     ensName,
+    resolveEnsName,
+    ensProfile,
+    hasEns: ens.enabled,
     loadPostBody,
+    loadPostText,
+    index,
+    baseFees,
     resolveGlyphRefs,
     resolveImages,
-  };
+    loadImageBytes,
+    imageRefsIn,
+  });
 }

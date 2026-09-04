@@ -31,3 +31,23 @@ jobs:
           name: playwright-report
           path: webapp/playwright-report
           retention-days: 7
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            webapp/package-lock.json
+            cli/package-lock.json
+      # The CLI's tests run against the same mock JSON-RPC node the browser
+      # tests use, which lives in webapp and needs its dependencies.
+      - run: npm ci
+        working-directory: webapp
+      - run: npm ci
+        working-directory: cli
+      - run: npm test
+        working-directory: cli

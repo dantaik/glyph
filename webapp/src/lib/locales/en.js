@@ -178,7 +178,7 @@ export default {
   // --- Backup and restore --------------------------------------------------
   'backup.heading': 'Backup and restore',
   'backup.note':
-    'Save everything on this page — each chain’s endpoint list, the rescan delay, the publish target, the language, the theme, the body text size and the console log switch — as one JSON file, and import it on another browser or machine. An import lists what it would change first, and applies only once confirmed, with no reload.',
+    'Save everything on this page — each chain’s endpoint list, the rescan delay, the publish target, the language, the theme and the console log switch — as one JSON file, and import it on another browser or machine. An import lists what it would change first, and applies only once confirmed, with no reload.',
   'backup.export': 'Export settings',
   'backup.import': 'Import settings…',
   'backup.pickFile': 'Choose a settings file',
@@ -209,6 +209,15 @@ export default {
   'wallet.willConnect':
     'Publishing will ask to connect a wallet; the post is written permanently to the contract on the chosen network.',
   'wallet.none': 'No wallet detected — please install a browser wallet such as MetaMask.',
+  'wallet.chooseWallet': 'Which wallet signs',
+  'wallet.browserWallet': 'Browser wallet',
+  'wallet.walletConnect': 'WalletConnect',
+  'wallet.disconnect': 'Disconnect',
+  'wallet.connectedWith': ({ wallet }) => `Connected with ${wallet}`,
+
+  // --- The draft kept between visits ---------------------------------------
+  'draft.restored': ({ when }) => `Draft restored from ${when}`,
+  'draft.discard': 'Discard',
 
   // --- Writing and publishing ---------------------------------------------
   'publish.placeholderBody': `# A heading
@@ -240,6 +249,8 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.compressing': 'Compressing the body…',
   'publish.uploadingToChain': 'Uploading images on-chain…',
   'publish.uploadProgress': ({ index, total, key }) => `Uploading image (${index}/${total}): ${key}`,
+  'publish.reusingImage': ({ index, total, key }) =>
+    `Image (${index}/${total}): ${key} is already on chain — reusing it`,
   'publish.done': 'Published.',
   'publish.failed': 'Could not publish',
   'publish.noWalletConnected': 'No wallet connected',
@@ -250,7 +261,147 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.waitForBlock': 'It appears in the list once the block is confirmed',
   'publish.writeAnother': 'Write another',
 
+  // --- The authors this reader follows -------------------------------------
+  'following.follow': 'Follow',
+  'following.following': 'Following',
+  'following.followTitle': 'Keep up with this author, in this browser',
+  'following.unfollowTitle': 'Stop following this author',
+  'following.title': 'Following',
+  'following.subtitle': ({ count }) => `${count} author${count === 1 ? '' : 's'}`,
+  'following.neverPublished': ({ count }) =>
+    count === 1 ? ' · 1 has not published yet' : ` · ${count} have not published yet`,
+  'following.allPosts': 'All posts',
+  'following.link': ({ count }) => `Following ${count}`,
+  'following.empty': 'You are not following anyone yet',
+  'following.emptyBody':
+    'Follow an author from their page and their posts appear here. It costs one read per author — no block ranges are scanned at all.',
+  'following.goRead': 'Go and find someone',
+  'following.nothingYet': 'Nothing from them yet',
+  'following.nothingYetBody': 'The authors you follow have not published anything that has been read here.',
+  'following.write': 'Write something yourself',
+  'following.newSince': ({ when }) => `Read up to here ${when}`,
+  'following.reading': 'Reading their posts…',
+  'following.settingsHeading': 'Following',
+  'following.settingsNote':
+    'Kept in this browser only, and carried in the settings file. Following someone costs nothing and tells them nothing.',
+  'following.none': 'Nobody yet.',
+  'following.remove': ({ address }) => `Stop following ${address}`,
+
+  // --- ENS: the identity layer the contract deliberately has not got -------
+  'ens.resolving': 'Looking up the name…',
+  'ens.notFound': ({ name }) => `No such name: ${name}`,
+  'ens.notFoundBody':
+    'This name resolves to no address on Ethereum. It may never have been registered, it may have expired, or it may point somewhere other than an address. An author can always be reached by their address.',
+  'ens.goHome': 'Back to the feed',
+  'profile.website': 'Website',
+  'profile.twitter': 'On X',
+  'profile.github': 'On GitHub',
+
+  // --- Getting one post out of this page -----------------------------------
+  'share.label': 'Share',
+  'share.menu': 'Share this post',
+  'share.copyLink': 'Copy link',
+  'share.share': 'Share…',
+  'share.copyEmbed': 'Copy embed code',
+  'share.copyRef': 'Copy reference',
+  'share.copied': 'Copied',
+  'lightbox.close': 'Close',
+  'lightbox.image': 'Image from this post',
+
+  // --- Archive bundles: what this browser has read, as one file ------------
+  'archive.heading': 'Archive',
+  'archive.note':
+    'One file holding the exact stored text of every post this browser has read, and the images they refer to. It is data, not the app: any tool that reads JSON can read it. Import one into another browser and those posts open with no node at all — which is the answer to a future where public endpoints no longer serve calldata from today.',
+  'archive.exportBrowser': 'Export everything read here',
+  'archive.exportAuthor': 'Export this author',
+  'archive.counts': ({ posts, images }) =>
+    `${posts} post${posts === 1 ? '' : 's'}, ${images} image${images === 1 ? '' : 's'}`,
+  'archive.nothingRead': 'Nothing has been read in this browser yet.',
+  'archive.import': 'Import an archive…',
+  'archive.pickFile': 'Choose an archive file',
+  'archive.exporting': ({ done, total }) => `Reading ${done} of ${total}…`,
+  'archive.walking': 'Reading this author back to their first post…',
+  'archive.chainLine': ({ chain, posts, images }) =>
+    `${chain}: ${posts} post${posts === 1 ? '' : 's'}, ${images} image${images === 1 ? '' : 's'}`,
+  'archive.completeAuthors': ({ count }) =>
+    count === 1 ? '1 author, complete' : `${count} authors, complete`,
+  'archive.applied': ({ posts, images, skipped }) =>
+    `Added ${posts} post${posts === 1 ? '' : 's'} and ${images} image${images === 1 ? '' : 's'}. ${skipped} were already here.`,
+  'archive.notJson': 'Not a valid JSON file.',
+  'archive.notArchive': 'This is not an archive file (the glyph.archive marker is missing).',
+  'archive.wrongVersion': ({ version }) => `Archive version ${version} is not supported.`,
+  'archive.wrongContract': ({ contract }) =>
+    `This archive is from a different deployment of the contract (${contract}).`,
+  'archive.droppedPosts': ({ count }) => `Ignoring ${count} posts that are malformed or on an unknown chain.`,
+  'archive.droppedImages': ({ count }) => `Ignoring ${count} images that are malformed or on an unknown chain.`,
+  'archive.empty': 'The file holds no posts that can be imported.',
+  'archive.failed': ({ reason }) => `Could not read the archive: ${reason}`,
+
+  // --- Finding things among what this browser has read ---------------------
+  'tag.title': ({ tag }) => `Tagged ${tag}`,
+  'tag.scope': ({ count }) => `Among the ${count} posts this browser has read`,
+  'tag.reading': 'Reading the posts this browser holds…',
+  'tag.none': ({ tag }) => `Nothing read here carries the tag ${tag}`,
+  'tag.noneBody': 'Read further back and this page will find more.',
+  'tag.readMore': 'Read earlier posts',
+  'search.open': 'Search',
+  'search.title': 'Search',
+  'search.placeholder': 'A word from a title, a tag, or the text',
+  'search.scope': ({ count }) => `Among the ${count} posts this browser has read`,
+  'search.reading': 'Reading the posts this browser holds…',
+  'search.none': ({ query }) => `Nothing read here contains “${query}”`,
+  'search.noneBody': 'Read further back and this page will find more.',
+  'search.readMore': 'Read earlier posts',
+  'search.tagCloud': 'The tags seen so far',
+  'search.noTagsYet': 'No tags yet — open a few posts and they will appear here.',
+
+  // --- What a post says about other posts ----------------------------------
+  'relations.heading': 'Relations',
+  'relations.note':
+    'Optional. All of it travels in the post’s own front-matter, so a reader that does not know a field simply ignores it.',
+  'relations.re': 'Reply to',
+  'relations.supersedes': 'Supersedes',
+  'relations.prev': 'Continues from',
+  'relations.series': 'Series',
+  'relations.seriesPlaceholder': 'Letters to Xiaoman',
+  'relations.part': 'Part',
+  'relations.partNeedsSeries': 'A part number needs a series name to belong to.',
+  'relations.language': 'Language',
+  'relations.languagePlaceholder': 'en, zh…',
+  'relations.refPlaceholder': '0xTRANSACTION_HASH, or a link to the post',
+  'relations.invalidRef': 'That is not a post reference.',
+  'relations.noSuchPost': 'No post at that reference.',
+  'relations.inReplyTo': 'In reply to',
+  'relations.continuesFrom': 'Continues from',
+  'relations.supersedesLine': 'Supersedes',
+  'relations.partOf': ({ part, series }) => `Part ${part} of ${series}`,
+  'relations.inSeries': ({ series }) => `Part of ${series}`,
+  'relations.partsKnown': ({ count }) => ` · ${count} parts read here`,
+  'relations.supersededBy': 'A newer version of this post exists:',
+  'relations.replies': 'Replies',
+  'relations.continuedIn': 'Continued in',
+  'relations.seriesHeading': ({ series }) => `More of ${series}`,
+  'relations.partShort': ({ part }) => `Part ${part}`,
+  'relations.knownHere': 'Among the posts this browser has read.',
+  'relations.reply': 'Reply',
+
+  // --- The letter as the chain holds it, and as a file ---------------------
+  'raw.show': 'Raw',
+  'raw.hide': 'Hide raw',
+  'raw.compressed': ({ bytes }) => `${bytes} on chain`,
+  'raw.decompressed': ({ bytes }) => `${bytes} of text`,
+  'raw.ratio': ({ ratio }) => `${ratio}× compression`,
+  'export.download': 'Download .md',
+  'export.import': 'Import .md…',
+  'export.pickMarkdown': 'Choose a Markdown file',
+  'export.importReplace': 'Replace what you are writing with this file?',
+  'export.imported': ({ name }) => `Imported ${name}`,
+  'export.importDropped': ({ keys }) =>
+    `Imported, without these front-matter keys this version does not know: ${keys}`,
+
   // --- The image dropzone --------------------------------------------------
+  'image.pasteHint':
+    'You can also paste or drop an image straight into the body; it is attached and referenced where the cursor is.',
   'image.hint':
     'Images are numbered img1, img2, … automatically; click an image or its name to copy its reference and paste it into the body. An image the body never references is not written on-chain and is not charged for.',
   'image.copyRef': ({ key }) => `Copy the reference for ${key}`,
@@ -269,6 +420,15 @@ Drop images into the area below or click to upload; click an image or its name t
   'cost.nearLimit': ({ limit }) =>
     `The body is close to the single-transaction ceiling (about ${limit} KB compressed). Over it, the node rejects the publish — shorten the body or split it across several posts.`,
   'cost.total': 'Total',
+  'cost.alreadyOnChain': 'already on chain · no cost',
+  'cost.sparklineLabel': ({ chain }) => `${chain} base fee over the last day`,
+  'cost.nowAt': ({ fee }) => `now ${fee}`,
+  'cost.low24h': ({ fee, time }) => `24h low ${fee} at ${time}`,
+  'cost.wouldHaveCost': ({ cost }) => `this post would have cost ≈ ${cost}`,
+  'cost.onOtherChain': ({ chain, eth, usd }) => `On ${chain} this would cost ≈ ${eth}${usd ? ` (${usd})` : ''}`,
+  'cost.onOtherChainUnknown': ({ chain }) => `${chain}’s gas price is unavailable`,
+  'cost.publishThere': 'Publish there',
+  'cost.ownGasPriceNote': 'Estimates use each network’s own gas price, read from its node.',
 
   // --- Failures the reader is shown ---------------------------------------
   'error.nodeBehind': ({ block }) => `The node has not synced to block ${block} yet — try again shortly.`,
@@ -315,11 +475,28 @@ Drop images into the area below or click to upload; click an image or its name t
   'settingsFile.themeShape': 'theme should be light, dark or null (follow the system).',
   'settingsFile.lang': ({ lang }) => `Language: ${lang}`,
   'settingsFile.langShape': 'lang should be en or zh.',
+  'settingsFile.following': ({ count }) =>
+    count === 0 ? 'Following: nobody' : `Following: ${count} author${count === 1 ? '' : 's'}`,
+  'settingsFile.followingShape': 'following should be a list of addresses.',
+  'settingsFile.followingDropped': ({ count }) => `Ignoring ${count} entries that are not addresses.`,
   'settingsFile.log': ({ state }) => `Console log: ${state}`,
   'settingsFile.on': 'on',
   'settingsFile.off': 'off',
   'settingsFile.logShape': 'log should be true or false.',
   'settingsFile.nothing': 'The file holds no settings that can be applied.',
+
+  // --- The desktop app -----------------------------------------------------
+  'desktop.updateAvailable': ({ version }) => `Xueni ${version} is available`,
+  'desktop.download': 'Download',
+  'desktop.dismiss': 'Dismiss',
+  'desktop.walletConnectOnly':
+    'There are no browser extensions inside the app, so publishing signs through ' +
+    'WalletConnect: connecting shows a QR code to scan with a wallet on your phone. ' +
+    'Reading needs no wallet at all.',
+  'desktop.noPublishInThisBuild':
+    'This build cannot publish: it was made without a WalletConnect project id, and ' +
+    'there is no browser extension inside the app to sign with instead. Reading works ' +
+    'as it does everywhere.',
 
   // --- Chain names that are not proper nouns ------------------------------
   'chain.unknown': ({ id }) => `Chain ${id}`,

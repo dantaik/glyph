@@ -3,10 +3,14 @@ import { getReader } from '../lib/data';
 import { useUrlState, isHeadless, ADDRESS_RE } from '../lib/router';
 import { useView } from '../lib/view';
 import AuthorPage from './AuthorPage';
+import AuthorResolver from './AuthorResolver';
 import HomeFeed from './HomeFeed';
 import PostLocator from './PostLocator';
 import PostRoute from './PostRoute';
+import FollowingPage from './FollowingPage';
 import ScanPage from './ScanPage';
+import SearchPage from './SearchPage';
+import TagPage from './TagPage';
 
 /**
  * The reading surface: which page the URL asks for, over the view it asks
@@ -41,6 +45,17 @@ export default function Reader({ onStartWriting }) {
   }, [tx, params.chain, params.txEvent, headless, navigate]);
 
   if (params.scan) return <ScanPage navigate={navigate} />;
+  if (params.following)
+    return (
+      <FollowingPage
+        view={view}
+        navigate={navigate}
+        currentChain={params.chain}
+        onStartWriting={onStartWriting}
+      />
+    );
+  if (params.tag) return <TagPage view={view} tag={params.tag} navigate={navigate} currentChain={params.chain} />;
+  if (params.search) return <SearchPage view={view} query={params.q ?? ''} navigate={navigate} currentChain={params.chain} />;
   if (tx && params.chain == null) {
     return (
       <PostLocator
@@ -60,9 +75,19 @@ export default function Reader({ onStartWriting }) {
         eventIndex={txEvent}
         navigate={navigate}
         headless={headless}
+        onStartWriting={onStartWriting}
       />
     );
   }
   if (author) return <AuthorPage view={view} author={author} navigate={navigate} currentChain={params.chain} />;
+  if (params.authorName)
+    return (
+      <AuthorResolver
+        view={view}
+        name={params.authorName}
+        navigate={navigate}
+        currentChain={params.chain}
+      />
+    );
   return <HomeFeed view={view} navigate={navigate} currentChain={params.chain} onStartWriting={onStartWriting} />;
 }

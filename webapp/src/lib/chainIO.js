@@ -8,8 +8,10 @@
 // Every call goes through the chain's client of the moment (clients.js), so
 // an edited endpoint list applies to the next request, even mid-sweep.
 
-import { decodeEventLog, decodeFunctionData, hexToBytes } from 'viem';
+import { decodeEventLog, decodeFunctionData, hexToBytes, zeroAddress } from 'viem';
+import { normalize } from 'viem/ens';
 import { abi, POST_EVENT } from './abi';
+import { mapLimit } from './async';
 import { getChain } from './chains';
 import { getClient } from './clients';
 import { GLYPH_ADDRESS } from './config';
@@ -37,6 +39,15 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
     }
   }
 }
+
+const ZERO_ADDRESS = zeroAddress;
+
+/**
+ * ENS names are normalised before they are hashed (UTS-46 plus ENSIP-15), so
+ * "Xiaoman.ETH" and "xiaoman.eth" are the same name. A name that cannot be
+ * normalised is not a name; viem would throw, and the caller wants null.
+ */
+const normalizeEns = (name) => normalize(String(name).trim());
 
 const errorText = (err) => String(err?.details || err?.shortMessage || err?.message || err);
 
@@ -107,21 +118,6 @@ function logToMeta(log, block) {
   };
 }
 
-/** Run `fn` over `items` with at most `limit` in flight; results in order. */
-async function mapLimit(items, limit, fn) {
-  const out = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    for (;;) {
-      const i = next++;
-      if (i >= items.length) return;
-      out[i] = await fn(items[i], i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
-}
-
 const short = (s) => `${String(s).slice(0, 10)}…`;
 
 /**
@@ -139,6 +135,10 @@ export function createChainIO(chainId, log) {
   const id = Number(chainId);
   const chain = getChain(id);
   const client = () => getClient(id);
+
+  // Only Ethereum mainnet hosts ENS. Asking any other chain is a wasted
+  // round trip that can only answer null, so it is never made.
+  const hasEns = Boolean(chain.viem?.contracts?.ensUniversalResolver);
 
   // A block's timestamp, once per block for the life of the page. Blocks
   // are immutable once mined, so the promise is kept for good — except on
@@ -192,7 +192,11 @@ export function createChainIO(chainId, log) {
       );
     },
 
-    /** `{ number, timestamp }` of a block, by height or `'latest'`. */
+    /**
+     * `{ number, timestamp, baseFeePerGas }` of a block, by height or
+     * `'latest'`. The base fee is what the gas history samples (gasHistory.js);
+     * it is null on a chain, or from a node, that does not report one.
+     */
     async block(which) {
       const args = which === 'latest' ? { blockTag: 'latest' } : { blockNumber: BigInt(which) };
       const b = await log.fromNode(
@@ -201,7 +205,11 @@ export function createChainIO(chainId, log) {
         () => client().getBlock(args),
         (out) => `block ${log.b(out.number)} @ ${out.timestamp}`,
       );
-      return { number: b.number, timestamp: Number(b.timestamp) };
+      return {
+        number: b.number,
+        timestamp: Number(b.timestamp),
+        baseFeePerGas: b.baseFeePerGas == null ? null : BigInt(b.baseFeePerGas),
+      };
     },
 
     /**
@@ -347,7 +355,12 @@ export function createChainIO(chainId, log) {
       }));
     },
 
-    /** `{ tags, markdown }` decoded from a publish() transaction's calldata. */
+    /**
+     * The body of a post, decoded from its publish() transaction's calldata:
+     * `{ meta, tags, markdown, text, compressedBytes }`. `text` is the exact
+     * document the chain holds (the raw view, a `.md` download and an archive
+     * all carry it verbatim) and `compressedBytes` is what it cost to store.
+     */
     async postBody(txHash) {
       const tx = await log.fromNode(
         'eth_getTransactionByHash',
@@ -356,7 +369,9 @@ export function createChainIO(chainId, log) {
         (t) => `${log.b((t.input.length - 2) / 2)} bytes calldata`,
       );
       const decoded = decodeFunctionData({ abi, data: tx.input });
-      return decodePayload(hexToBytes(decoded.args[1]));
+      const bytes = hexToBytes(decoded.args[1]);
+      const body = await decodePayload(bytes);
+      return { ...body, compressedBytes: bytes.length };
     },
 
     /** The raw bytes an image transaction carries as calldata. */
@@ -372,7 +387,7 @@ export function createChainIO(chainId, log) {
 
     /** ENS name for `address`, or null — without a round trip on chains that have no ENS. */
     async ensName(address) {
-      if (!chain.viem?.contracts?.ensUniversalResolver) return null;
+      if (!hasEns) return null;
       const name = await log.fromNode(
         'ens_getName',
         shortAddr(address),
@@ -380,6 +395,46 @@ export function createChainIO(chainId, log) {
         (v) => v ?? 'no name',
       );
       return name ?? null;
+    },
+
+    /** Does this chain host ENS at all? Only mainnet does; the rest never ask. */
+    hasEns,
+
+    /** The address a name points at, or null. */
+    async ensAddress(name) {
+      if (!hasEns) return null;
+      const address = await log.fromNode(
+        'ens_getAddress',
+        name,
+        () => client().getEnsAddress({ name: normalizeEns(name) }),
+        (v) => v ?? 'no address',
+      );
+      // The resolver answers the zero address for a name with no record.
+      return address && address !== ZERO_ADDRESS ? address : null;
+    },
+
+    /** The avatar a name publishes, already resolved to a URL, or null. */
+    async ensAvatar(name) {
+      if (!hasEns) return null;
+      const url = await log.fromNode(
+        'ens_getAvatar',
+        name,
+        () => client().getEnsAvatar({ name: normalizeEns(name) }),
+        (v) => v ?? 'no avatar',
+      );
+      return url ?? null;
+    },
+
+    /** One text record of a name (`description`, `url`, `com.github`…), or null. */
+    async ensText(name, key) {
+      if (!hasEns) return null;
+      const value = await log.fromNode(
+        'ens_getText',
+        `${name} ${key}`,
+        () => client().getEnsText({ name: normalizeEns(name), key }),
+        (v) => v ?? 'empty',
+      );
+      return value || null;
     },
   };
   return io;

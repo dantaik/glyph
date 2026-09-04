@@ -36,6 +36,25 @@ export async function getMarketState(client) {
   return { gasPriceWei, ethUsd };
 }
 
+/**
+ * The same, for several chains at once. ETH/USD is one number for all of
+ * them (every chain here settles in ether), so it is fetched once and
+ * shared; the gas price is each chain's own.
+ * @param {Array<{ chainId: number, client: import('viem').PublicClient }>} chains
+ * @returns {Promise<Record<number, { gasPriceWei: bigint | null, ethUsd: number | null }>>}
+ */
+export async function getMarketStates(chains) {
+  const ethUsd = await getEthUsdPrice().catch(() => null);
+  const prices = await Promise.all(
+    chains.map(({ client }) => client.getGasPrice().catch(() => null)),
+  );
+  const out = {};
+  chains.forEach(({ chainId }, i) => {
+    out[chainId] = { gasPriceWei: prices[i], ethUsd };
+  });
+  return out;
+}
+
 // --- Gas estimates ---
 //
 // Under EIP-7623 (Pectra), data-heavy txs hit the calldata floor:

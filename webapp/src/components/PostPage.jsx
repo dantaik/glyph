@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useAsync } from '../lib/hooks';
 import { chainFromSlug } from '../lib/chains';
 import ChainChip from './ChainChip';
 import { hrefFor } from '../lib/router';
 import { renderMarkdown } from '../lib/renderMarkdown';
 import {
+  chainName,
   fmtBlock,
   fmtIndex,
   fmtTitle,
@@ -13,13 +14,21 @@ import {
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
+import { downloadText, postFileName } from '../lib/download';
+import { setPendingDraftPatch } from '../lib/drafts';
+import { formatPostRef } from '../lib/glyphRefs';
 import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
-import AddressLabel from './Address';
+import AddressLabel, { Identicon } from './Address';
 import BackButton from './BackButton';
+import FollowButton from './FollowButton';
+import Lightbox from './Lightbox';
 import { BTN_OUTLINE_PILL } from './formStyles';
 import { ArticleTitle, Meta, Micro } from './Text';
 import PostNav from './PostNav';
+import RawView from './RawView';
+import ShareMenu from './ShareMenu';
+import { RelationsAbove, RelationsBelow, SupersededNotice } from './RelationsPanel';
 import { ArticleSkeleton } from './Skeleton';
 
 /**
@@ -47,13 +56,19 @@ export default function PostPage({
   neighbors,
   onNavigate,
   onOpenAuthor,
+  onStartWriting,
   headless = false,
 }) {
-  const [body, setBody] = useState(null); // { tags, markdown }
+  const [body, setBody] = useState(null); // { meta, tags, markdown }
+  // The exact on-chain document, fetched only when it is asked for.
+  const [raw, setRaw] = useState(null);
+  const [showRaw, setShowRaw] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  // The image the reader clicked, shown at the size it was paid for.
+  const [zoomed, setZoomed] = useState(null);
   // The tab title is written imperatively, so it needs the language as a
   // dependency of its own — a re-render alone would not rewrite it.
   const lang = useLang();
@@ -77,6 +92,8 @@ export default function PostPage({
       const res = await reader.loadPostBody(meta.txHash);
       const b = res.body;
       setBody(b);
+      setRaw(b.text != null ? b : null);
+      setShowRaw(false);
       setFromCache(res.fromCache);
       const md = await reader.resolveGlyphRefs(b.markdown);
       const { markdown: resolved, urls } = await reader.resolveImages(md);
@@ -119,14 +136,115 @@ export default function PostPage({
   const absTime = fmtAbsTime(time.value);
 
   // Author display: ENS name when the address has one, else the address.
-  const ens = useAsync(() => reader.ensName(meta.author), [reader, meta.author]);
-  const ensName = ens.value ?? null;
+  // The byline shows the author's ENS name and avatar when they have them.
+  const profile = useAsync(() => reader.ensProfile(meta.author), [reader, meta.author]);
+  const ensName = profile.value?.name ?? null;
 
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
 
+  // --- What this post says about others, and they about it -------------
+  //
+  // Forward relations come from the post's own front-matter and are as
+  // durable as the post itself. Backward ones come from the local index of
+  // bodies this browser has read, so they grow as the reader reads — and
+  // the panel says so rather than implying it has them all.
+  const index = reader.index;
+  const indexVersion = useSyncExternalStore(index.subscribe, index.getVersion, index.getVersion);
+  useEffect(() => {
+    index.warm();
+  }, [index]);
+
+  const eventIndex = meta.eventIndex ?? 0;
+  const backlinks = useMemo(
+    () => index.backlinksTo(meta.txHash, eventIndex),
+    // indexVersion IS the subscription: the answers change when it changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [index, meta.txHash, eventIndex, indexVersion],
+  );
+  const seriesParts = useMemo(
+    () => (body?.meta?.series ? index.seriesOf(meta.author, body.meta.series) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [index, meta.author, body?.meta?.series, indexVersion],
+  );
+  const supersededBy = backlinks.filter((b) => b.kind === 'supersedes');
+
+  // --- Reading with the keyboard ---------------------------------------
+  //
+  // The previous and next post of this author are already resolved for the
+  // cards at the foot, so the arrow keys cost nothing extra. Ignored while
+  // the reader is typing, or while the lightbox has the screen: an arrow key
+  // in a search box means "move the caret", and nothing else.
+  useEffect(() => {
+    if (headless) return undefined;
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (zoomed || isTyping(e.target)) return;
+      const to = e.key === 'ArrowLeft' ? neighbors?.prev : neighbors?.next;
+      if (!to) return;
+      e.preventDefault();
+      onNavigate?.(to);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [headless, zoomed, neighbors?.prev, neighbors?.next, onNavigate]);
+
+  // A relation is learnt from a body, which can be read long before anything
+  // says who wrote it — a body cached on an earlier visit, above all. The
+  // missing rows are one receipt read each, and resolving them makes the
+  // lists below appear; the index notices and re-renders.
+  useEffect(() => {
+    for (const hash of index.unresolvedRelated(meta.txHash, eventIndex, body?.meta?.series)) {
+      reader.findMetaByTx(hash, 0).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, reader, meta.txHash, eventIndex, body?.meta?.series, indexVersion]);
+
+  /** Answer this letter: the write tab opens with the reference filled in. */
+  const reply = () => {
+    setPendingDraftPatch({
+      meta: {
+        re: formatPostRef({ chainId: reader.chainId, txHash: meta.txHash, eventIndex }, reader.chainId),
+      },
+    });
+    onStartWriting?.();
+  };
+
+  /**
+   * The document byte for byte. Bodies cached before the text was kept do
+   * not carry it, so it is read once and the record upgraded (reader.js).
+   */
+  const withRaw = async () => {
+    if (raw) return raw;
+    const full = await reader.loadPostText(meta.txHash);
+    setRaw(full);
+    return full;
+  };
+
+  const toggleRaw = async () => {
+    if (showRaw) {
+      setShowRaw(false);
+      return;
+    }
+    await withRaw().catch(() => {});
+    setShowRaw(true);
+  };
+
+  const download = async () => {
+    const full = await withRaw().catch(() => null);
+    if (full?.text == null) return;
+    downloadText(
+      postFileName({ title, ts: time.value, txHash: meta.txHash }),
+      full.text,
+      'text/markdown;charset=utf-8',
+    );
+  };
+
   return (
-    <article>
+    // The language the post was written in, when it says: better line
+    // breaking for CJK, and a screen reader that pronounces it correctly.
+    <article lang={body?.meta?.lang || undefined}>
       {!headless && (
         <div className="mb-8">
           <BackButton onClick={onBack} />
@@ -153,9 +271,18 @@ export default function PostPage({
               title={meta.author}
               className="inline-flex items-center hover:text-accent transition-colors"
             >
-              {ensName || <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />}
+              {ensName ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Identicon address={meta.author} size={14} avatar={profile.value?.avatar ?? null} />
+                  <span>{ensName}</span>
+                </span>
+              ) : (
+                <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />
+              )}
             </a>
           </span>
+          <Dot />
+          <FollowButton author={meta.author} compact />
           <Dot />
           <ChainChip chainId={reader.chainId} navigate={navigate} />
           <Dot />
@@ -167,8 +294,18 @@ export default function PostPage({
             </>
           )}
         </Meta>
+        {body?.meta && (
+          <RelationsAbove
+            meta={body.meta}
+            chainId={reader.chainId}
+            navigate={navigate}
+            series={seriesParts}
+          />
+        )}
         </div>
       </header>
+
+      {loaded && <SupersededNotice by={supersededBy} chainId={reader.chainId} navigate={navigate} />}
 
       {loading && <ArticleSkeleton />}
 
@@ -205,6 +342,12 @@ export default function PostPage({
             // — route them instead of reloading the page. The chain segment
             // is optional here so a ref written before the prefix, or by
             // hand, still lands somewhere sensible: this post's own chain.
+            // An image is worth looking at properly: it was paid for by the
+            // byte, and the column is narrower than it is.
+            if (e.target.tagName === 'IMG' && !e.target.closest?.('a[href]')) {
+              setZoomed({ src: e.target.getAttribute('src'), alt: e.target.getAttribute('alt') ?? '' });
+              return;
+            }
             const href = e.target.closest?.('a[href]')?.getAttribute('href');
             const m = href?.match(
               /^#?\/(?:([^/]+)\/)?tx\/(0x[0-9a-fA-F]{64})(?:\/(\d+))?\/?$/,
@@ -239,20 +382,68 @@ export default function PostPage({
                 <span>{t('post.fromCache')}</span>
               </>
             )}
+            <Dot />
+            <button type="button" onClick={toggleRaw} className="hover:text-accent transition-colors">
+              {showRaw ? t('raw.hide') : t('raw.show')}
+            </button>
+            <Dot />
+            <button type="button" onClick={download} className="hover:text-accent transition-colors">
+              {t('export.download')}
+            </button>
+            <Dot />
+            <ShareMenu
+              chainId={reader.chainId}
+              txHash={meta.txHash}
+              eventIndex={eventIndex}
+              title={title}
+              onReply={onStartWriting ? reply : null}
+            />
+          </Meta>
+          {/* On paper a link is not a link, so the anchor is printed in
+              full: the chain and the transaction that holds these words. */}
+          <Meta nums data-printonly="" className="mt-2 break-all">
+            {chainName(reader.chainId)}
+            <span className="select-none" aria-hidden="true"> · </span>
+            {meta.txHash}
           </Meta>
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
               {body.tags.map((tag) => (
-                <span
+                <a
                   key={tag}
-                  className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft"
+                  href={hrefFor({ tag })}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate({ tag });
+                  }}
+                  className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft hover:border-accent hover:text-accent transition-colors"
                 >
                   {tag}
-                </span>
+                </a>
               ))}
             </div>
           )}
         </footer>
+      )}
+
+      {loaded && showRaw && raw?.text != null && (
+        <RawView
+          text={raw.text}
+          compressedBytes={raw.compressedBytes}
+          block={meta.block}
+          txHash={meta.txHash}
+          chainId={reader.chainId}
+        />
+      )}
+
+      {loaded && (
+        <RelationsBelow
+          backlinks={backlinks}
+          seriesParts={seriesParts}
+          meta={{ ...(body?.meta ?? {}), txHash: meta.txHash }}
+          chainId={reader.chainId}
+          navigate={navigate}
+        />
       )}
 
       {!headless && (
@@ -262,6 +453,8 @@ export default function PostPage({
           onGo={onNavigate}
         />
       )}
+
+      <Lightbox src={zoomed?.src} alt={zoomed?.alt} onClose={() => setZoomed(null)} />
     </article>
   );
 }
@@ -273,4 +466,13 @@ function Dot() {
       ·
     </span>
   );
+}
+
+/**
+ * Is the reader typing? An arrow key in a field means "move the caret", and
+ * nothing this page has any business overriding.
+ */
+function isTyping(el) {
+  if (!el || typeof el.closest !== 'function') return false;
+  return Boolean(el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], dialog'));
 }

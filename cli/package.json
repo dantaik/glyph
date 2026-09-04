@@ -1,0 +1,19 @@
+{
+  "name": "xueni",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Publish, read, export and verify Xueni posts from a terminal.",
+  "bin": {
+    "xueni": "./bin/xueni.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "viem": "^2.27.0"
+  }
+}

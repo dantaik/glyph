@@ -5,7 +5,9 @@ import { chainName, shortAddr } from '../lib/format';
 import { LANGS, LANG_NAMES, setLang, useLang, useT } from '../lib/i18n';
 import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
+import ArchiveSection from './ArchiveSection';
 import BackupSection from './BackupSection';
+import FollowingSection from './FollowingSection';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
 import { Micro, Note } from './Text';
@@ -210,7 +212,11 @@ export default function SettingsPage({ navigate }) {
         <Note className="mt-2 max-w-2xl">{t('settings.rescanNote')}</Note>
       </section>
 
+      <FollowingSection navigate={navigate} />
+
       <BackupSection />
+
+      <ArchiveSection />
 
       <div className="flex items-center justify-between gap-3 border-t border-edge pt-6">
         <button type="button" onClick={() => resetEndpointConfig()} className={BTN_QUIET}>

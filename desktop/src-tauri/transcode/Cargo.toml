@@ -1,0 +1,24 @@
+[package]
+name = "xueni-transcode"
+version = "0.1.0"
+description = "Downscale an image and encode it as lossy WebP"
+edition = "2021"
+rust-version = "1.77.2"
+license = "MIT"
+publish = false
+
+# Its own workspace on purpose. The shell next door depends on Tauri, which
+# only builds where the system webview libraries are installed; keeping this
+# crate outside that workspace means `cargo test` here resolves and compiles
+# nothing but the two image libraries, on any machine.
+[workspace]
+
+# The test images are millions of pixels, and an unoptimised PNG or WebP
+# codec spends half a minute on them. Building the libraries with
+# optimisation even in a debug run keeps `cargo test` a few seconds.
+[profile.dev.package."*"]
+opt-level = 2
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "webp"] }
+webp = { version = "0.3", default-features = false }

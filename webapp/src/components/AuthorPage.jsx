@@ -6,6 +6,9 @@ import { useMergedAuthorList } from '../lib/mergedAuthorList';
 import { hrefFor } from '../lib/router';
 import { rowKey } from '../lib/timeline';
 import AddressLabel from './Address';
+import AuthorProfile from './AuthorProfile';
+import ExportAuthorButton from './ExportAuthorButton';
+import FollowButton from './FollowButton';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
@@ -23,12 +26,17 @@ import { ListSkeleton } from './Skeleton';
  * the readers — they keep going and keep their rows if the page is left
  * mid-way — and render block by block as they go.
  */
-export default function AuthorPage({ view, author, navigate, currentChain = null }) {
+export default function AuthorPage({ view, author, displayName = null, navigate, currentChain = null }) {
   const controller = view.authorList(author);
   const list = useMergedAuthorList(controller);
   const counts = useAsync(() => view.counts(author), [view, author]);
-  // Show the author's ENS name when the address has one, else the address.
-  const ens = useAsync(() => view.ensName(author), [view, author]);
+  // Everything ENS knows about this author: the name they have claimed (and
+  // which claims them back), their avatar, and whatever they have written
+  // about themselves. All optional, all best effort.
+  const profile = useAsync(() => view.ensProfile(author), [view, author]);
+  // `displayName` is the name in the URL, when the page was reached by one:
+  // it is already known, so the header does not wait for the lookup.
+  const name = displayName ?? profile.value?.name ?? null;
 
   const { rows, frontier, hasMore, job, scanning, chains, allErrored } = list;
   const single = chains.length === 1;
@@ -63,17 +71,28 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
     <div>
       <ListHeader
         title={
-          ens.value ? (
-            `${t('author.postsByPrefix')}${ens.value}${t('author.postsBySuffix')}`
+          name ? (
+            `${t('author.postsByPrefix')}${name}${t('author.postsBySuffix')}`
           ) : (
             <span className="inline-flex items-center gap-1.5">
               {t('author.postsByPrefix') && <span>{t('author.postsByPrefix')}</span>}
-              <AddressLabel address={author} size={18} tailClassName="text-lg" />
+              <AddressLabel
+                address={author}
+                size={18}
+                avatar={profile.value?.avatar ?? null}
+                tailClassName="text-lg"
+              />
               {t('author.postsBySuffix') && <span>{t('author.postsBySuffix')}</span>}
             </span>
           )
         }
         titleAttr={author}
+        right={
+          <span className="inline-flex items-center gap-2">
+            <ExportAuthorButton view={view} author={author} />
+            <FollowButton author={author} />
+          </span>
+        }
         subtitle={
           single ? (
             <>
@@ -96,6 +115,8 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
           )
         }
       />
+
+      <AuthorProfile profile={profile.value} />
 
       {loading && (
         <>

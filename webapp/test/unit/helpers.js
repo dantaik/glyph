@@ -64,7 +64,8 @@ export const AUTHORS = [
  *
  * Options: `rangeLimit` makes eth_getLogs refuse windows wider than that
  * (the reader halves its window); `secondsPerBlock`/`now` shape block
- * timestamps; `fail` is a predicate over a call that makes it throw;
+ * timestamps; `baseFee(block)` shapes the base fee a header carries; `fail`
+ * is a predicate over a call that makes it throw;
  * `legacyRows` hands out rows without `ts`, the way rows persisted before
  * timestamps existed look.
  */
@@ -77,6 +78,7 @@ export function fakeChain({
   rangeLimit = null,
   fail = null,
   legacyRows = false,
+  baseFee = null,
 } = {}) {
   const sorted = [...posts]
     .map((p) => ({ ...p, index: BigInt(p.index), block: BigInt(p.block) }))
@@ -104,6 +106,9 @@ export function fakeChain({
   });
   const byAuthor = (author) => rows.filter((r) => r.author.toLowerCase() === String(author).toLowerCase());
   const tsOf = (block) => now - Number(headBlock - BigInt(block)) * secondsPerBlock;
+  // A base fee that varies with height when a test wants one, so gas-history
+  // samples can be told apart and a lowest one exists.
+  const baseFeeOf = (block) => (baseFee ? BigInt(baseFee(block)) : 1_000_000_000n);
   // What chainIO hands out: a copy, with the block's timestamp attached.
   const meta = (r) => ({ ...r, ts: legacyRows ? null : tsOf(r.block) });
   const calls = [];
@@ -121,7 +126,7 @@ export function fakeChain({
     async block(which) {
       record('eth_getBlockByNumber', which);
       const n = which === 'latest' ? headBlock : BigInt(which);
-      return { number: n, timestamp: tsOf(n) };
+      return { number: n, timestamp: tsOf(n), baseFeePerGas: baseFeeOf(n) };
     },
     async postsInRange(from, to) {
       record('eth_getLogs', from, to);
@@ -159,7 +164,18 @@ export function fakeChain({
     async imageBytes() {
       throw new Error('fake chain has no images');
     },
+    // Only Ethereum hosts ENS, the same rule the real chainIO applies.
+    hasEns: Number(chainId) === 1,
     async ensName() {
+      return null;
+    },
+    async ensAddress() {
+      return null;
+    },
+    async ensAvatar() {
+      return null;
+    },
+    async ensText() {
       return null;
     },
   };

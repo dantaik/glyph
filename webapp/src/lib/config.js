@@ -25,7 +25,13 @@
 // for a private redeploy (a changed Blog.sol yields a different address).
 
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_CHAIN_ID, SELECTABLE_CHAIN_IDS, defaultRpcs, isKnownChain } from './chains';
+import {
+  DEFAULT_CHAIN_ID,
+  DEFAULT_GLYPH_ADDRESS,
+  SELECTABLE_CHAIN_IDS,
+  defaultRpcs,
+  isKnownChain,
+} from './chains';
 
 const KEY_CHAIN = 'glyph.chainId.v1'; // the active chain, before every chain was read at once
 const KEY_PUBLISH_CHAIN = 'glyph.publishChain.v1';
@@ -69,8 +75,10 @@ const subscribeTo = (name) => (callback) => {
   return () => window.removeEventListener(name, callback);
 };
 
-/** The canonical CREATE2 deployment — identical on every EVM chain. */
-export const DEFAULT_GLYPH_ADDRESS = '0x000000AE2f2249c497cfc5F262dd1491634C361C';
+// The deployed address itself lives in chains.js, so that plain Node can
+// read it without Vite; it is re-exported here, where it has always been
+// imported from.
+export { DEFAULT_GLYPH_ADDRESS };
 
 export const GLYPH_ADDRESS = import.meta.env.VITE_GLYPH_ADDRESS || DEFAULT_GLYPH_ADDRESS;
 

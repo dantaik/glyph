@@ -10,6 +10,7 @@ import {
   saveRescanDelay,
   saveRpcUrls,
 } from '../../src/lib/config';
+import { follow, getFollowing } from '../../src/lib/following';
 import { getLang, setLang } from '../../src/lib/i18n';
 import * as rpcLog from '../../src/lib/rpcLog';
 import { applySettings, collectSettings, parseSettingsFile, serializeSettings, settingsFileName } from '../../src/lib/settingsFile';
@@ -44,6 +45,7 @@ describe('settingsFile', () => {
     setLang('zh');
     setThemePref('dark');
     rpcLog.setEnabled(false);
+    follow('0x327fa3369B1D1D42120d84bc407e5865ECa7c458');
     const text = serializeSettings();
 
     localStorage.clear();
@@ -60,6 +62,7 @@ describe('settingsFile', () => {
       'Publish to: Taiko',
       'Language: 中文',
       'Theme: dark',
+      'Following: 1 author',
       'Console log: off',
     ]);
     applySettings(settings);
@@ -68,6 +71,7 @@ describe('settingsFile', () => {
     expect(getRpcUrls(167000)).toEqual(['https://taiko.example/rpc', 'https://taiko2.example']);
     expect(hasCustomRpcs(1)).toBe(false);
     expect(getRescanDelayMs()).toBe(300_000);
+    expect(getFollowing()).toEqual(['0x327fa3369b1d1d42120d84bc407e5865eca7c458']);
     expect(getPublishChainId()).toBe(167000);
     expect(getThemePref()).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);

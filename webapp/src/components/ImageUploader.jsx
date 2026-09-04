@@ -1,35 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { copyToClipboard } from '../lib/clipboard';
+import { nextImageKeys } from '../lib/imageKeys';
 import { t } from '../lib/i18n';
 import { Check, AlertCircle, Close, Plus } from './Icons';
 import { Micro } from './Text';
-
-/**
- * Copy text to the clipboard. Secure contexts use the async Clipboard API;
- * falls back to a hidden textarea + execCommand for everything else.
- * @returns {Promise<boolean>} whether the copy succeeded
- */
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try {
-      ok = document.execCommand('copy');
-    } catch {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
 
 
 /**
@@ -67,13 +41,12 @@ export default function ImageUploader({
 
   const addFiles = (list) => {
     if (disabled) return;
+    const incoming = [...list];
     const next = { ...files };
     // Keys are plain sequence numbers: img1, img2, … (not filenames).
-    for (const f of list) {
-      let n = 1;
-      while (next[`img${n}`]) n += 1;
-      next[`img${n}`] = f;
-    }
+    nextImageKeys(next, incoming.length).forEach((key, i) => {
+      next[key] = incoming[i];
+    });
     onChange(next);
   };
 
@@ -108,9 +81,9 @@ export default function ImageUploader({
         </div>
       )}
 
-      {Object.keys(files).length > 0 && (
-        <Micro className="mt-2">{t('image.hint')}</Micro>
-      )}
+      <Micro className="mt-2">
+        {Object.keys(files).length > 0 ? t('image.hint') : t('image.pasteHint')}
+      </Micro>
 
       <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
         {Object.entries(files).map(([key, file]) => (

@@ -9,6 +9,20 @@ The interface reads in **English by default and can be switched to Chinese** at 
 
 Technical design: [`glyph-spec.md`](./glyph-spec.md)
 
+## Download for macOS
+
+[**Xueni for macOS**](https://github.com/dantaik/glyph/releases/latest/download/Xueni-macOS.dmg) —
+one universal application for Apple Silicon and Intel, macOS 13 or later, around ten megabytes. It is
+this repository's web app in a window, not a second program: the same reader, the same permanent
+caches, the same two chains, and links to explorers open in your own browser. Publishing from it signs
+through WalletConnect — an application has no browser extension in it — so the write tab shows a QR
+code to scan with a wallet on your phone.
+
+Today's builds are ad-hoc signed rather than signed with an Apple Developer ID, so macOS refuses the
+first launch with "the developer cannot be verified": right-click the app, choose Open, and Open again
+in the dialog. macOS remembers the answer. To build it yourself, or to read exactly what the shell
+does, see [`desktop/README.md`](./desktop/README.md).
+
 ## Quick start
 
 The contract is deployed, and both its address (the same on every chain, via CREATE2) and each
@@ -47,12 +61,64 @@ ranges this browser has scanned so far, reachable from the footer). Add `?headle
 (`/taiko/tx/0xTXHASH/0?headless=1`) to get that post with no app around it — no masthead, no site
 footer, no back button and no previous/next cards, just the letter, its byline and its provenance —
 for embedding one in an iframe or a preview pane. It applies to post URLs only and to that page
-alone: a link followed out of it lands in the ordinary interface.
+alone: a link followed out of it lands in the ordinary interface. "Copy embed code" in the share menu
+writes that snippet for you.
 **Writing**: the "Wallet and network" panel at the top of the Write tab — connect a wallet, choose which
 chain to publish to (it follows the wallet's own network until you pick one, and then it is remembered),
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Tags and search**: a tag on a row or under a post opens `/tag/<name>`, and the magnifier in the
+masthead (⋯ menu on a phone) opens `/search`, which finds a word in any title, tag or body — matched as
+a substring, so Chinese works without word splitting. Both cover the posts this browser has read, say
+so in their subtitle, and offer the ordinary "read earlier posts" as the way to cover more. Neither
+asks anything of a server: no node can filter on the inside of compressed calldata, and an index that
+went looking would be a crawler.
+**Reading a post**: `←` and `→` move to the author's previous and next post on the same chain, unless
+you are typing. Clicking an image opens it full size with its alt text as the caption, so a picture that
+cost gas by the byte can actually be looked at. Printing takes the app away and leaves the letter, black
+on white, with the chain and the full transaction hash under it, because on paper a link is not a link.
+The "Share" menu in the provenance line copies the canonical link, an `<iframe>` snippet for the headless
+view, or the Markdown reference `[title](0xTXHASH)` that quotes this post from inside another one.
+**Names**: an author who has an ENS name is shown by it — in bylines, on their own page, and at
+`/author/xiaoman.eth`, which resolves the name and shows their posts. Their ENS avatar replaces the
+identicon once it has loaded, and their `description`, `url`, `com.twitter` and `com.github` records
+become a short profile above the list. The contract knows only addresses and always will; ENS is the
+identity layer already on chain, under a registry with no owner, so none of this needs a server. A
+reverse record is a claim the address makes about itself, so the name is resolved forward again and
+only shown when it comes back to the same address. Every lookup is best effort and only Ethereum
+answers it.
+**Following**: "Follow" on an author's page (or under any post of theirs) keeps them in a list held in this
+browser and nowhere else, and `/following` — one click from the home feed — shows their newest posts merged
+across both chains. It is the cheap path the contract was designed for: the home feed has to sweep block
+ranges because there is no global head pointer, but every author has one of their own, and each of their
+posts names the block of the previous one. So this feed costs one head read per author per chain and then a
+walk down single blocks, with no range scan anywhere. A divider marks where you got to last time. The list
+costs no gas, tells the author nothing, can be pruned on `/settings`, and travels in the settings file.
+**Relations**: a post can say what it is to other posts, in its own front-matter and therefore on chain:
+a reply (`re`), a replacement for an earlier version (`supersedes` — the only honest kind of edit on an
+immutable chain), a continuation (`prev`), a place in a `series`, and the `lang` it is written in. Fill
+them in the folded "Relations" section of the Write tab, or choose "Reply" in a post's share menu to
+start one with the reference already there. Reading, the forward half comes from the post itself and is always
+there; the backward half — its replies, what continues it, whether a newer version exists — is drawn
+from the posts this browser has read, and says so.
+**The letter as the chain holds it**: every post page has "Raw", which shows the exact decompressed
+document — front-matter included — with what it cost to store and what it decompresses to, and
+"Download .md", which saves those same bytes as a file named for the day and the title. "Import .md…"
+in the Write tab brings such a file back as a draft: front-matter this version knows fills the fields,
+and anything it does not know is named rather than silently carried on chain.
+**Images**: paste or drop one straight into the body and it is attached and referenced where the cursor
+is; the preview shows both an attached file and an image already on chain (`eth:0x…`). An image whose
+processed bytes this browser has already published on this chain is referenced again rather than paid
+for again — the estimate says "already on chain · no cost" before you sign, and no transaction is sent.
+**Wallets**: every wallet that announces itself (EIP-6963) is listed by name and icon in the "Wallet and
+network" panel, so a browser with two of them is a choice rather than a coin toss; the choice is
+remembered. Build with `VITE_WALLETCONNECT_PROJECT_ID=<id from Reown Cloud>` to add WalletConnect as
+one more entry — the only way to sign on a device with no extension. Without that variable the entry
+does not exist and none of its code is in the bundle.
+**Drafts**: what you are writing — title, tags, body and attached images — is saved in this browser
+half a second after you stop typing, and offered back the next time the Write tab opens, so a reload
+or a wallet sending you away and back loses nothing. "Discard" throws it away; publishing clears it.
 **Paging**: "Load earlier posts" at the foot of the feed and author pages scans backwards a segment at a
 time — a block range already scanned is answered from the local cache and never requested again. When the
 feed has unscanned blocks between two scanned segments, it says so in the middle of the list and offers to
@@ -84,15 +150,47 @@ does not change, so one post's metadata, title, body and images are never reques
 button, or the ⋯ menu on a phone) or from `/settings`. The choice applies immediately, is kept in this
 browser, and travels in the settings file. It changes the interface only — a post stays on-chain in the
 language it was written in.
+**Archive**: "Export everything read here" on `/settings` writes one `.xueni.json` file holding the exact
+stored text of every post this browser has read and the images they refer to; an author page has "Export
+this author", which first walks their list back to their first post so the bundle can say it is complete.
+Import one into another browser and those posts open with no node at all: the local cache is the only
+copy a reader controls, and until it is a file it is a browser profile that a cleared cache takes away.
+It is also the answer to history expiry (EIP-4444) — a reader years from now, whose endpoints no longer
+serve calldata from today, opens a bundle instead of running an archive node. `xueni export` writes the
+same format from a terminal. An import claims only what it can prove: the posts it carries and the
+authors it says are complete, never the home feed, which is a claim about every author at once.
 **Backup and restore**: "Export settings" on `/settings` writes the endpoint lists, rescan delay, publish
-target, language, theme, text size and log switch to one JSON file; "Import settings" lists what it would
+target, language, theme, followed authors and log switch to one JSON file; "Import settings" lists what it would
 change first and applies it on confirmation, with no reload.
 **Interface**: an author is shown as a blockies icon generated from their address plus the last 6
 characters of it (contracts and transaction hashes still use `0x1234…abcd`). On a narrow screen the
 language, theme and settings controls fold into the ⋯ menu and everything else stays on one row.
 **Console**: every node request and every local cache hit writes one console line, labelled with the chain;
 `?log=0` turns it off.
-**Cost estimate**: gas (from the node) plus ETH/USD (from CoinGecko) shown live before publishing.
+**Cost estimate**: gas (from the node) plus ETH/USD (from CoinGecko) shown live before publishing —
+with the two things that actually move the price. WHEN: the last day of base fees, sampled one block
+header an hour from the chain itself, drawn as a small line with the cheapest hour named and what this
+post would have cost then. WHERE: the same draft priced on the other network, with one click to send
+it there instead. Both degrade quietly — no USD when CoinGecko is unreachable, no line when a node
+will not serve headers.
+
+## Command line
+
+`xueni` publishes, reads, exports and verifies posts from a terminal — for scripting, for bulk work,
+and for a nightly backup of an author. It shares the payload layer with the web app rather than
+reimplementing it, so a post published from the command line is byte for byte the post the browser
+would have written.
+
+```bash
+cd cli && npm install
+node bin/xueni.js fetch taiko 0xTXHASH          # print the post
+node bin/xueni.js author all 0xAUTHOR           # their titles, newest first
+node bin/xueni.js export 0xAUTHOR --out ./mine  # every post as .md, plus an importable archive
+node bin/xueni.js publish letter.md --chain taiko --dry-run
+```
+
+`PRIVATE_KEY` comes from the environment and is never an argument. See [`cli/README.md`](cli/README.md)
+for every command and option.
 
 ## Testing
 
@@ -108,7 +206,17 @@ The e2e mock node (`webapp/test/e2e/rpcServer.mjs`) serves the demo world (`src/
 JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-encoded Post events whose
 bodies are brotli-compressed `publish()` calldata, so viem, chainIO and the brotli WASM all really run.
 During development, `npm run dev` and then `/?fixtures=1` shows the same demo data from memory. GitHub
-Actions (`.github/workflows/ci.yml`) runs all three steps on every PR.
+Actions (`.github/workflows/ci.yml`) runs all three steps on every PR, and the `cli` job runs the
+command-line tool's tests against that same mock node (`cd cli && npm test`). The macOS application has
+its own workflow (`.github/workflows/desktop.yml`), which builds on a `v*` tag and on a pull request
+that touches `desktop/`; its image-encoding crate is tested with `cd desktop/src-tauri/transcode &&
+cargo test`.
+
+Two of the end-to-end specs are worth knowing about. `following.spec.js` inspects the mock node's call
+log and asserts that reading a followed author never issued an `eth_getLogs` spanning more than one
+block, which is the claim the contract's head pointer exists to make. `archive.spec.js` exports a bundle
+in one browser, imports it into a second, opens that author's page and one of their posts there, and
+asserts that not one transaction was read.
 
 Most of the demo world is written in English. Two of its posts are deliberately left in Chinese: they are
 the multi-byte-title fixtures — one title is exactly 27 bytes of UTF-8, the other is a `bytes32` title cut

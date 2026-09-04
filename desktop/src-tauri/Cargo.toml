@@ -1,0 +1,40 @@
+[package]
+name = "xueni"
+version = "0.1.0"
+description = "Xueni, the desktop reader and writer"
+edition = "2021"
+rust-version = "1.77.2"
+license = "MIT"
+publish = false
+
+# The image work is its own crate, next door, so that it can be built and
+# tested anywhere: this one pulls in a whole webview stack and only compiles
+# where that stack is installed. `transcode/` declares its own workspace,
+# hence the exclusion.
+[workspace]
+exclude = ["transcode"]
+
+[lib]
+# The mobile targets Tauri generates expect the app to be reachable as a
+# library; `main.rs` is a three-line wrapper around it either way.
+name = "xueni_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-window-state = "2"
+xueni-transcode = { path = "transcode" }
+
+[profile.release]
+# A reader that is downloaded once and kept: small beats fast to build.
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

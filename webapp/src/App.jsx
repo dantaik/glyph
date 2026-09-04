@@ -4,10 +4,12 @@ import Reader from './components/Reader';
 import Publisher from './components/Publisher';
 import SettingsPage from './components/SettingsPage';
 import ChainIcon from './components/ChainIcon';
+import UpdateNotice from './components/UpdateNotice';
 import { FIXTURES_MODE } from './lib/data';
 import { chainName, fmtBlock } from './lib/format';
 import { t, useLang } from './lib/i18n';
 import { lowest, highest } from './lib/segments';
+import { isDesktop, openExternal } from './lib/platform';
 import { hrefFor, isHeadless, useUrlState } from './lib/router';
 import { getAllChainsView } from './lib/view';
 import { Micro } from './components/Text';
@@ -42,8 +44,25 @@ export default function App() {
     [urlSurface, navigate],
   );
 
+  // In the desktop app a link to another site — an explorer, an ENS
+  // profile — must leave the app: following it inside the window would put
+  // the reader in a browser with no address bar, no tabs and no way back.
+  // One handler on the shell catches them all, because a link is a link
+  // wherever it is written; the app's own links are same-origin and fall
+  // through to the router untouched. On the web this does nothing.
+  const handleClick = useCallback((e) => {
+    if (!isDesktop() || e.defaultPrevented || e.button !== 0) return;
+    const anchor = e.target?.closest?.('a[href]');
+    if (!anchor) return;
+    const url = new URL(anchor.href, window.location.href);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+    if (url.origin === window.location.origin) return;
+    e.preventDefault();
+    openExternal(url.href);
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" onClick={handleClick}>
       {!headless && (
         <Header
           // Settings is neither reading nor writing, so neither tab is
@@ -93,12 +112,13 @@ function Footer({ navigate }) {
   };
 
   return (
-    <footer className="border-t border-edge px-4 py-10 text-center sm:px-6">
+    <footer data-noprint="" className="border-t border-edge px-4 py-10 text-center sm:px-6">
       <Micro as="ul" nums className="space-y-1">
         {feed.chains.map((c) => (
           <ChainLine key={c.chainId} chainId={c.chainId} span={scanSpan(c.coverage)} scanning={c.job != null} go={go} />
         ))}
       </Micro>
+      <UpdateNotice />
     </footer>
   );
 }

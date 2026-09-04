@@ -200,3 +200,48 @@
 .prose-glyph th { font-weight: 600; }
 
 .prose-compact { --article-size: 1rem; }
+
+/* --- On paper ------------------------------------------------------------
+ *
+ * A printed post is a letter, not a screenshot of an app: the interface goes
+ * away and the words are left, black on white, at the width of the page.
+ *
+ * What survives is chosen rather than inherited. The provenance line prints
+ * the chain and the transaction hash in full, because on paper a link is not
+ * a link — a copy that cannot be traced back to the chain that holds it is
+ * just a piece of paper. Everything a reader can only click is hidden with
+ * `data-noprint`, which is an attribute rather than a class so that hiding
+ * something is one word at the place it is written.
+ */
+@media print {
+  [data-noprint] { display: none !important; }
+  [data-printonly] { display: block !important; }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* The article takes the page: no app column, no maximum measure. */
+  main, article, .article-column, .prose-glyph {
+    max-width: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  .prose-glyph a { color: #000 !important; text-decoration: underline; }
+  .prose-glyph img { max-width: 100% !important; filter: none !important; page-break-inside: avoid; }
+  .prose-glyph h1, .prose-glyph h2, .prose-glyph h3 { page-break-after: avoid; }
+  .prose-glyph blockquote, .prose-glyph pre, .prose-glyph table { page-break-inside: avoid; }
+
+  .prose-glyph pre {
+    background: transparent !important;
+    border: 1px solid #ccc !important;
+  }
+}
+
+/* Printed only: hidden on screen, shown by the block above. */
+[data-printonly] { display: none; }

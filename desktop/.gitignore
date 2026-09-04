@@ -1,0 +1,17 @@
+node_modules/
+
+# Rust build output, for the shell and for the image crate beside it.
+src-tauri/target/
+src-tauri/transcode/target/
+
+# Written by tauri-build on every build: the capability schemas and the
+# generated platform projects.
+src-tauri/gen/
+
+# `npm run icon` writes a full set for every platform Tauri can target. Only
+# the files `tauri.conf.json` names are kept; these are the rest.
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png
+src-tauri/icons/64x64.png

@@ -1,13 +1,15 @@
 // publish.js — Author side (browser).
 //
 // Flow:
-//   1. process each image (downscale + WebP q60) → bytes
+//   1. process each image (downscale + WebP q60) → bytes, unless this
+//      browser has published those exact bytes on this chain before
 //   2. store each image as a plain self-tx → txhash → rewrite upload:KEY → eth:0x<hash>
-//   3. encode { tags, markdown } into a versioned binary payload, brotli q11
+//   3. encode { meta, tags, markdown } as front-matter + Markdown, brotli q11
 //   4. encode title to bytes32 (UTF-8, zero-padded)
 //   5. publish(title, payload)
 //
-// Requires a browser wallet (window.ethereum).
+// Needs a wallet to sign, whichever one the reader chose (wallet.js): an
+// announced extension, or WalletConnect where a build carries a project id.
 
 import { createWalletClient, custom, toHex } from 'viem';
 import { GLYPH_ADDRESS } from './config';
@@ -15,24 +17,17 @@ import { getChain } from './chains';
 import { abi } from './abi';
 import { encodeTitle } from './title';
 import { encodePayload } from './payload';
+import { nextImageKeys } from './imageKeys';
+import { knownImage, rememberImage, sha256Hex } from './imageLedger';
+import { MAX_CALLDATA_BYTES, MAX_TX_BYTES } from './limits';
 import { t } from './i18n';
+import { getProvider, noWalletMessage } from './wallet';
+import { invoke, isDesktop } from './platform';
 
-/**
- * Per-transaction byte ceiling. NOT a consensus rule: geth's transaction
- * pool rejects anything whose encoded size exceeds txMaxSize (4 × 32 KiB)
- * with "oversized data", and every public endpoint runs that default — so
- * it binds long before EIP-7825's 16,777,216 gas cap (~409 KB of calldata,
- * the figure in the spec's constants table).
- */
-export const MAX_TX_BYTES = 131_072;
-
-/**
- * What's left for calldata once the transaction envelope is accounted for
- * (signature, nonce, gas fields, and for publish() the selector + title +
- * ABI offset/length header). Generous on purpose — being a kilobyte
- * conservative costs nothing, and guessing high costs a rejected send.
- */
-export const MAX_CALLDATA_BYTES = MAX_TX_BYTES - 1_024;
+// The ceilings themselves live in limits.js, which imports nothing, so the
+// command-line tool can enforce the same numbers without the browser
+// pipeline. They are re-exported here, where every caller already looks.
+export { MAX_CALLDATA_BYTES, MAX_TX_BYTES };
 
 const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
 
@@ -42,12 +37,15 @@ const asKB = (bytes) => `${Math.ceil(bytes / 1024)} KB`;
  * write tab (which asks the wallet to switch to it) is the one to sign on.
  */
 async function getWallet(chainId) {
-  if (!window.ethereum) {
-    throw new Error(t('wallet.none'));
+  // Whichever wallet the write tab is signing with — the one chosen from
+  // the wallets that announced themselves, or WalletConnect (wallet.js).
+  const provider = getProvider();
+  if (!provider) {
+    throw new Error(noWalletMessage());
   }
   const wallet = createWalletClient({
     chain: getChain(chainId).viem,
-    transport: custom(window.ethereum),
+    transport: custom(provider),
   });
   const [account] = await wallet.getAddresses();
   return { wallet, account };
@@ -80,6 +78,29 @@ async function canvasToBlob(canvas, type, quality) {
 }
 
 /**
+ * The same work in the desktop app, where the canvas is no help: WebKit
+ * cannot encode WebP from one, so the shell does it with libwebp (the
+ * `transcode_image` command, desktop/src-tauri). The loop is the canvas
+ * loop, in the whole numbers the encoder there takes.
+ */
+async function transcodeInShell(file, { maxEdge, quality, maxBytes }) {
+  // A plain array, not the Uint8Array: nested inside the argument object it
+  // is JSON-serialised, and a typed array stringifies to `{"0":…}`, which is
+  // not a list of bytes any more. One image, once, so the cost is nothing.
+  const source = Array.from(new Uint8Array(await file.arrayBuffer()));
+  let q = Math.round(quality * 100);
+  let bytes;
+  do {
+    bytes = new Uint8Array(await invoke('transcode_image', { bytes: source, maxEdge, quality: q }));
+    q -= 10;
+  } while (bytes.length > maxBytes && q > 30);
+  if (bytes.length > maxBytes) {
+    throw new Error(t('error.imageTooBig', { size: asKB(bytes.length), limit: asKB(maxBytes) }));
+  }
+  return bytes;
+}
+
+/**
  * Downscale and compress an image file to WebP.
  * Falls back to a DOM canvas when OffscreenCanvas is unavailable.
  */
@@ -87,6 +108,8 @@ async function processImage(
   file,
   { maxEdge = 1600, quality = 0.6, maxBytes = MAX_CALLDATA_BYTES } = {},
 ) {
+  if (isDesktop()) return transcodeInShell(file, { maxEdge, quality, maxBytes });
+
   const bmp = await createImageBitmap(file);
   const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * scale);
@@ -107,6 +130,11 @@ async function processImage(
   let blob;
   do {
     blob = await canvasToBlob(canvas, 'image/webp', q);
+    // A browser that cannot encode WebP does not refuse: it hands back PNG
+    // bytes under a different type and leaves the caller to notice. Those
+    // bytes would go on chain as an image the reader is told is WebP, so
+    // the type is checked rather than assumed.
+    if (blob.type !== 'image/webp') throw new Error(t('error.noWebp'));
     q -= 0.1;
   } while (blob.size > maxBytes && q > 0.3);
   // The loop stops lowering quality at 0.3 whether or not it got under
@@ -118,6 +146,19 @@ async function processImage(
 
   return new Uint8Array(await blob.arrayBuffer());
 }
+
+/**
+ * The processed bytes of `file` and their hash, without sending anything.
+ * The write tab uses it to tell, before publishing, which attached images
+ * are already on chain and therefore free.
+ * @returns {Promise<{ bytes: Uint8Array, hash: string }>}
+ */
+export async function hashProcessedImage(file, opts = {}) {
+  const bytes = await processImage(file, opts);
+  return { bytes, hash: await sha256Hex(bytes) };
+}
+
+export { nextImageKeys };
 
 export async function storeImage(bytes, wallet, account) {
   return wallet.sendTransaction({
@@ -152,23 +193,36 @@ export function usedImageKeys(markdown, files) {
 /**
  * Replace `upload:KEY` refs in markdown with `eth:0x<txhash>` after uploading
  * the images the body shows (see usedImageKeys — the rest are left alone)
- * on `chainId`. Optional `onProgress(key, i, total)` fires before each
- * image upload (i is 1-based) so the UI can show per-image progress.
+ * on `chainId`.
+ *
+ * An image whose exact processed bytes this browser has already published on
+ * this chain is NOT sent again: the reference points at the copy that is
+ * there (imageLedger.js). `onProgress(key, i, total, { reused })` fires
+ * before each one so the UI can say which.
  */
 export async function embedImages(markdown, files, { chainId, quality = 0.6, onProgress } = {}) {
   const used = usedImageKeys(markdown, files);
   if (used.length === 0) return markdown; // nothing to pay for
-  const { wallet, account } = await getWallet(chainId);
+  let wallet = null;
+  let account = null;
   let out = markdown;
   let i = 0;
   for (const key of used) {
     i += 1;
-    onProgress?.(key, i, used.length);
-    const bytes = await processImage(files[key], { quality }).catch((err) => {
+    const { bytes, hash } = await hashProcessedImage(files[key], { quality }).catch((err) => {
       throw new Error(t('error.imageNamed', { key, message: err.message }));
     });
-    const hash = await storeImage(bytes, wallet, account);
-    out = out.replace(imageRefRe(key, 'g'), `$1eth:${hash}`);
+    const already = knownImage(chainId, hash);
+    onProgress?.(key, i, used.length, { reused: Boolean(already) });
+    let txHash = already;
+    if (!txHash) {
+      // The wallet is only needed once something actually has to be sent, so
+      // a body whose images are all already on chain costs no prompt at all.
+      if (!wallet) ({ wallet, account } = await getWallet(chainId));
+      txHash = await storeImage(bytes, wallet, account);
+      rememberImage(chainId, hash, txHash);
+    }
+    out = out.replace(imageRefRe(key, 'g'), `$1eth:${txHash}`);
   }
   return out;
 }
@@ -189,24 +243,26 @@ function placeholderHash() {
  * the draft as typed would undercount.
  * @returns {Promise<{ bytes: number, limit: number, ok: boolean }>}
  */
-export async function measurePayload({ tags = [], markdown, files = {} }) {
+export async function measurePayload({ tags = [], markdown, files = {}, meta = {} }) {
   let doc = markdown || '';
   for (const key of usedImageKeys(doc, files)) {
     doc = doc.replace(imageRefRe(key, 'g'), `$1eth:${placeholderHash()}`);
   }
-  const payload = await encodePayload({ tags, markdown: doc });
+  const payload = await encodePayload({ tags, markdown: doc, meta });
   const limit = MAX_CALLDATA_BYTES;
   return { bytes: payload.length, limit, ok: payload.length <= limit };
 }
 
 /**
  * Publish a post on `chainId`.
- * @param {{ chainId: number, title: string, tags?: string[], markdown: string }} draft
+ * `meta` is the rest of the front-matter — the language, the relations —
+ * which rides in the same payload as the tags (spec §5.1).
+ * @param {{ chainId: number, title: string, tags?: string[], markdown: string, meta?: object }} draft
  * @returns {Promise<`0x${string}`>} tx hash of the publish call
  */
-export async function publishPost({ chainId, title, tags = [], markdown }) {
+export async function publishPost({ chainId, title, tags = [], markdown, meta = {} }) {
   const { wallet, account } = await getWallet(chainId);
-  const payload = await encodePayload({ tags, markdown });
+  const payload = await encodePayload({ tags, markdown, meta });
   const titleHex = encodeTitle(title);
   return wallet.writeContract({
     account,

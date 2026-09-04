@@ -1,0 +1,16 @@
+{
+  "name": "xueni-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Xueni as a macOS application: a Tauri shell around the same web app.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon ../webapp/public/icon.svg",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.1"
+  }
+}

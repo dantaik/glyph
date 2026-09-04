@@ -14,7 +14,8 @@
 // sweep takes several round trips — the way to watch posts arrive one window
 // at a time; `?fixtures=1&window=700&log=1` shows it in the console.
 
-import { buildWorld } from './fixtureWorld';
+import { ENS_RECORDS, buildWorld, ensAddressOf, ensNameOf } from './fixtureWorld';
+import { buildPayloadText, parsePayloadText } from './payloadText';
 
 const DELAY_MIN_MS = 350;
 const DELAY_SPAN_MS = 250;
@@ -77,7 +78,8 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
     async block(which) {
       await wait();
       const number = which === 'latest' ? world.head : BigInt(which);
-      return { number, timestamp: world.tsOf(number) };
+      // A constant base fee: the demo is about the reader, not the market.
+      return { number, timestamp: world.tsOf(number), baseFeePerGas: 1n };
     },
 
     async postsInRange(from, to) {
@@ -116,15 +118,46 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
       await wait();
       const body = bodyByTx.get(txHash);
       if (!body) throw new Error('no such transaction in the demo data');
-      return { tags: [...body.tags], markdown: body.markdown };
+      // Built and re-parsed through the real text layer, so the demo body
+      // carries the same `text` and front-matter the chain would.
+      const text = buildPayloadText({
+        markdown: body.markdown,
+        meta: { ...(body.meta ?? {}), tags: body.tags },
+      });
+      return {
+        ...parsePayloadText(text),
+        text,
+        compressedBytes: Math.ceil(new TextEncoder().encode(text).length * 0.45),
+      };
     },
 
     async imageBytes() {
       throw new Error('the demo data has no on-chain images'); // bodies use data: URIs instead
     },
 
-    async ensName() {
-      return null; // demo data has no ENS names
+    // The demo's ENS: one author with a name, on Ethereum only, so the
+    // avatar-and-profile path is visible in the DEV demo as it is on chain.
+    hasEns: world.chainId === 1,
+
+    async ensName(address) {
+      await wait();
+      return world.chainId === 1 ? ensNameOf(address) : null;
+    },
+
+    async ensAddress(name) {
+      await wait();
+      return world.chainId === 1 ? ensAddressOf(name) : null;
+    },
+
+    async ensAvatar() {
+      await wait();
+      return null; // no demo avatar: the identicon is what the demo shows
+    },
+
+    async ensText(name, key) {
+      await wait();
+      if (world.chainId !== 1) return null;
+      return ENS_RECORDS[String(name ?? '').toLowerCase()]?.[key] ?? null;
     },
   };
 }

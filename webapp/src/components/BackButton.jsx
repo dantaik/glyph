@@ -8,6 +8,7 @@ export default function BackButton({ onClick, label }) {
     <button
       type="button"
       onClick={onClick}
+      data-noprint=""
       className={`-ml-3 inline-flex items-center gap-1.5 ${BTN_QUIET}`}
     >
       <ArrowLeft size={16} />

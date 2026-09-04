@@ -1,27 +1,34 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useCallback, useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   embedImages,
+  hashProcessedImage,
+  nextImageKeys,
   publishPost,
   usedImageKeys,
   measurePayload,
   MAX_CALLDATA_BYTES,
 } from '../lib/publish';
+import { knownImage } from '../lib/imageLedger';
 import { getClient } from '../lib/clients';
+import { READ_CHAIN_IDS } from '../lib/config';
 import { getReader } from '../lib/data';
-import { resolvePublishChain, usePublishChainId } from '../lib/config';
+import { resolvePublishChain, savePublishChainId, usePublishChainId } from '../lib/config';
 import { useWallet } from '../lib/wallet';
-import { chainName, etherscanTxUrl } from '../lib/format';
+import { chainName, etherscanTxUrl, fmtRelTime } from '../lib/format';
+import { clearDraft, isEmptyDraft, loadDraft, saveDraft, takePendingDraftPatch } from '../lib/drafts';
 import { t, useLang } from '../lib/i18n';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
+import ImportMarkdown from './ImportMarkdown';
+import RelationsFields from './RelationsFields';
 import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
 import WalletPanel from './WalletPanel';
-import { BTN_PRIMARY, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { BTN_PRIMARY, BTN_QUIET, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 import { Body, Meta, Micro } from './Text';
 import {
-  getMarketState,
+  getMarketStates,
   estimatePublishGas,
   estimateImageGas,
   gasToCost,
@@ -36,6 +43,13 @@ import {
 const MarkdownEditor = lazy(() => import('./MarkdownEditor'));
 
 const PLACEHOLDER_TITLE = '';
+
+/**
+ * How long after the last keystroke the draft is written. Long enough that
+ * typing a sentence is one write, short enough that nothing is lost to a
+ * closed tab.
+ */
+const DRAFT_SAVE_DELAY_MS = 500;
 
 /**
  * The starting draft, in the language the tab was opened in. Read as a
@@ -55,7 +69,17 @@ export default function Publisher() {
   const [statusMsg, setStatusMsg] = useState('');
   const [txHash, setTxHash] = useState(null);
   const [isFirstPost, setIsFirstPost] = useState(true);
-  const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
+  // One entry per chain the app reads: the draft's cost can then be shown
+  // on the chain it is going to AND on the others, which is the second big
+  // lever on what a post costs.
+  const [markets, setMarkets] = useState({});
+  // The last day of base fees on the publish chain (gasHistory.js).
+  const [history, setHistory] = useState([]);
+  // Front-matter beyond the tags — the language, the relations. Empty until
+  // the Relations fields fill it; carried in the draft either way.
+  const [meta, setMeta] = useState({});
+  // Set when what is on screen came back from storage: drives the notice.
+  const [restoredAt, setRestoredAt] = useState(null);
   useLang(); // the phrases below are read at render time
   const { account, chainId: walletChainId, connect } = useWallet();
   // The chain to publish on: the one picked here, else the wallet's own
@@ -65,7 +89,76 @@ export default function Publisher() {
   const pickedChain = usePublishChainId();
   const chainId = resolvePublishChain(pickedChain, walletChainId);
   const reader = getReader(chainId);
+  // The market on the chain this draft is going to; the rest are what the
+  // comparison lines are made of.
+  const market = markets[chainId] ?? { gasPriceWei: null, ethUsd: null };
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
+
+  // --- The draft, kept across the tab ------------------------------------
+  //
+  // Read once on mount, written a moment after every change. `hydrated`
+  // gates the write: without it the empty form this component starts with
+  // would overwrite the stored letter in the instant before the read
+  // returns.
+  const hydrated = useRef(false);
+  const skipSave = useRef(false);
+  // Bumped whenever the draft is deliberately forgotten. A save scheduled
+  // before that moment must not land after it: publishing takes a second or
+  // two, a debounced write is half a second out, and on a busy machine the
+  // timer can fire after the publish has already cleared the draft — which
+  // would put a letter that is now on chain back in the editor.
+  const draftEpoch = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await loadDraft().catch(() => null);
+      // "Reply to this post" hands over its fields in memory (drafts.js).
+      const patch = takePendingDraftPatch();
+      if (cancelled) return;
+      const restoring = Boolean(stored) && !isEmptyDraft(stored);
+      if (restoring) {
+        setTitle(stored.title ?? '');
+        setTags(stored.tags ?? []);
+        setMarkdown(stored.markdown ?? '');
+        setFiles(stored.files ?? {});
+        setMeta(stored.meta ?? {});
+        setRestoredAt(stored.updatedAt ?? null);
+      }
+      if (patch) {
+        if (patch.title != null) setTitle(patch.title);
+        if (patch.markdown != null) setMarkdown(patch.markdown);
+        if (patch.tags != null) setTags(patch.tags);
+        if (patch.meta) setMeta((cur) => ({ ...cur, ...patch.meta }));
+      }
+      hydrated.current = true;
+      // Restoring is not itself a change worth writing back: saving here
+      // would only move `updatedAt` forward, and the notice would claim the
+      // letter was written a moment ago. A patch IS a change, so it saves.
+      if (restoring && !patch) skipSave.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated.current) return undefined;
+    if (skipSave.current) {
+      skipSave.current = false;
+      return undefined;
+    }
+    const draft = { title, tags, markdown, meta, files };
+    const epoch = draftEpoch.current;
+    const id = setTimeout(() => {
+      if (draftEpoch.current !== epoch) return; // published or discarded since
+      // An untouched form is not a draft: it is never stored, so opening the
+      // write tab and leaving does not leave something to restore.
+      if (isEmptyDraft(draft)) clearDraft().catch(() => {});
+      else saveDraft(draft).catch(() => {});
+    }, DRAFT_SAVE_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [title, tags, markdown, meta, files]);
 
   // Stable preview URLs for uploaded files — shared by the dropzone
   // thumbnails and the editor's live preview pane.
@@ -100,6 +193,70 @@ export default function Publisher() {
   // what publishing will really sign.
   const usedKeys = useMemo(() => usedImageKeys(markdown, files), [markdown, files]);
 
+  // --- Images already on chain -------------------------------------------
+  //
+  // An attached image whose processed bytes this browser has already
+  // published on this chain costs nothing to use again (imageLedger.js), and
+  // the estimate should say so before the writer commits. Hashing means
+  // processing the image, so each File is hashed once and remembered.
+  const [alreadyOnChain, setAlreadyOnChain] = useState({});
+  const hashes = useRef(new WeakMap()); // File -> hash
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const out = {};
+      for (const key of usedKeys) {
+        const file = files[key];
+        if (!file) continue;
+        try {
+          let hash = hashes.current.get(file);
+          if (!hash) {
+            hash = (await hashProcessedImage(file)).hash;
+            hashes.current.set(file, hash);
+          }
+          out[key] = Boolean(knownImage(chainId, hash));
+        } catch {
+          // A browser that cannot process the image here will say so
+          // properly at publish time; the estimate just assumes it is new.
+          out[key] = false;
+        }
+      }
+      if (!cancelled) setAlreadyOnChain(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [usedKeys, files, chainId]);
+
+  /** Images pasted or dropped into the editor: attached, and named. */
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const addImagesFromEditor = useCallback((incoming) => {
+    const keys = nextImageKeys(filesRef.current, incoming.length);
+    setFiles((cur) => {
+      const next = { ...cur };
+      keys.forEach((key, i) => {
+        next[key] = incoming[i];
+      });
+      return next;
+    });
+    return keys;
+  }, []);
+
+  /** A `.md` file becoming the draft (markdownImport.js). */
+  const importDraft = (fields) => {
+    setTitle(fields.title);
+    setTags(fields.tags);
+    setTagsInput('');
+    setMarkdown(fields.markdown);
+    setMeta(fields.meta);
+    setRestoredAt(null);
+  };
+
+  /** On-chain image references, resolved for the preview pane. */
+  const resolveEth = useCallback((md) => reader.resolveImages(md), [reader]);
+
   // First-post status (drives the cold-SSTORE estimate), from the shared
   // wallet store instead of a one-off eth_accounts poll.
   useEffect(() => {
@@ -117,12 +274,15 @@ export default function Publisher() {
     };
   }, [account, reader]);
 
-  // Poll gas + ETH price every 30s.
+  // Poll gas + ETH price every 30s, for every chain at once — the price is
+  // one lookup shared between them, and the comparison needs them all.
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
-      const m = await getMarketState(getClient(chainId));
-      if (!cancelled) setMarket(m);
+      const m = await getMarketStates(
+        READ_CHAIN_IDS.map((id) => ({ chainId: id, client: getClient(id) })),
+      );
+      if (!cancelled) setMarkets(m);
     };
     refresh();
     const id = setInterval(refresh, 30_000);
@@ -130,12 +290,29 @@ export default function Publisher() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [chainId]);
+  }, []);
+
+  // The day's base fees for the chain being published to. Held for ten
+  // minutes by the reader, so switching back and forth costs nothing.
+  useEffect(() => {
+    let cancelled = false;
+    setHistory([]);
+    reader
+      .baseFees()
+      .then((h) => !cancelled && setHistory(h))
+      .catch(() => {}); // a node that will not serve headers just hides the line
+    return () => {
+      cancelled = true;
+    };
+  }, [reader]);
 
   // --- Cost estimate ---
+  //
+  // The gas this draft would burn, which is the same wherever it is sent —
+  // kept apart from the price, so the same figure can be costed on every
+  // chain and at any hour of the day.
   // Rough approximation — actual brotli output may differ a little either way.
-  const costEstimate = useMemo(() => {
-    if (!market.gasPriceWei) return null;
+  const gas = useMemo(() => {
     // payload raw bytes: 3 header + tags + markdown
     const rawBytes =
       3 +
@@ -143,33 +320,53 @@ export default function Publisher() {
       new TextEncoder().encode(markdown).length;
     // brotli q11 on markdown text typically lands at 0.35–0.5
     const estCompressed = Math.max(60, Math.ceil(rawBytes * 0.45));
-
     const postGas = estimatePublishGas(estCompressed, isFirstPost);
-    const postCost = gasToCost(postGas, market.gasPriceWei, market.ethUsd);
-
-    // Image costs: estimate post-processing size at 50 KB if not yet processed
-    // (real value depends on the source image; we use a placeholder until uploaded)
-    const imageCosts = usedKeys.map((key) => {
-      const estBytes = Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3));
-      const g = estimateImageGas(estBytes);
-      return { key, ...gasToCost(g, market.gasPriceWei, market.ethUsd), gas: g };
-    });
-
-    const totalGas = postGas + imageCosts.reduce((a, c) => a + c.gas, 0);
-    const totalCost = gasToCost(totalGas, market.gasPriceWei, market.ethUsd);
-
+    // The real size depends on the source image; a third of the original is
+    // a fair guess until it has actually been processed.
+    const images = usedKeys.map((key) => ({
+      key,
+      // Already on chain: the reference costs nothing to write.
+      reused: alreadyOnChain[key] === true,
+      gas: alreadyOnChain[key]
+        ? 0
+        : estimateImageGas(Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3))),
+    }));
     return {
-      postGas,
-      postCost,
-      imageCosts,
-      totalGas,
-      totalCost,
       estCompressed,
+      postGas,
+      images,
+      totalGas: postGas + images.reduce((a, c) => a + c.gas, 0),
+    };
+  }, [tags, markdown, files, usedKeys, isFirstPost, alreadyOnChain]);
+
+  const costEstimate = useMemo(() => {
+    if (!market.gasPriceWei) return null;
+    const price = (g) => gasToCost(g, market.gasPriceWei, market.ethUsd);
+    return {
+      postGas: gas.postGas,
+      postCost: price(gas.postGas),
+      imageCosts: gas.images.map(({ key, gas: g, reused }) => ({ key, gas: g, reused, ...price(g) })),
+      totalGas: gas.totalGas,
+      totalCost: price(gas.totalGas),
+      estCompressed: gas.estCompressed,
       // Rough — the exact size is measured with brotli at publish time.
       limitBytes: MAX_CALLDATA_BYTES,
-      nearLimit: estCompressed > MAX_CALLDATA_BYTES * 0.9,
+      nearLimit: gas.estCompressed > MAX_CALLDATA_BYTES * 0.9,
     };
-  }, [market, tags, markdown, files, usedKeys, isFirstPost]);
+  }, [market, gas]);
+
+  /** The same draft, priced on the chains it is NOT going to. */
+  const comparisons = useMemo(
+    () =>
+      READ_CHAIN_IDS.filter((id) => id !== chainId).map((id) => {
+        const m = markets[id];
+        return {
+          chainId: id,
+          cost: m?.gasPriceWei ? gasToCost(gas.totalGas, m.gasPriceWei, m.ethUsd) : null,
+        };
+      }),
+    [chainId, markets, gas],
+  );
 
   // --- Tag handling ---
   // Delimiters: Enter, half/full-width comma (,) and semicolon (;).
@@ -215,11 +412,26 @@ export default function Publisher() {
     markdown.trim() &&
     uploadRefs.every((k) => files[k]);
 
-  const resetDraft = () => {
+  /** Forget the stored draft, and any save still on its way to it. */
+  const forgetDraft = () => {
+    draftEpoch.current += 1;
+    clearDraft().catch(() => {});
+  };
+
+  /** Back to an empty form, and nothing left in storage. */
+  const emptyTheForm = () => {
+    forgetDraft();
     setTitle(PLACEHOLDER_TITLE);
     setTags([]);
+    setTagsInput('');
     setMarkdown(placeholderBody());
     setFiles({});
+    setMeta({});
+    setRestoredAt(null);
+  };
+
+  const resetDraft = () => {
+    emptyTheForm();
     setStatus('idle');
     setStatusMsg('');
     setTxHash(null);
@@ -239,7 +451,7 @@ export default function Publisher() {
       // Images are uploaded one paid transaction at a time, so check the
       // body against the transaction ceiling while failing is still free.
       setStatusMsg(t('publish.compressing'));
-      const size = await measurePayload({ tags, markdown, files });
+      const size = await measurePayload({ tags, markdown, files, meta });
       if (!size.ok) {
         const kb = (n) => `${Math.ceil(n / 1024)} KB`;
         setStatus('error');
@@ -252,8 +464,10 @@ export default function Publisher() {
         setStatusMsg(t('publish.uploadingToChain'));
         finalMd = await embedImages(markdown, files, {
           chainId,
-          onProgress: (key, i, total) =>
-            setStatusMsg(t('publish.uploadProgress', { index: i, total, key })),
+          onProgress: (key, i, total, { reused } = {}) =>
+            setStatusMsg(
+              t(reused ? 'publish.reusingImage' : 'publish.uploadProgress', { index: i, total, key }),
+            ),
         });
         setMarkdown(finalMd);
       }
@@ -265,15 +479,34 @@ export default function Publisher() {
         title: title.trim(),
         tags,
         markdown: finalMd,
+        meta,
       });
       setTxHash(hash);
       setStatus('done');
       setStatusMsg(t('publish.done'));
+      // It is on chain now; keeping a copy of it here would only offer to
+      // restore something already published.
+      forgetDraft();
+      setRestoredAt(null);
     } catch (err) {
       setStatus('error');
       setStatusMsg(err.message || t('publish.failed'));
     }
   };
+
+  // While images are being paid for, or a publish is waiting to be signed,
+  // leaving costs money or loses a signature. Every other moment is covered
+  // by the autosave above, so a warning then would be noise.
+  const inFlight = status === 'processing' || status === 'signing';
+  useEffect(() => {
+    if (!inFlight) return undefined;
+    const warn = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // older browsers want this to show their own prompt
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [inFlight]);
 
   // --- Render ---
   return (
@@ -283,6 +516,23 @@ export default function Publisher() {
         picked={pickedChain != null}
         disabled={status === 'processing' || status === 'signing'}
       />
+
+      {restoredAt != null && (
+        <div
+          role="status"
+          data-draft-restored=""
+          className="mb-8 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-paper-raised px-4 py-2.5"
+        >
+          <Meta as="span">
+            {t('draft.restored', {
+              when: fmtRelTime(new Date(restoredAt), { exact: true }) ?? '',
+            })}
+          </Meta>
+          <button type="button" onClick={emptyTheForm} className={BTN_QUIET}>
+            {t('draft.discard')}
+          </button>
+        </div>
+      )}
 
       <SectionHeader label={t('publish.titleHeading')} />
       <div className="mb-10">
@@ -337,9 +587,24 @@ export default function Publisher() {
         </div>
       </div>
 
+      <div className="mb-10">
+        <RelationsFields
+          meta={meta}
+          onChange={setMeta}
+          chainId={chainId}
+          disabled={status === 'processing' || status === 'signing'}
+        />
+      </div>
+
       <SectionHeader
         label={t('publish.bodyHeading')}
         right={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ImportMarkdown
+              onImport={importDraft}
+              confirmReplace={!isEmptyDraft({ title, tags, markdown, meta, files })}
+              disabled={status === 'processing' || status === 'signing'}
+            />
           <div
             role="group"
             aria-label={t('publish.editorView')}
@@ -362,6 +627,7 @@ export default function Publisher() {
               {t('publish.preview')}
             </button>
           </div>
+          </div>
         }
       />
       <div className="mb-10">
@@ -373,6 +639,8 @@ export default function Publisher() {
             disabled={status === 'processing'}
             height="26rem"
             previewUrls={filePreviews}
+            resolveEth={resolveEth}
+            onAddImages={addImagesFromEditor}
           />
         </Suspense>
       </div>
@@ -398,7 +666,14 @@ export default function Publisher() {
 
       <SectionHeader label={t('publish.costHeading')} />
       <div className="mb-6">
-        <CostPanel estimate={costEstimate} market={market} chainId={chainId} />
+        <CostPanel
+          estimate={costEstimate}
+          market={market}
+          chainId={chainId}
+          history={history}
+          comparisons={comparisons}
+          onPublishThere={savePublishChainId}
+        />
       </div>
 
       <div className="pt-6">

@@ -168,7 +168,7 @@ export default {
   // --- 备份与恢复 ----------------------------------------------------------
   'backup.heading': '备份与恢复',
   'backup.note':
-    '把这一页的全部设置——各链的节点列表、扫描延迟、发布目标、界面语言、主题、正文字号、控制台日志——存成一个 JSON 文件，换浏览器、换电脑时再导入。导入前会先列出将要改动的项目，确认后才生效，无需刷新。',
+    '把这一页的全部设置——各链的节点列表、扫描延迟、发布目标、界面语言、主题、控制台日志——存成一个 JSON 文件，换浏览器、换电脑时再导入。导入前会先列出将要改动的项目，确认后才生效，无需刷新。',
   'backup.export': '导出设置',
   'backup.import': '导入设置…',
   'backup.pickFile': '选择设置文件',
@@ -197,6 +197,15 @@ export default {
   'wallet.followingWallet': ({ chain }) => `钱包已在${chain}上；发布目标跟随钱包所在的网络。`,
   'wallet.willConnect': '发布时会请求连接钱包；文章会永久写入所选网络上的合约。',
   'wallet.none': '未检测到钱包，请安装 MetaMask 等浏览器钱包。',
+  'wallet.chooseWallet': '用哪个钱包签名',
+  'wallet.browserWallet': '浏览器钱包',
+  'wallet.walletConnect': 'WalletConnect',
+  'wallet.disconnect': '断开连接',
+  'wallet.connectedWith': ({ wallet }) => `已通过 ${wallet} 连接`,
+
+  // --- 留在浏览器里的草稿 ---------------------------------------------------
+  'draft.restored': ({ when }) => `已恢复${when}的草稿`,
+  'draft.discard': '丢弃',
 
   // --- 写作与发布 ----------------------------------------------------------
   'publish.placeholderBody': `# 小标题
@@ -226,6 +235,8 @@ export default {
   'publish.compressing': '正在压缩正文…',
   'publish.uploadingToChain': '正在上传图片到链上…',
   'publish.uploadProgress': ({ index, total, key }) => `正在上传图片（${index}/${total}）：${key}`,
+  'publish.reusingImage': ({ index, total, key }) =>
+    `图片（${index}/${total}）：${key} 已在链上，直接复用`,
   'publish.done': '发布成功！',
   'publish.failed': '发布失败',
   'publish.noWalletConnected': '未连接钱包',
@@ -236,7 +247,137 @@ export default {
   'publish.waitForBlock': '等待区块确认后即可在列表中看到',
   'publish.writeAnother': '再写一封',
 
+  // --- 关注的作者 -----------------------------------------------------------
+  'following.follow': '关注',
+  'following.following': '已关注',
+  'following.followTitle': '在这个浏览器里关注这位作者',
+  'following.unfollowTitle': '取消关注',
+  'following.title': '关注',
+  'following.subtitle': ({ count }) => `${count} 位作者`,
+  'following.neverPublished': ({ count }) => ` · 其中 ${count} 位还没发表过`,
+  'following.allPosts': '全部文章',
+  'following.link': ({ count }) => `关注中 ${count}`,
+  'following.empty': '还没有关注任何人',
+  'following.emptyBody': '在作者页上点「关注」，他们的文章就会出现在这里。每位作者只需一次读取，完全不扫描区块范围。',
+  'following.goRead': '去找几位作者',
+  'following.nothingYet': '还没有他们的文章',
+  'following.nothingYetBody': '你关注的作者还没有在这里读到过的文章。',
+  'following.write': '自己写一篇',
+  'following.newSince': ({ when }) => `上次读到这里（${when}）`,
+  'following.reading': '正在读取他们的文章…',
+  'following.settingsHeading': '关注',
+  'following.settingsNote': '只保存在这个浏览器里，并随设置文件一起导出。关注不花费任何费用，对方也不会知道。',
+  'following.none': '还没有关注任何人。',
+  'following.remove': ({ address }) => `取消关注 ${address}`,
+
+  // --- ENS：合约有意不提供的身份层 -----------------------------------------
+  'ens.resolving': '正在解析名称……',
+  'ens.notFound': ({ name }) => `没有这个名称：${name}`,
+  'ens.notFoundBody':
+    '这个名称在以太坊上没有对应的地址。可能从未注册，可能已过期，也可能指向的不是地址。用地址总能找到作者。',
+  'ens.goHome': '回到列表',
+  'profile.website': '网站',
+  'profile.twitter': 'X',
+  'profile.github': 'GitHub',
+
+  // --- 把一篇文章带出这个页面 -----------------------------------------------
+  'share.label': '分享',
+  'share.menu': '分享这篇文章',
+  'share.copyLink': '复制链接',
+  'share.share': '分享……',
+  'share.copyEmbed': '复制嵌入代码',
+  'share.copyRef': '复制引用',
+  'share.copied': '已复制',
+  'lightbox.close': '关闭',
+  'lightbox.image': '文章中的图片',
+
+  // --- 存档包：把这台浏览器读过的一切装成一个文件 ---------------------------
+  'archive.heading': '存档',
+  'archive.note':
+    '一个文件，装着这台浏览器读过的每篇文章在链上的原文，以及它们引用的图片。它是数据，不是程序：任何能读 JSON 的工具都能读它。导入到另一台浏览器，这些文章不需要任何节点就能打开——将来公共节点不再提供今天的 calldata 时，靠的就是它。',
+  'archive.exportBrowser': '导出这里读过的全部',
+  'archive.exportAuthor': '导出这位作者',
+  'archive.counts': ({ posts, images }) => `${posts} 篇文章，${images} 张图片`,
+  'archive.nothingRead': '这台浏览器还没读过任何文章。',
+  'archive.import': '导入存档……',
+  'archive.pickFile': '选择存档文件',
+  'archive.exporting': ({ done, total }) => `正在读取 ${done} / ${total}……`,
+  'archive.walking': '正在把这位作者一路读到第一篇……',
+  'archive.chainLine': ({ chain, posts, images }) => `${chain}：${posts} 篇文章，${images} 张图片`,
+  'archive.completeAuthors': ({ count }) => `${count} 位作者，完整`,
+  'archive.applied': ({ posts, images, skipped }) =>
+    `新增 ${posts} 篇文章和 ${images} 张图片，其中 ${skipped} 篇本来就在。`,
+  'archive.notJson': '不是有效的 JSON 文件。',
+  'archive.notArchive': '这不是存档文件（缺少 glyph.archive 标记）。',
+  'archive.wrongVersion': ({ version }) => `不支持版本 ${version} 的存档。`,
+  'archive.wrongContract': ({ contract }) => `这个存档来自另一份合约部署（${contract}）。`,
+  'archive.droppedPosts': ({ count }) => `忽略 ${count} 篇格式错误或链未知的文章。`,
+  'archive.droppedImages': ({ count }) => `忽略 ${count} 张格式错误或链未知的图片。`,
+  'archive.empty': '文件里没有可以导入的文章。',
+  'archive.failed': ({ reason }) => `无法读取存档：${reason}`,
+
+  // --- 在已读过的文章里查找 -------------------------------------------------
+  'tag.title': ({ tag }) => `标签：${tag}`,
+  'tag.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,
+  'tag.reading': '正在读取本机保存的文章…',
+  'tag.none': ({ tag }) => `已读过的文章里没有带 ${tag} 标签的`,
+  'tag.noneBody': '往前多读一些，这一页就会找到更多。',
+  'tag.readMore': '读更早的文章',
+  'search.open': '搜索',
+  'search.title': '搜索',
+  'search.placeholder': '标题、标签或正文里的一个词',
+  'search.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,
+  'search.reading': '正在读取本机保存的文章…',
+  'search.none': ({ query }) => `已读过的文章里没有包含“${query}”的`,
+  'search.noneBody': '往前多读一些，这一页就会找到更多。',
+  'search.readMore': '读更早的文章',
+  'search.tagCloud': '目前见过的标签',
+  'search.noTagsYet': '还没有标签——打开几篇文章后就会出现。',
+
+  // --- 文章之间的关系 -------------------------------------------------------
+  'relations.heading': '关系',
+  'relations.note': '都是可选的。这些字段随文章的前置数据一起上链，不认识某个字段的阅读器会直接忽略它。',
+  'relations.re': '回复',
+  'relations.supersedes': '替代',
+  'relations.prev': '承接自',
+  'relations.series': '系列',
+  'relations.seriesPlaceholder': '给小满的信',
+  'relations.part': '第几篇',
+  'relations.partNeedsSeries': '填了篇号，还需要一个系列名。',
+  'relations.language': '语言',
+  'relations.languagePlaceholder': 'en、zh…',
+  'relations.refPlaceholder': '0x交易哈希，或文章链接',
+  'relations.invalidRef': '这不是一个文章引用。',
+  'relations.noSuchPost': '这个引用没有对应的文章。',
+  'relations.inReplyTo': '回复',
+  'relations.continuesFrom': '承接自',
+  'relations.supersedesLine': '替代',
+  'relations.partOf': ({ part, series }) => `${series} 第 ${part} 篇`,
+  'relations.inSeries': ({ series }) => `属于《${series}》`,
+  'relations.partsKnown': ({ count }) => ` · 本机已读 ${count} 篇`,
+  'relations.supersededBy': '这篇文章有更新的版本：',
+  'relations.replies': '回复',
+  'relations.continuedIn': '后续',
+  'relations.seriesHeading': ({ series }) => `《${series}》的其他篇`,
+  'relations.partShort': ({ part }) => `第 ${part} 篇`,
+  'relations.knownHere': '以上来自本浏览器已经读过的文章。',
+  'relations.reply': '回复这篇',
+
+  // --- 链上原文与文件 -------------------------------------------------------
+  'raw.show': '原文',
+  'raw.hide': '收起原文',
+  'raw.compressed': ({ bytes }) => `链上 ${bytes}`,
+  'raw.decompressed': ({ bytes }) => `正文 ${bytes}`,
+  'raw.ratio': ({ ratio }) => `压缩 ${ratio} 倍`,
+  'export.download': '下载 .md',
+  'export.import': '导入 .md…',
+  'export.pickMarkdown': '选择一个 Markdown 文件',
+  'export.importReplace': '用这个文件替换正在写的内容？',
+  'export.imported': ({ name }) => `已导入 ${name}`,
+  'export.importDropped': ({ keys }) => `已导入；以下本版本不认识的前置字段被略过：${keys}`,
+
   // --- 图片上传 ------------------------------------------------------------
+  'image.pasteHint': '也可以直接把图片粘贴或拖进正文，会自动作为附件并在光标处插入引用。',
   'image.hint': '图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。',
   'image.copyRef': ({ key }) => `复制引用 ${key}`,
   'image.copyRefTitle': '点击复制引用',
@@ -254,6 +395,15 @@ export default {
   'cost.nearLimit': ({ limit }) =>
     `正文接近单笔交易上限（约 ${limit} KB 压缩后）。超出时发布会被节点拒绝，请精简正文或拆成多篇。`,
   'cost.total': '合计',
+  'cost.alreadyOnChain': '已在链上 · 无需费用',
+  'cost.sparklineLabel': ({ chain }) => `${chain} 最近一天的基础费`,
+  'cost.nowAt': ({ fee }) => `当前 ${fee}`,
+  'cost.low24h': ({ fee, time }) => `24 小时最低 ${fee}，在 ${time}`,
+  'cost.wouldHaveCost': ({ cost }) => `那时发这篇约需 ${cost}`,
+  'cost.onOtherChain': ({ chain, eth, usd }) => `在${chain}上约需 ${eth}${usd ? `（${usd}）` : ''}`,
+  'cost.onOtherChainUnknown': ({ chain }) => `${chain}的 gas 价格暂时读不到`,
+  'cost.publishThere': '发到那条链',
+  'cost.ownGasPriceNote': '各链的估算都使用该链节点报告的 gas 价格。',
 
   // --- 出错时 --------------------------------------------------------------
   'error.nodeBehind': ({ block }) => `节点尚未同步到区块 ${block}，稍后重试即可`,
@@ -298,11 +448,25 @@ export default {
   'settingsFile.themeShape': 'theme 应是 light、dark 或 null（跟随系统）。',
   'settingsFile.lang': ({ lang }) => `界面语言：${lang}`,
   'settingsFile.langShape': 'lang 应是 en 或 zh。',
+  'settingsFile.following': ({ count }) => `关注：${count} 位作者`,
+  'settingsFile.followingShape': 'following 应该是一组地址。',
+  'settingsFile.followingDropped': ({ count }) => `已忽略 ${count} 个不是地址的条目。`,
   'settingsFile.log': ({ state }) => `控制台日志：${state}`,
   'settingsFile.on': '开',
   'settingsFile.off': '关',
   'settingsFile.logShape': 'log 应是 true 或 false。',
   'settingsFile.nothing': '文件里没有可应用的设置。',
+
+  // --- 桌面应用 ------------------------------------------------------------
+  'desktop.updateAvailable': ({ version }) => `雪泥 ${version} 已经发布`,
+  'desktop.download': '下载',
+  'desktop.dismiss': '不再提示',
+  'desktop.walletConnectOnly':
+    '应用内没有浏览器钱包扩展，发布时通过 WalletConnect 签名：连接后会出现二维码，' +
+    '用手机上的钱包扫描即可。阅读完全不需要钱包。',
+  'desktop.noPublishInThisBuild':
+    '此版本无法发布：构建时没有提供 WalletConnect 项目 id，而应用内也没有可以用来签名的' +
+    '浏览器扩展。阅读一切照常。',
 
   // --- 链名 ----------------------------------------------------------------
   'chain.unknown': ({ id }) => `链 ${id}`,

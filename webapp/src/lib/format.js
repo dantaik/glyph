@@ -76,6 +76,16 @@ export function fmtIndex(index) {
   return t('post.index', { index: Number(index) + 1 });
 }
 
+/** A byte count, in the unit that reads easiest: `1,432 B`, `41.9 KB`. */
+export function fmtBytes(bytes) {
+  if (bytes == null) return '';
+  const n = Number(bytes);
+  if (!Number.isFinite(n)) return '';
+  if (n < 1024) return `${n.toLocaleString('en-US')} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 /** `22540123n` → `"22,540,123"` (comma grouping regardless of UI locale). */
 export function fmtBlock(block) {
   if (block === null || block === undefined) return '';
@@ -153,6 +163,24 @@ const absFormat = () => {
   }
   return fmt;
 };
+
+const CLOCK_FMTS = new Map();
+const clockFormat = () => {
+  const locale = getLocale();
+  let fmt = CLOCK_FMTS.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+    CLOCK_FMTS.set(locale, fmt);
+  }
+  return fmt;
+};
+
+/** Seconds since the epoch → `04:00`, the hour of the day alone; null-safe. */
+export function fmtClock(ts) {
+  if (ts == null) return null;
+  const date = new Date(Number(ts) * 1000);
+  return Number.isNaN(date.getTime()) ? null : clockFormat().format(date);
+}
 
 /** Seconds since the epoch → `September 3, 2026 at 15:04`; null-safe. */
 export function fmtAbsTime(ts) {

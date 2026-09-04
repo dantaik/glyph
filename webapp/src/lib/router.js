@@ -32,6 +32,23 @@ function currentUrl() {
   return { path: window.location.pathname, search: window.location.search };
 }
 
+/**
+ * What counts as a name in a URL. Narrow on purpose: it decides whether
+ * `/author/<segment>` is worth a lookup or is a mistyped address, and this
+ * has to agree with `isEnsName` in ens.js (which cannot be imported here —
+ * the router is the one module with no dependencies).
+ */
+export const ENS_NAME_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.eth$/;
+
+/** A path segment as a name: percent-escapes undone, lower-cased. */
+function decodeName(segment) {
+  try {
+    return decodeURIComponent(segment).trim().toLowerCase();
+  } catch {
+    return segment.trim().toLowerCase();
+  }
+}
+
 export function readParams() {
   if (typeof window === 'undefined') return {};
   const { path, search } = currentUrl();
@@ -53,14 +70,31 @@ export function readParams() {
     if (mTx[2] != null) out.txEvent = mTx[2];
   }
   const mAuthor = route.match(/^\/author\/(0x[0-9a-fA-F]{40})\/?$/);
+  // An author may also be named rather than numbered: `/author/xiaoman.eth`.
+  // The name stays in the URL — it is the readable half of the link, and the
+  // address it resolves to is a detail of this visit.
+  const mAuthorName = !mAuthor && route.match(/^\/author\/([^/]+)\/?$/);
   if (mAuthor) {
     out.author = mAuthor[1];
+  } else if (mAuthorName && ENS_NAME_RE.test(decodeName(mAuthorName[1]))) {
+    out.authorName = decodeName(mAuthorName[1]);
   } else if (out.author) {
     out.authorFromQuery = true; // legacy ?author= link
   }
   // Local status / configuration pages.
   if (route.match(/^\/scan\/?$/)) out.scan = '1';
   if (route.match(/^\/settings\/?$/)) out.settings = '1';
+  // Finding things among what this browser has read.
+  const mTag = route.match(/^\/tag\/(.+?)\/?$/);
+  if (mTag) {
+    try {
+      out.tag = decodeURIComponent(mTag[1]).trim();
+    } catch {
+      out.tag = mTag[1].trim(); // a malformed escape is still a tag to try
+    }
+  }
+  if (route.match(/^\/search\/?$/)) out.search = '1';
+  if (route.match(/^\/following\/?$/)) out.following = '1';
   return out;
 }
 
@@ -97,8 +131,12 @@ function buildUrl(next) {
       k === 'tx' ||
       k === 'txEvent' ||
       k === 'author' ||
+      k === 'authorName' ||
       k === 'scan' ||
       k === 'settings' ||
+      k === 'tag' ||
+      k === 'search' ||
+      k === 'following' ||
       k === 'authorFromQuery'
     )
       continue;
@@ -107,15 +145,19 @@ function buildUrl(next) {
   // Dev demo mode (fixtures) follows in-app navigation.
   if (next.fixtures == null && state.fixtures) sp.set('fixtures', state.fixtures);
   const search = sp.toString();
-  const route = next.tx
-    ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
-    : next.author
-      ? `/author/${next.author}`
-      : next.scan
-        ? '/scan'
-        : next.settings
-          ? '/settings'
-          : '/';
+  // The path a state map describes. These are mutually exclusive surfaces,
+  // so this reads as a list rather than as a nest of ternaries.
+  const route = (() => {
+    if (next.tx) return `/tx/${next.tx}${next.txEvent != null ? `/${next.txEvent}` : ''}`;
+    if (next.author) return `/author/${next.author}`;
+    if (next.authorName) return `/author/${encodeURIComponent(next.authorName)}`;
+    if (next.tag) return `/tag/${encodeURIComponent(next.tag)}`;
+    if (next.following) return '/following';
+    if (next.search) return '/search';
+    if (next.scan) return '/scan';
+    if (next.settings) return '/settings';
+    return '/';
+  })();
   // A post is on one chain: its URL must say which. Everything else carries
   // the chain only as a filter.
   const chain = next.tx ? (next.chain ?? null) : inheritedChain(next);
@@ -189,3 +231,4 @@ export function queryParam(name) {
 export const isHeadless = (params) => params.headless === '1' && Boolean(params.tx);
 
 export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView } from '@codemirror/view';
@@ -14,12 +14,19 @@ import { useTheme } from '../lib/theme';
  * - 'preview' renders only the full-width preview (the editor input is
  *   hidden entirely).
  *
+ * The preview shows both kinds of image reference: `upload:KEY` for a file
+ * attached to this draft (`previewUrls`), and `eth:0x…` for one already on
+ * chain (`resolveEth`, cache-first through the reader). Without the second,
+ * reusing an image you published before was writing blind.
+ *
+ * An image pasted or dropped into the text goes straight in: `onAddImages`
+ * attaches the files and returns their keys, and the references are written
+ * at the cursor.
+ *
  * Theme-aware: follows the app light/dark theme and pins chrome colors to
  * the design tokens (Prec.highest so the builtin oneDark bg never wins).
  *
- * Props: { value, onChange, mode, disabled, height, previewUrls }
- * previewUrls: { key: blobUrl } for uploaded images, used to render
- *   `upload:KEY` references in the preview.
+ * Props: { value, onChange, mode, disabled, height, previewUrls, resolveEth, onAddImages }
  */
 export default function MarkdownEditor({
   value,
@@ -28,13 +35,34 @@ export default function MarkdownEditor({
   disabled,
   height = '26rem',
   previewUrls = {},
+  resolveEth = null,
+  onAddImages = null,
 }) {
   const { isDark } = useTheme();
+  const [previewHtml, setPreviewHtml] = useState('');
+
+  // Object URLs minted for on-chain images in the preview; ours to revoke.
+  const urlsRef = useRef([]);
+  const releaseUrls = () => {
+    urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    urlsRef.current = [];
+  };
+  useEffect(() => () => releaseUrls(), []);
+
+  // Images arriving by paste or drop. Held in a ref so the editor's extensions
+  // stay stable — reconfiguring CodeMirror on every attached file would throw
+  // away its state mid-sentence.
+  const addImages = useRef(onAddImages);
+  addImages.current = onAddImages;
 
   const extensions = useMemo(
     () => [
       markdown({ base: markdownLanguage }),
       EditorView.lineWrapping,
+      EditorView.domEventHandlers({
+        paste: (event, view) => insertImages(event.clipboardData, view, event, addImages),
+        drop: (event, view) => insertImages(event.dataTransfer, view, event, addImages),
+      }),
       Prec.highest(
         EditorView.theme(
           {
@@ -64,17 +92,44 @@ export default function MarkdownEditor({
     [isDark],
   );
 
-  // Only computed in preview mode — no per-keystroke re-render while typing.
-  const previewHtml = useMemo(() => {
-    if (mode !== 'preview') return '';
-    // Resolve upload:KEY image references to blob URLs so the
-    // preview actually shows the uploaded images.
-    const resolved = value.replace(/!\[([^\]]*)\]\(upload:([^)\s]+)\)/g, (m, alt, key) => {
+  // Only computed in preview mode — no per-keystroke render while typing.
+  useEffect(() => {
+    if (mode !== 'preview') {
+      releaseUrls();
+      setPreviewHtml('');
+      return undefined;
+    }
+    let cancelled = false;
+    // Attached files first: they are already local, so they never flicker.
+    const withUploads = value.replace(/!\[([^\]]*)\]\(upload:([^)\s]+)\)/g, (m, alt, key) => {
       const url = previewUrls[key];
       return url ? `![${alt}](${url})` : m;
     });
-    return renderMarkdown(resolved);
-  }, [mode, value, previewUrls]);
+    (async () => {
+      let resolved = withUploads;
+      let urls = [];
+      if (resolveEth) {
+        // An image the node will not serve leaves its reference alone and
+        // renders as alt text, exactly as it does on a post page.
+        try {
+          ({ markdown: resolved, urls } = await resolveEth(withUploads));
+        } catch {
+          resolved = withUploads;
+          urls = [];
+        }
+      }
+      if (cancelled) {
+        urls.forEach((url) => URL.revokeObjectURL(url));
+        return;
+      }
+      releaseUrls();
+      urlsRef.current = urls;
+      setPreviewHtml(renderMarkdown(resolved));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, value, previewUrls, resolveEth]);
 
   return (
     <div className="grid grid-cols-1 gap-3">
@@ -107,4 +162,25 @@ export default function MarkdownEditor({
       )}
     </div>
   );
+}
+
+/**
+ * Attach whatever images a paste or a drop carried, and write their
+ * references at the cursor. Anything that is not an image — text, a file of
+ * another kind — is left to CodeMirror to handle as it always did.
+ */
+function insertImages(transfer, view, event, addImages) {
+  const onAdd = addImages.current;
+  const files = [...(transfer?.files ?? [])].filter((f) => f.type?.startsWith('image/'));
+  if (!onAdd || files.length === 0) return false;
+  event.preventDefault();
+  const keys = onAdd(files);
+  if (!keys?.length) return false;
+  const insert = keys.map((key) => `![](upload:${key})`).join('\n');
+  const at = view.state.selection.main.head;
+  view.dispatch({
+    changes: { from: at, to: at, insert },
+    selection: { anchor: at + insert.length },
+  });
+  return true;
 }

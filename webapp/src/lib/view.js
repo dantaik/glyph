@@ -12,8 +12,10 @@ import { DEFAULT_CHAIN_ID } from './chains';
 import { READ_CHAIN_IDS } from './config';
 import { getReader } from './data';
 import { MergedAuthorList } from './mergedAuthorList';
+import { FollowFeed } from './followFeed';
 import { MergedFeed } from './mergedFeed';
 import { PAGE_SIZE } from './reader';
+import { compareMerged, timeRows } from './timeline';
 import { useUrlState } from './router';
 
 /**
@@ -54,6 +56,20 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     return merged;
   }
 
+  /**
+   * Every post these chains have READ, merged newest first — not every post
+   * that exists.
+   *
+   * The feed shows posts inside swept ranges, because a hole in a feed is a
+   * lie about what is newest. Finding by tag or by word is a different
+   * question: any post this browser holds is a fair answer, whether it came
+   * from a sweep, an author's page or a link somebody sent. The surfaces
+   * that use this say what it covers.
+   */
+  function knownRows() {
+    return list.flatMap((r) => timeRows(r.store.allPosts(), r.chainId, null)).sort(compareMerged);
+  }
+
   /** `{ total, byChain }` — total is null until every chain has answered. */
   async function counts(author) {
     const settled = await Promise.allSettled(list.map((r) => r.count(author)));
@@ -73,8 +89,27 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     return { total: complete ? total : null, byChain };
   }
 
+  // One FollowFeed per set of followed authors, kept so that changing the
+  // list does not throw away the walks for the authors that stayed. The
+  // walks themselves belong to the readers, so nothing is walked twice.
+  const followFeeds = new Map();
+  function followFeed(addresses) {
+    const key = [...addresses].map((a) => String(a).toLowerCase()).sort().join(',');
+    let feed = followFeeds.get(key);
+    if (!feed) {
+      feed = new FollowFeed({ readers: list, addresses, pageSize });
+      followFeeds.set(key, feed);
+    }
+    return feed;
+  }
+
+  // Only mainnet hosts ENS, and an address is the same everywhere, so a
+  // Taiko-only view still asks Ethereum. When this view has no mainnet
+  // reader at all, every lookup answers null rather than guessing.
   const ens = ensReader ?? byId.get(DEFAULT_CHAIN_ID) ?? null;
   const ensName = (address) => (ens ? ens.ensName(address) : Promise.resolve(null));
+  const resolveEnsName = (name) => (ens ? ens.resolveEnsName(name) : Promise.resolve(null));
+  const ensProfile = (address) => (ens ? ens.ensProfile(address) : Promise.resolve(null));
 
   /** The reader for one of this view's chains (null when it isn't in the view). */
   const reader = (chainId) => byId.get(Number(chainId)) ?? null;
@@ -101,7 +136,23 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     return null;
   }
 
-  return { key, chainIds, readers: list, reader, feed, authorList, counts, ensName, loadPostBody, findMetaByTx, findPostAnywhere };
+  return {
+    key,
+    chainIds,
+    readers: list,
+    reader,
+    feed,
+    followFeed,
+    authorList,
+    counts,
+    ensName,
+    resolveEnsName,
+    ensProfile,
+    knownRows,
+    loadPostBody,
+    findMetaByTx,
+    findPostAnywhere,
+  };
 }
 
 /** The chains a URL filter selects: that chain alone, or every chain read. */

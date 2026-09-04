@@ -1,0 +1,189 @@
+# desktop.yml — the macOS application.
+#
+# Kept apart from ci.yml on purpose: that workflow is the fast check every
+# push gets, and a Tauri build on a macOS runner is neither fast nor free.
+# This one runs when the shell itself changes, and on a version tag, where
+# it publishes the release the README links to.
+#
+# A note on the triggers: GitHub applies a `paths` filter to every push,
+# tags included, so a release tag whose commit happens not to touch
+# `desktop/**` would be silently skipped. Rather than risk that, tags have
+# no filter and the path filter lives on pull requests, which is where a
+# change to the shell actually arrives.
+name: desktop
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write # to create the release on a tag
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history, so an annotated tag's message is here to be
+          # read as the release notes.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            webapp/package-lock.json
+            desktop/package-lock.json
+
+      # Before anything is built: the tag says which version this is, and
+      # two files have to agree with it. A release whose app reports a
+      # different version than its tag is a bug nobody can fix afterwards.
+      - name: The tag and the version agree
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          conf=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
+          pkg=$(node -p "require('./desktop/package.json').version")
+          if [ "$tag" != "$conf" ] || [ "$tag" != "$pkg" ]; then
+            echo "tag $GITHUB_REF_NAME, tauri.conf.json $conf, package.json $pkg"
+            echo "Set the version in both files to $tag, or retag."
+            exit 1
+          fi
+
+      - run: npm ci
+        working-directory: webapp
+      - run: npm ci
+        working-directory: desktop
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Two, because the image crate is its own workspace (see below).
+          workspaces: |
+            desktop/src-tauri
+            desktop/src-tauri/transcode
+
+      # The image work is a crate of its own beside the shell (it is the
+      # only part with tests, and the only part that builds without a
+      # webview), so the tests are run where they live.
+      - name: Image transcoding tests
+        run: cargo test
+        working-directory: desktop/src-tauri/transcode
+
+      - name: Release notes from the tag message
+        id: notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          {
+            echo 'body<<XUENI_NOTES_EOF'
+            git tag -l --format='%(contents)' "$GITHUB_REF_NAME"
+            echo 'XUENI_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Apple signing is optional, but "optional" has to mean ABSENT rather
+      # than empty: a secret that does not exist becomes an empty string, and
+      # tauri reads a set-but-empty APPLE_CERTIFICATE as a certificate to
+      # import, which fails the bundle at codesign. `secrets` cannot be read
+      # in an `if:`, so the variables are put into the environment here, and
+      # only when there is really something to sign with. With none of them
+      # set tauri skips signing, the DMG is ad-hoc signed, and Gatekeeper
+      # warns on first launch (the README says what to do about it).
+      - name: Apple signing, when there is a certificate
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          ID: ${{ secrets.APPLE_ID }}
+          PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CERTIFICATE" ]; then
+            echo "No Apple certificate in this repository: the DMG will be ad-hoc signed."
+            exit 0
+          fi
+          # The heredoc form, because a certificate is multi-line and a
+          # password may be anything at all.
+          for name in APPLE_CERTIFICATE:CERTIFICATE \
+                      APPLE_CERTIFICATE_PASSWORD:CERTIFICATE_PASSWORD \
+                      APPLE_SIGNING_IDENTITY:SIGNING_IDENTITY \
+                      APPLE_ID:ID \
+                      APPLE_PASSWORD:PASSWORD \
+                      APPLE_TEAM_ID:TEAM_ID; do
+            key=${name%%:*}
+            value=$(printenv "${name##*:}" || true)
+            {
+              echo "$key<<XUENI_SECRET_EOF"
+              echo "$value"
+              echo "XUENI_SECRET_EOF"
+            } >> "$GITHUB_ENV"
+          done
+          echo "Signing with an Apple Developer ID."
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Inside the app there is no browser extension, so WalletConnect
+          # is the only way to sign. Without the secret the app still
+          # builds and reads; the write tab says it cannot publish.
+          VITE_WALLETCONNECT_PROJECT_ID: ${{ secrets.WALLETCONNECT_PROJECT_ID }}
+        with:
+          projectPath: desktop
+          args: --target universal-apple-darwin
+          # Empty on anything but a tag, which is how tauri-action is told
+          # to build without publishing a release.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('Xueni {0}', github.ref_name) || '' }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+
+      # There is no WebDriver for Tauri on macOS, so the app itself is not
+      # driven here; what can be checked is that the thing built is the
+      # thing described: a mountable DMG holding a signed, universal Xueni.
+      - name: The DMG holds a universal Xueni.app
+        run: |
+          dmg=$(find desktop/src-tauri/target -name '*.dmg' -print -quit)
+          if [ -z "$dmg" ]; then echo "no DMG was built"; exit 1; fi
+          echo "checking $dmg"
+          hdiutil attach "$dmg" -mountpoint /Volumes/XueniCheck -nobrowse -readonly
+          test -d /Volumes/XueniCheck/Xueni.app
+          # Informational: an unsigned build still carries the linker's own
+          # ad-hoc signature, but that is a detail of the toolchain and not
+          # something worth failing a release over. The architectures are.
+          codesign -dv /Volumes/XueniCheck/Xueni.app || echo "not signed (expected without an Apple identity)"
+          # Found rather than named: what the executable inside the bundle is
+          # called follows from productName, and is not ours to assume.
+          bin=$(find /Volumes/XueniCheck/Xueni.app/Contents/MacOS -type f -perm -111 -print -quit)
+          if [ -z "$bin" ]; then echo "no executable in the bundle"; exit 1; fi
+          archs=$(lipo -archs "$bin")
+          echo "architectures: $archs"
+          case "$archs" in *arm64*) ;; *) echo "no arm64 slice"; exit 1 ;; esac
+          case "$archs" in *x86_64*) ;; *) echo "no x86_64 slice"; exit 1 ;; esac
+          hdiutil detach /Volumes/XueniCheck
+
+      # One name the README can link to for good, whatever the version in
+      # the file tauri built is called.
+      - name: A download link that never changes
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dmg=$(find desktop/src-tauri/target -name '*.dmg' -print -quit)
+          cp "$dmg" Xueni-macOS.dmg
+          gh release upload "$GITHUB_REF_NAME" Xueni-macOS.dmg --clobber
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: Xueni-macOS-dmg
+          path: desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 7
