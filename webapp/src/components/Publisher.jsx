@@ -19,6 +19,7 @@ import { clearDraft, isEmptyDraft, loadDraft, saveDraft, takePendingDraftPatch }
 import { t, useLang } from '../lib/i18n';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
+import ImportMarkdown from './ImportMarkdown';
 import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
@@ -241,6 +242,16 @@ export default function Publisher() {
     });
     return keys;
   }, []);
+
+  /** A `.md` file becoming the draft (markdownImport.js). */
+  const importDraft = (fields) => {
+    setTitle(fields.title);
+    setTags(fields.tags);
+    setTagsInput('');
+    setMarkdown(fields.markdown);
+    setMeta(fields.meta);
+    setRestoredAt(null);
+  };
 
   /** On-chain image references, resolved for the preview pane. */
   const resolveEth = useCallback((md) => reader.resolveImages(md), [reader]);
@@ -577,6 +588,12 @@ export default function Publisher() {
       <SectionHeader
         label={t('publish.bodyHeading')}
         right={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ImportMarkdown
+              onImport={importDraft}
+              confirmReplace={!isEmptyDraft({ title, tags, markdown, meta, files })}
+              disabled={status === 'processing' || status === 'signing'}
+            />
           <div
             role="group"
             aria-label={t('publish.editorView')}
@@ -598,6 +615,7 @@ export default function Publisher() {
             >
               {t('publish.preview')}
             </button>
+          </div>
           </div>
         }
       />

@@ -13,6 +13,7 @@ import {
   etherscanTxUrl,
   friendlyError,
 } from '../lib/format';
+import { downloadText, postFileName } from '../lib/download';
 import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
 import AddressLabel from './Address';
@@ -20,6 +21,7 @@ import BackButton from './BackButton';
 import { BTN_OUTLINE_PILL } from './formStyles';
 import { ArticleTitle, Meta, Micro } from './Text';
 import PostNav from './PostNav';
+import RawView from './RawView';
 import { ArticleSkeleton } from './Skeleton';
 
 /**
@@ -49,7 +51,10 @@ export default function PostPage({
   onOpenAuthor,
   headless = false,
 }) {
-  const [body, setBody] = useState(null); // { tags, markdown }
+  const [body, setBody] = useState(null); // { meta, tags, markdown }
+  // The exact on-chain document, fetched only when it is asked for.
+  const [raw, setRaw] = useState(null);
+  const [showRaw, setShowRaw] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
@@ -77,6 +82,8 @@ export default function PostPage({
       const res = await reader.loadPostBody(meta.txHash);
       const b = res.body;
       setBody(b);
+      setRaw(b.text != null ? b : null);
+      setShowRaw(false);
       setFromCache(res.fromCache);
       const md = await reader.resolveGlyphRefs(b.markdown);
       const { markdown: resolved, urls } = await reader.resolveImages(md);
@@ -124,6 +131,36 @@ export default function PostPage({
 
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
+
+  /**
+   * The document byte for byte. Bodies cached before the text was kept do
+   * not carry it, so it is read once and the record upgraded (reader.js).
+   */
+  const withRaw = async () => {
+    if (raw) return raw;
+    const full = await reader.loadPostText(meta.txHash);
+    setRaw(full);
+    return full;
+  };
+
+  const toggleRaw = async () => {
+    if (showRaw) {
+      setShowRaw(false);
+      return;
+    }
+    await withRaw().catch(() => {});
+    setShowRaw(true);
+  };
+
+  const download = async () => {
+    const full = await withRaw().catch(() => null);
+    if (full?.text == null) return;
+    downloadText(
+      postFileName({ title, ts: time.value, txHash: meta.txHash }),
+      full.text,
+      'text/markdown;charset=utf-8',
+    );
+  };
 
   return (
     <article>
@@ -239,6 +276,14 @@ export default function PostPage({
                 <span>{t('post.fromCache')}</span>
               </>
             )}
+            <Dot />
+            <button type="button" onClick={toggleRaw} className="hover:text-accent transition-colors">
+              {showRaw ? t('raw.hide') : t('raw.show')}
+            </button>
+            <Dot />
+            <button type="button" onClick={download} className="hover:text-accent transition-colors">
+              {t('export.download')}
+            </button>
           </Meta>
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -253,6 +298,16 @@ export default function PostPage({
             </div>
           )}
         </footer>
+      )}
+
+      {loaded && showRaw && raw?.text != null && (
+        <RawView
+          text={raw.text}
+          compressedBytes={raw.compressedBytes}
+          block={meta.block}
+          txHash={meta.txHash}
+          chainId={reader.chainId}
+        />
       )}
 
       {!headless && (

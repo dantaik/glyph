@@ -53,7 +53,7 @@ test.describe('images in a post', () => {
 
     // First post: the image is new, so it costs its own transaction.
     await page.locator('#post-title').fill('With a photograph');
-    await page.locator('input[type=file]').setInputFiles(pngFile);
+    await page.locator('input[type=file][accept="image/*"]').setInputFiles(pngFile);
     await page.locator('.cm-content').click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('![](upload:img1)');
@@ -64,7 +64,7 @@ test.describe('images in a post', () => {
     // Second post, same image.
     await page.getByRole('button', { name: 'Write another' }).click();
     await page.locator('#post-title').fill('The same photograph');
-    await page.locator('input[type=file]').setInputFiles(pngFile);
+    await page.locator('input[type=file][accept="image/*"]').setInputFiles(pngFile);
     await page.locator('.cm-content').click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('![](upload:img1)');

@@ -247,6 +247,19 @@ export default {
   'publish.waitForBlock': '等待区块确认后即可在列表中看到',
   'publish.writeAnother': '再写一封',
 
+  // --- 链上原文与文件 -------------------------------------------------------
+  'raw.show': '原文',
+  'raw.hide': '收起原文',
+  'raw.compressed': ({ bytes }) => `链上 ${bytes}`,
+  'raw.decompressed': ({ bytes }) => `正文 ${bytes}`,
+  'raw.ratio': ({ ratio }) => `压缩 ${ratio} 倍`,
+  'export.download': '下载 .md',
+  'export.import': '导入 .md…',
+  'export.pickMarkdown': '选择一个 Markdown 文件',
+  'export.importReplace': '用这个文件替换正在写的内容？',
+  'export.imported': ({ name }) => `已导入 ${name}`,
+  'export.importDropped': ({ keys }) => `已导入；以下本版本不认识的前置字段被略过：${keys}`,
+
   // --- 图片上传 ------------------------------------------------------------
   'image.pasteHint': '也可以直接把图片粘贴或拖进正文，会自动作为附件并在光标处插入引用。',
   'image.hint': '图片自动编号 img1、img2…；点击图片或名称，复制引用并粘贴到正文。未被正文引用的图片不会上链，也不计费。',

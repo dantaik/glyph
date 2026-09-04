@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { t as translateNow, useT } from '../lib/i18n';
+import { downloadText } from '../lib/download';
 import { applySettings, parseSettingsFile, serializeSettings, settingsFileName } from '../lib/settingsFile';
 import { Download } from './Icons';
 import SectionHeader from './SectionHeader';
@@ -22,15 +23,7 @@ export default function BackupSection() {
 
   const exportFile = () => {
     const name = settingsFileName();
-    const blob = new Blob([serializeSettings()], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(name, serializeSettings(), 'application/json');
     setReview(null);
     setNotice(t('backup.exported', { name }));
   };

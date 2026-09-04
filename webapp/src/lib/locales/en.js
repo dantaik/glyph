@@ -261,6 +261,20 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.waitForBlock': 'It appears in the list once the block is confirmed',
   'publish.writeAnother': 'Write another',
 
+  // --- The letter as the chain holds it, and as a file ---------------------
+  'raw.show': 'Raw',
+  'raw.hide': 'Hide raw',
+  'raw.compressed': ({ bytes }) => `${bytes} on chain`,
+  'raw.decompressed': ({ bytes }) => `${bytes} of text`,
+  'raw.ratio': ({ ratio }) => `${ratio}× compression`,
+  'export.download': 'Download .md',
+  'export.import': 'Import .md…',
+  'export.pickMarkdown': 'Choose a Markdown file',
+  'export.importReplace': 'Replace what you are writing with this file?',
+  'export.imported': ({ name }) => `Imported ${name}`,
+  'export.importDropped': ({ keys }) =>
+    `Imported, without these front-matter keys this version does not know: ${keys}`,
+
   // --- The image dropzone --------------------------------------------------
   'image.pasteHint':
     'You can also paste or drop an image straight into the body; it is attached and referenced where the cursor is.',

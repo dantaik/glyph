@@ -400,6 +400,11 @@ What is stored is Markdown, but only a **small, safe subset** — what is cut do
 
 **Cut**: raw HTML (which also removes XSS), footnotes, reference-style links, definition lists.
 
+The reader can always see the bytes rather than take them on trust: "Raw" on a post page shows the
+decompressed document as stored, with its compressed and decompressed sizes, and "Download .md" saves
+exactly those bytes. The write tab reads one back with `markdownImport.js`. That round trip is what
+makes "any editor, decades from now" a fact rather than an intention.
+
 **Render order**: `loadTitleList` → the user clicks → `loadPostBody` (cache-first) → `resolveGlyphRefs` (0x… → a /tx/ path, taking the target's title when the link text is empty) → `resolveImages` (eth: → blob) → the restricted parser renders → sanitize.
 
 ### 8.1 Cross-article references
@@ -429,6 +434,8 @@ To reference another article from a body, the link target is written as the targ
   1. **The IndexedDB local cache**: every body and image you have visited is cached permanently in the browser, at zero network latency.
   2. **Your own backup**: keep the original images and the original drafts yourself. When you need to, verify them against the on-chain txhash / block hash.
   3. **The on-chain anchor**: the bytes are anchored to Ethereum, and you hold a copy you can verify.
+  - The simplest way to take a copy is "Download .md" on any post page: it saves the exact document the
+    chain holds, which "Import .md…" reads back.
 - **If you want every full node to keep it**: **SSTORE2** (storing the bytes as contract code, in **state**) would do it, at roughly 5× the cost of calldata and under the 24KB contract limit (EIP-170). The conclusion: **calldata + local cache + your own backup** is the more practical answer.
 
 ---
@@ -460,6 +467,7 @@ To reference another article from a body, the link target is written as the targ
 | ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
 | Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
 | Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| Getting a post out and back | "Raw" and "Download .md" hand over the exact stored document; "Import .md…" reads one into a draft | The design's central claim is that the bytes are plain readable Markdown; this is where the claim can be checked, and the simplest personal backup there is |
 | Publishing an image twice | The processed bytes are hashed (SHA-256) and the transaction remembered per chain in `localStorage`; a match is referenced, not re-sent | An image is its own transaction and the dearest part of a post; nothing in the protocol stopped paying for the same bytes twice |
 | When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |

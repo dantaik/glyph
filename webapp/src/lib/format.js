@@ -76,6 +76,16 @@ export function fmtIndex(index) {
   return t('post.index', { index: Number(index) + 1 });
 }
 
+/** A byte count, in the unit that reads easiest: `1,432 B`, `41.9 KB`. */
+export function fmtBytes(bytes) {
+  if (bytes == null) return '';
+  const n = Number(bytes);
+  if (!Number.isFinite(n)) return '';
+  if (n < 1024) return `${n.toLocaleString('en-US')} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 /** `22540123n` → `"22,540,123"` (comma grouping regardless of UI locale). */
 export function fmtBlock(block) {
   if (block === null || block === undefined) return '';

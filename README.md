@@ -53,6 +53,11 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**The letter as the chain holds it**: every post page has "Raw", which shows the exact decompressed
+document — front-matter included — with what it cost to store and what it decompresses to, and
+"Download .md", which saves those same bytes as a file named for the day and the title. "Import .md…"
+in the Write tab brings such a file back as a draft: front-matter this version knows fills the fields,
+and anything it does not know is named rather than silently carried on chain.
 **Images**: paste or drop one straight into the body and it is attached and referenced where the cursor
 is; the preview shows both an attached file and an image already on chain (`eth:0x…`). An image whose
 processed bytes this browser has already published on this chain is referenced again rather than paid
