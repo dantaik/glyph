@@ -8,6 +8,9 @@ import PostMeta from './PostMeta';
 
 export const EXCERPT_CHARS = 256;
 
+/** Tags shown on a row before the rest are left to the post page. */
+export const ROW_TAGS = 3;
+
 /**
  * One article row in a reading list — shared by the home feed and the
  * author title list. Layout: title on the first line; author (left) +
@@ -21,14 +24,19 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
   // Content preview: the body is fetched cache-first (IndexedDB) and shown
   // as a short plain-text excerpt; silently degrades to title-only.
   const [teaser, setTeaser] = useState(null);
+  const [tags, setTags] = useState([]);
   useEffect(() => {
     if (!loadBody) return undefined;
     let cancelled = false;
     setTeaser(null);
+    setTags([]);
     loadBody(post)
       .then((res) => {
         if (cancelled) return;
         setTeaser(excerpt(res?.body?.markdown, EXCERPT_CHARS) || null);
+        // The row already has the body; showing its tags costs nothing and
+        // gives the reader somewhere to go sideways.
+        setTags((res?.body?.tags ?? []).slice(0, ROW_TAGS));
       })
       .catch(() => {});
     return () => {
@@ -52,6 +60,23 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
       </div>
       {teaser && (
         <Body className="mt-2 leading-relaxed">{teaser}</Body>
+      )}
+      {tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <a
+              key={tag}
+              href={hrefFor({ tag })}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate({ tag });
+              }}
+              className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-2xs text-ink-faint hover:border-accent hover:text-accent transition-colors"
+            >
+              {tag}
+            </a>
+          ))}
+        </div>
       )}
       <div className="mt-1.5">
         <PostMeta

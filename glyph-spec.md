@@ -393,6 +393,14 @@ container.innerHTML = renderMarkdown(md);
 > Reading N titles is N serial single-block queries, each downloading a few hundred bytes of log. N=20 takes ~0.5–1s; on a cache hit the body appears instantly.
 > Clicking a post → one `getTransactionByHash` → one brotli decompress → render. After the first visit everything is cached in IndexedDB and later visits make no RPC calls at all.
 
+**Local search.** Finding by tag or by word is answered from `bodyIndex.js` plus the bodies this
+browser holds — never from the node, which cannot filter inside compressed calldata, and never from a
+server, which would be the off-chain dependency the design refuses. Matching is a case-folded
+SUBSTRING rather than tokens: a tokeniser has to know where words begin, and Chinese does not put
+spaces between them, so the posts this app was written for are exactly the ones a tokeniser would
+fail on. Every such surface states its scope ("among the N posts this browser has read") and offers
+the ordinary paging control as the way to widen it.
+
 **The home feed (no address): the newest N across authors** — the one deliberate range scan in the whole design, used **only for address-less discovery**; the single-author path is unaffected:
 
 ```js
@@ -494,6 +502,7 @@ To reference another article from a body, the link target is written as the targ
 | ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
 | Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
 | Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| Finding by tag or word | Local, over the bodies already read; case-folded substring matching | The node cannot filter inside calldata and a server is out of the question; substrings work in Chinese, where tokens do not |
 | Relations between posts | Front-matter keys (`re`, `supersedes`, `prev`, `series`/`part`), with the reverse direction indexed locally from bodies already read | The contract indexes only authors, and indexing the inside of calldata is exactly the off-chain dependency this design refuses; forward relations are durable, reverse ones are honest about their scope |
 | The language of a post | A `lang` front-matter key, applied to the article element | Better CJK line breaking and a screen reader that pronounces it correctly, without guessing from the characters |
 | Getting a post out and back | "Raw" and "Download .md" hand over the exact stored document; "Import .md…" reads one into a draft | The design's central claim is that the bytes are plain readable Markdown; this is where the claim can be checked, and the simplest personal backup there is |

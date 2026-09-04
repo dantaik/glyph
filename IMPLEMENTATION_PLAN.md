@@ -52,7 +52,7 @@ never delete or skip a test to get there.
 | 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☑ | #16 | |
 | 5 | Markdown round trip and the raw view | ☑ | #16 | |
 | 6 | Front-matter relations and the body index | ☑ | #16 | |
-| 7 | Tags and search over what this browser has read | ☐ | | |
+| 7 | Tags and search over what this browser has read | ☑ | #16 | |
 | 8 | The following feed | ☐ | | |
 | 9 | ENS identity: names in URLs, avatars, profiles | ☐ | | |
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☐ | | |

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { hrefFor, useUrlState } from '../lib/router';
 import { LANG_NAMES, setLang, useLang, useT } from '../lib/i18n';
 import { useTheme } from '../lib/theme';
-import { GlyphMark, Globe, Sun, Moon, Sliders, MoreHorizontal } from './Icons';
+import { GlyphMark, Globe, Search, Sun, Moon, Sliders, MoreHorizontal } from './Icons';
 
 // No display utility here on purpose: call sites choose between `inline-flex`
 // and `hidden sm:inline-flex`, and both set `display`. Baking `inline-flex`
@@ -122,7 +122,15 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
 
         {/* Everything after this is pushed to the trailing edge. */}
         <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
-          {/* sm+: language, theme and settings as their own buttons. */}
+          {/* sm+: search, language, theme and settings as their own buttons. */}
+          <button
+            onClick={() => navigate({ search: '1' })}
+            aria-label={t('search.open')}
+            title={t('search.open')}
+            className={`hidden sm:inline-flex ${ICON_BTN}`}
+          >
+            <Search />
+          </button>
           <button
             onClick={() => setLang(other)}
             aria-label={t('nav.switchLanguage', { name: LANG_NAMES[other] })}
@@ -151,6 +159,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
             className="sm:hidden"
             isDark={isDark}
             otherLang={other}
+            onSearch={() => navigate({ search: '1' })}
             onSwitchLanguage={() => setLang(other)}
             onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
             onOpenSettings={onOpenSettings}
@@ -169,6 +178,7 @@ function OverflowMenu({
   className = '',
   isDark,
   otherLang,
+  onSearch,
   onSwitchLanguage,
   onToggleTheme,
   onOpenSettings,
@@ -217,6 +227,10 @@ function OverflowMenu({
           role="menu"
           className="absolute right-0 z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-edge bg-paper-raised py-1 shadow-pop"
         >
+          <button type="button" role="menuitem" onClick={pick(onSearch)} className={ITEM}>
+            <Search size={16} />
+            {t('search.open')}
+          </button>
           <button type="button" role="menuitem" onClick={pick(onSwitchLanguage)} className={ITEM}>
             <Globe size={16} />
             {LANG_NAMES[otherLang]}

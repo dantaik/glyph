@@ -29,9 +29,12 @@ export async function run(argv) {
   const { values, positionals } = readArgs(argv, OPTIONS);
   if (values.help) return print(help.verify);
 
-  const [file, chainArg, postArg] = positionals;
+  // `verify <file> <chain> <post>`, or `--chain <chain>` with the post alone —
+  // see fetch.js.
+  const [file, second, third] = positionals;
   if (!file) fail(msg.needsFile('verify'));
-  const chain = chainArg ?? values.chain;
+  const chain = third == null ? values.chain : second;
+  const postArg = third ?? second;
   if (!chain || !postArg) fail(msg.needsPost('verify'));
   const chainId = resolveChain(chain, { command: 'verify' });
   const post = parsePostArg(postArg);

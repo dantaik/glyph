@@ -61,6 +61,16 @@ export function readParams() {
   // Local status / configuration pages.
   if (route.match(/^\/scan\/?$/)) out.scan = '1';
   if (route.match(/^\/settings\/?$/)) out.settings = '1';
+  // Finding things among what this browser has read.
+  const mTag = route.match(/^\/tag\/(.+?)\/?$/);
+  if (mTag) {
+    try {
+      out.tag = decodeURIComponent(mTag[1]).trim();
+    } catch {
+      out.tag = mTag[1].trim(); // a malformed escape is still a tag to try
+    }
+  }
+  if (route.match(/^\/search\/?$/)) out.search = '1';
   return out;
 }
 
@@ -99,6 +109,8 @@ function buildUrl(next) {
       k === 'author' ||
       k === 'scan' ||
       k === 'settings' ||
+      k === 'tag' ||
+      k === 'search' ||
       k === 'authorFromQuery'
     )
       continue;
@@ -111,11 +123,15 @@ function buildUrl(next) {
     ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
     : next.author
       ? `/author/${next.author}`
-      : next.scan
-        ? '/scan'
-        : next.settings
-          ? '/settings'
-          : '/';
+      : next.tag
+        ? `/tag/${encodeURIComponent(next.tag)}`
+        : next.search
+          ? '/search'
+          : next.scan
+            ? '/scan'
+            : next.settings
+              ? '/settings'
+              : '/';
   // A post is on one chain: its URL must say which. Everything else carries
   // the chain only as a filter.
   const chain = next.tx ? (next.chain ?? null) : inheritedChain(next);

@@ -17,6 +17,17 @@ import * as verify from '../src/commands/verify.js';
 import { msg, usage } from '../src/messages.js';
 import { CliError, errorText, note, print } from '../src/out.js';
 
+// `xueni author … | head -3` closes the pipe as soon as it has its three
+// lines, and the next write raises EPIPE. That is the reader saying "enough",
+// not a failure: a tool that dumps a stack trace there is a tool that cannot
+// be piped, so stop quietly, the way every well-behaved Unix program does.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (err) => {
+    if (err?.code === 'EPIPE') process.exit(0);
+    throw err;
+  });
+}
+
 const COMMANDS = {
   publish,
   fetch: fetchCmd,
@@ -45,6 +56,8 @@ try {
   await main(process.argv.slice(2));
 } catch (err) {
   note(err instanceof CliError ? err.message : errorText(err));
-  if (process.env.XUENI_DEBUG && !(err instanceof CliError)) note(err.stack ?? '');
+  // The cause is where a chain read's real error went (chain.js), so debugging
+  // wants both stacks or neither.
+  if (process.env.XUENI_DEBUG) note([err.stack, err.cause?.stack].filter(Boolean).join('\n'));
   process.exitCode = 1;
 }

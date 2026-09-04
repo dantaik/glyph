@@ -41,8 +41,10 @@ export async function run(argv) {
   const { values, positionals } = readArgs(argv, OPTIONS);
   if (values.help) return print(help.author);
 
-  const [chainArg, addressArg] = positionals;
-  const chain = chainArg ?? values.chain;
+  // `author <chain> <address>`, or `--chain <chain> <address>` — see fetch.js.
+  const [first, second] = positionals;
+  const chain = second == null ? values.chain : first;
+  const addressArg = second ?? first;
   if (!chain) fail(msg.needsChain('author'));
   if (!addressArg) fail(msg.needsAddress('author'));
   const selection = resolveChain(chain, { allowAll: true, command: 'author' });

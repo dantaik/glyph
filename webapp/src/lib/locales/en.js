@@ -261,6 +261,24 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.waitForBlock': 'It appears in the list once the block is confirmed',
   'publish.writeAnother': 'Write another',
 
+  // --- Finding things among what this browser has read ---------------------
+  'tag.title': ({ tag }) => `Tagged ${tag}`,
+  'tag.scope': ({ count }) => `Among the ${count} posts this browser has read`,
+  'tag.reading': 'Reading the posts this browser holds…',
+  'tag.none': ({ tag }) => `Nothing read here carries the tag ${tag}`,
+  'tag.noneBody': 'Read further back and this page will find more.',
+  'tag.readMore': 'Read earlier posts',
+  'search.open': 'Search',
+  'search.title': 'Search',
+  'search.placeholder': 'A word from a title, a tag, or the text',
+  'search.scope': ({ count }) => `Among the ${count} posts this browser has read`,
+  'search.reading': 'Reading the posts this browser holds…',
+  'search.none': ({ query }) => `Nothing read here contains “${query}”`,
+  'search.noneBody': 'Read further back and this page will find more.',
+  'search.readMore': 'Read earlier posts',
+  'search.tagCloud': 'The tags seen so far',
+  'search.noTagsYet': 'No tags yet — open a few posts and they will appear here.',
+
   // --- What a post says about other posts ----------------------------------
   'relations.heading': 'Relations',
   'relations.note':

@@ -186,7 +186,7 @@ export const msg = {
   dryRun: 'nothing was sent (--dry-run).',
 
   // --- Reading ---
-  noSuchTx: (txHash) => `the chain has no transaction ${txHash}.`,
+  noSuchTx: (txHash) => `no such transaction: ${txHash}`,
   noPostsInTx: (txHash) => `${txHash} published nothing — it emits no Post event.`,
   noSuchEvent: (txHash, n, total) =>
     `${txHash} published ${total} post${total === 1 ? '' : 's'}, so there is no event ${n}.`,

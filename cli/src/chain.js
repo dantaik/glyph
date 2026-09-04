@@ -10,7 +10,8 @@
 
 import { createPublicClient, custom, http } from 'viem';
 import { getChain } from './shared.js';
-import { errorText } from './out.js';
+import { CliError, errorText } from './out.js';
+import { msg } from './messages.js';
 
 /**
  * A public endpoint is either quick or not coming. Eight seconds is what the
@@ -65,12 +66,15 @@ export function createClient(chainId, urls) {
  * Run `fn` and label whatever goes wrong with the chain it went wrong on.
  * With `--chain all` in play, "HTTP request failed" on its own tells the
  * reader nothing about which of the two chains is down.
+ *
+ * A new error rather than a relabelled one: viem carries its readable text in
+ * `shortMessage`, so editing `message` would leave the original wording to be
+ * printed anyway. The cause is kept for XUENI_DEBUG.
  */
 export async function onChain(chainName, fn) {
   try {
     return await fn();
   } catch (err) {
-    err.message = `${chainName}: ${errorText(err)}`;
-    throw err;
+    throw Object.assign(new CliError(msg.chainFailed(chainName, errorText(err))), { cause: err });
   }
 }

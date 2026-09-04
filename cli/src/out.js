@@ -65,7 +65,15 @@ export const fail = (message) => {
 
 /**
  * What went wrong, in the fewest words that still say it. viem wraps a node's
- * answer in several layers of prose; the short message is the useful line.
+ * answer in several layers of prose; the short message is the useful line —
+ * plus the endpoint, when there was one, because with a list of endpoints to
+ * fall back through, WHICH one gave up is half the answer.
  */
-export const errorText = (err) =>
-  String(err?.shortMessage || err?.details || err?.message || err || 'unknown error');
+export const errorText = (err) => {
+  const short = String(err?.shortMessage || err?.details || err?.message || err || 'unknown error');
+  // viem nests: a contract call's error holds the transport's error, which is
+  // the one that knows the endpoint. `walk` is viem's own way down the chain.
+  const found = typeof err?.walk === 'function' ? err.walk((e) => Boolean(e?.url)) : null;
+  const url = found?.url ?? err?.url;
+  return url ? `${short} (${url})` : short;
+};

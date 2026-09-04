@@ -59,8 +59,12 @@ export async function run(argv) {
   const { values, positionals } = readArgs(argv, OPTIONS);
   if (values.help) return print(help.fetch);
 
-  const [chainArg, postArg] = positionals;
-  const chain = chainArg ?? values.chain;
+  // `fetch <chain> <post>` is the documented shape, but `--chain` is a global
+  // option and someone will reach for it; with only one positional it must be
+  // the post, or the hash would be read as a chain name.
+  const [first, second] = positionals;
+  const chain = second == null ? values.chain : first;
+  const postArg = second ?? first;
   if (!chain || !postArg) fail(msg.needsPost('fetch'));
   const chainId = resolveChain(chain, { command: 'fetch' });
   const post = parsePostArg(postArg);

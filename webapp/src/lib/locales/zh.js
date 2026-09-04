@@ -247,6 +247,24 @@ export default {
   'publish.waitForBlock': '等待区块确认后即可在列表中看到',
   'publish.writeAnother': '再写一封',
 
+  // --- 在已读过的文章里查找 -------------------------------------------------
+  'tag.title': ({ tag }) => `标签：${tag}`,
+  'tag.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,
+  'tag.reading': '正在读取本机保存的文章…',
+  'tag.none': ({ tag }) => `已读过的文章里没有带 ${tag} 标签的`,
+  'tag.noneBody': '往前多读一些，这一页就会找到更多。',
+  'tag.readMore': '读更早的文章',
+  'search.open': '搜索',
+  'search.title': '搜索',
+  'search.placeholder': '标题、标签或正文里的一个词',
+  'search.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,
+  'search.reading': '正在读取本机保存的文章…',
+  'search.none': ({ query }) => `已读过的文章里没有包含“${query}”的`,
+  'search.noneBody': '往前多读一些，这一页就会找到更多。',
+  'search.readMore': '读更早的文章',
+  'search.tagCloud': '目前见过的标签',
+  'search.noTagsYet': '还没有标签——打开几篇文章后就会出现。',
+
   // --- 文章之间的关系 -------------------------------------------------------
   'relations.heading': '关系',
   'relations.note': '都是可选的。这些字段随文章的前置数据一起上链，不认识某个字段的阅读器会直接忽略它。',

@@ -14,6 +14,7 @@ import { getReader } from './data';
 import { MergedAuthorList } from './mergedAuthorList';
 import { MergedFeed } from './mergedFeed';
 import { PAGE_SIZE } from './reader';
+import { compareMerged, timeRows } from './timeline';
 import { useUrlState } from './router';
 
 /**
@@ -52,6 +53,20 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
       lists.set(k, merged);
     }
     return merged;
+  }
+
+  /**
+   * Every post these chains have READ, merged newest first — not every post
+   * that exists.
+   *
+   * The feed shows posts inside swept ranges, because a hole in a feed is a
+   * lie about what is newest. Finding by tag or by word is a different
+   * question: any post this browser holds is a fair answer, whether it came
+   * from a sweep, an author's page or a link somebody sent. The surfaces
+   * that use this say what it covers.
+   */
+  function knownRows() {
+    return list.flatMap((r) => timeRows(r.store.allPosts(), r.chainId, null)).sort(compareMerged);
   }
 
   /** `{ total, byChain }` — total is null until every chain has answered. */
@@ -101,7 +116,20 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     return null;
   }
 
-  return { key, chainIds, readers: list, reader, feed, authorList, counts, ensName, loadPostBody, findMetaByTx, findPostAnywhere };
+  return {
+    key,
+    chainIds,
+    readers: list,
+    reader,
+    feed,
+    authorList,
+    counts,
+    ensName,
+    knownRows,
+    loadPostBody,
+    findMetaByTx,
+    findPostAnywhere,
+  };
 }
 
 /** The chains a URL filter selects: that chain alone, or every chain read. */

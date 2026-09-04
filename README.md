@@ -53,6 +53,12 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Tags and search**: a tag on a row or under a post opens `/tag/<name>`, and the magnifier in the
+masthead (⋯ menu on a phone) opens `/search`, which finds a word in any title, tag or body — matched as
+a substring, so Chinese works without word splitting. Both cover the posts this browser has read, say
+so in their subtitle, and offer the ordinary "read earlier posts" as the way to cover more. Neither
+asks anything of a server: no node can filter on the inside of compressed calldata, and an index that
+went looking would be a crawler.
 **Relations**: a post can say what it is to other posts, in its own front-matter and therefore on chain:
 a reply (`re`), a replacement for an earlier version (`supersedes` — the only honest kind of edit on an
 immutable chain), a continuation (`prev`), a place in a `series`, and the `lang` it is written in. Fill

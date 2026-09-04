@@ -359,12 +359,17 @@ export default function PostPage({
           {body?.tags && body.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
               {body.tags.map((tag) => (
-                <span
+                <a
                   key={tag}
-                  className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft"
+                  href={hrefFor({ tag })}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate({ tag });
+                  }}
+                  className="rounded-md border border-edge bg-paper-sunken px-2 py-0.5 text-xs text-ink-soft hover:border-accent hover:text-accent transition-colors"
                 >
                   {tag}
-                </span>
+                </a>
               ))}
             </div>
           )}

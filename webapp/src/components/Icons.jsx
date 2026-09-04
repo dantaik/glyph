@@ -250,6 +250,15 @@ export function ChainMark({ size, ...rest }) {
 
 /** Overflow "⋯" — opens the menu holding the controls a phone has no room for. */
 /** A globe with meridians — the interface language. */
+export function Search({ size, ...rest }) {
+  return (
+    <svg {...iconProps(size)} {...rest}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
+    </svg>
+  );
+}
+
 export function Globe({ size, ...rest }) {
   return (
     <svg {...iconProps(size)} {...rest}>
