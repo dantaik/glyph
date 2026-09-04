@@ -278,6 +278,14 @@ Drop images into the area below or click to upload; click an image or its name t
   'cost.nearLimit': ({ limit }) =>
     `The body is close to the single-transaction ceiling (about ${limit} KB compressed). Over it, the node rejects the publish — shorten the body or split it across several posts.`,
   'cost.total': 'Total',
+  'cost.sparklineLabel': ({ chain }) => `${chain} base fee over the last day`,
+  'cost.nowAt': ({ fee }) => `now ${fee}`,
+  'cost.low24h': ({ fee, time }) => `24h low ${fee} at ${time}`,
+  'cost.wouldHaveCost': ({ cost }) => `this post would have cost ≈ ${cost}`,
+  'cost.onOtherChain': ({ chain, eth, usd }) => `On ${chain} this would cost ≈ ${eth}${usd ? ` (${usd})` : ''}`,
+  'cost.onOtherChainUnknown': ({ chain }) => `${chain}’s gas price is unavailable`,
+  'cost.publishThere': 'Publish there',
+  'cost.ownGasPriceNote': 'Estimates use each network’s own gas price, read from its node.',
 
   // --- Failures the reader is shown ---------------------------------------
   'error.nodeBehind': ({ block }) => `The node has not synced to block ${block} yet — try again shortly.`,

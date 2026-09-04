@@ -263,6 +263,14 @@ export default {
   'cost.nearLimit': ({ limit }) =>
     `正文接近单笔交易上限（约 ${limit} KB 压缩后）。超出时发布会被节点拒绝，请精简正文或拆成多篇。`,
   'cost.total': '合计',
+  'cost.sparklineLabel': ({ chain }) => `${chain} 最近一天的基础费`,
+  'cost.nowAt': ({ fee }) => `当前 ${fee}`,
+  'cost.low24h': ({ fee, time }) => `24 小时最低 ${fee}，在 ${time}`,
+  'cost.wouldHaveCost': ({ cost }) => `那时发这篇约需 ${cost}`,
+  'cost.onOtherChain': ({ chain, eth, usd }) => `在${chain}上约需 ${eth}${usd ? `（${usd}）` : ''}`,
+  'cost.onOtherChainUnknown': ({ chain }) => `${chain}的 gas 价格暂时读不到`,
+  'cost.publishThere': '发到那条链',
+  'cost.ownGasPriceNote': '各链的估算都使用该链节点报告的 gas 价格。',
 
   // --- 出错时 --------------------------------------------------------------
   'error.nodeBehind': ({ block }) => `节点尚未同步到区块 ${block}，稍后重试即可`,

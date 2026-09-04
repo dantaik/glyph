@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 // The write tab reaches for the gas price and a chain client on mount; neither
 // has anything to do with the draft, and both would go to the network.
 vi.mock('../../src/lib/price', () => ({
-  getMarketState: async () => ({ gasPriceWei: null, ethUsd: null }),
+  getMarketStates: async () => ({}),
   estimatePublishGas: () => 21_000,
   estimateImageGas: () => 21_000,
   gasToCost: () => ({ eth: null, usd: null }),
@@ -13,6 +13,8 @@ vi.mock('../../src/lib/price', () => ({
   fmtUsd: () => '',
   fmtGwei: () => '—',
 }));
+// With no client to read headers from, the day's base fees simply fail and
+// the sparkline is left out — which is the degradation relied on here.
 vi.mock('../../src/lib/clients', () => ({ getClient: () => ({}) }));
 
 const Publisher = (await import('../../src/components/Publisher')).default;

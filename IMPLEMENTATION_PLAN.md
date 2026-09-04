@@ -48,7 +48,7 @@ never delete or skip a test to get there.
 | 0 | Groundwork: shared refactors and two doc fixes | ☑ | #16 | |
 | 1 | Draft autosave | ☑ | #16 | |
 | 2 | Wallets: EIP-6963 discovery, optional WalletConnect | ☑ | #16 | ID still needed |
-| 3 | Cost awareness: base-fee history and both chains side by side | ☐ | | |
+| 3 | Cost awareness: base-fee history and both chains side by side | ☑ | #16 | |
 | 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☐ | | |
 | 5 | Markdown round trip and the raw view | ☐ | | |
 | 6 | Front-matter relations and the body index | ☐ | | |

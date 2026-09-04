@@ -7,8 +7,9 @@ import {
   MAX_CALLDATA_BYTES,
 } from '../lib/publish';
 import { getClient } from '../lib/clients';
+import { READ_CHAIN_IDS } from '../lib/config';
 import { getReader } from '../lib/data';
-import { resolvePublishChain, usePublishChainId } from '../lib/config';
+import { resolvePublishChain, savePublishChainId, usePublishChainId } from '../lib/config';
 import { useWallet } from '../lib/wallet';
 import { chainName, etherscanTxUrl, fmtRelTime } from '../lib/format';
 import { clearDraft, isEmptyDraft, loadDraft, saveDraft, takePendingDraftPatch } from '../lib/drafts';
@@ -22,7 +23,7 @@ import WalletPanel from './WalletPanel';
 import { BTN_PRIMARY, BTN_QUIET, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 import { Body, Meta, Micro } from './Text';
 import {
-  getMarketState,
+  getMarketStates,
   estimatePublishGas,
   estimateImageGas,
   gasToCost,
@@ -63,7 +64,12 @@ export default function Publisher() {
   const [statusMsg, setStatusMsg] = useState('');
   const [txHash, setTxHash] = useState(null);
   const [isFirstPost, setIsFirstPost] = useState(true);
-  const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
+  // One entry per chain the app reads: the draft's cost can then be shown
+  // on the chain it is going to AND on the others, which is the second big
+  // lever on what a post costs.
+  const [markets, setMarkets] = useState({});
+  // The last day of base fees on the publish chain (gasHistory.js).
+  const [history, setHistory] = useState([]);
   // Front-matter beyond the tags — the language, the relations. Empty until
   // the Relations fields fill it; carried in the draft either way.
   const [meta, setMeta] = useState({});
@@ -78,6 +84,9 @@ export default function Publisher() {
   const pickedChain = usePublishChainId();
   const chainId = resolvePublishChain(pickedChain, walletChainId);
   const reader = getReader(chainId);
+  // The market on the chain this draft is going to; the rest are what the
+  // comparison lines are made of.
+  const market = markets[chainId] ?? { gasPriceWei: null, ethUsd: null };
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
 
   // --- The draft, kept across the tab ------------------------------------
@@ -196,12 +205,15 @@ export default function Publisher() {
     };
   }, [account, reader]);
 
-  // Poll gas + ETH price every 30s.
+  // Poll gas + ETH price every 30s, for every chain at once — the price is
+  // one lookup shared between them, and the comparison needs them all.
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
-      const m = await getMarketState(getClient(chainId));
-      if (!cancelled) setMarket(m);
+      const m = await getMarketStates(
+        READ_CHAIN_IDS.map((id) => ({ chainId: id, client: getClient(id) })),
+      );
+      if (!cancelled) setMarkets(m);
     };
     refresh();
     const id = setInterval(refresh, 30_000);
@@ -209,12 +221,29 @@ export default function Publisher() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [chainId]);
+  }, []);
+
+  // The day's base fees for the chain being published to. Held for ten
+  // minutes by the reader, so switching back and forth costs nothing.
+  useEffect(() => {
+    let cancelled = false;
+    setHistory([]);
+    reader
+      .baseFees()
+      .then((h) => !cancelled && setHistory(h))
+      .catch(() => {}); // a node that will not serve headers just hides the line
+    return () => {
+      cancelled = true;
+    };
+  }, [reader]);
 
   // --- Cost estimate ---
+  //
+  // The gas this draft would burn, which is the same wherever it is sent —
+  // kept apart from the price, so the same figure can be costed on every
+  // chain and at any hour of the day.
   // Rough approximation — actual brotli output may differ a little either way.
-  const costEstimate = useMemo(() => {
-    if (!market.gasPriceWei) return null;
+  const gas = useMemo(() => {
     // payload raw bytes: 3 header + tags + markdown
     const rawBytes =
       3 +
@@ -222,33 +251,49 @@ export default function Publisher() {
       new TextEncoder().encode(markdown).length;
     // brotli q11 on markdown text typically lands at 0.35–0.5
     const estCompressed = Math.max(60, Math.ceil(rawBytes * 0.45));
-
     const postGas = estimatePublishGas(estCompressed, isFirstPost);
-    const postCost = gasToCost(postGas, market.gasPriceWei, market.ethUsd);
-
-    // Image costs: estimate post-processing size at 50 KB if not yet processed
-    // (real value depends on the source image; we use a placeholder until uploaded)
-    const imageCosts = usedKeys.map((key) => {
-      const estBytes = Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3));
-      const g = estimateImageGas(estBytes);
-      return { key, ...gasToCost(g, market.gasPriceWei, market.ethUsd), gas: g };
-    });
-
-    const totalGas = postGas + imageCosts.reduce((a, c) => a + c.gas, 0);
-    const totalCost = gasToCost(totalGas, market.gasPriceWei, market.ethUsd);
-
+    // The real size depends on the source image; a third of the original is
+    // a fair guess until it has actually been processed.
+    const images = usedKeys.map((key) => ({
+      key,
+      gas: estimateImageGas(Math.min(MAX_CALLDATA_BYTES, Math.ceil(files[key].size * 0.3))),
+    }));
     return {
-      postGas,
-      postCost,
-      imageCosts,
-      totalGas,
-      totalCost,
       estCompressed,
+      postGas,
+      images,
+      totalGas: postGas + images.reduce((a, c) => a + c.gas, 0),
+    };
+  }, [tags, markdown, files, usedKeys, isFirstPost]);
+
+  const costEstimate = useMemo(() => {
+    if (!market.gasPriceWei) return null;
+    const price = (g) => gasToCost(g, market.gasPriceWei, market.ethUsd);
+    return {
+      postGas: gas.postGas,
+      postCost: price(gas.postGas),
+      imageCosts: gas.images.map(({ key, gas: g }) => ({ key, gas: g, ...price(g) })),
+      totalGas: gas.totalGas,
+      totalCost: price(gas.totalGas),
+      estCompressed: gas.estCompressed,
       // Rough — the exact size is measured with brotli at publish time.
       limitBytes: MAX_CALLDATA_BYTES,
-      nearLimit: estCompressed > MAX_CALLDATA_BYTES * 0.9,
+      nearLimit: gas.estCompressed > MAX_CALLDATA_BYTES * 0.9,
     };
-  }, [market, tags, markdown, files, usedKeys, isFirstPost]);
+  }, [market, gas]);
+
+  /** The same draft, priced on the chains it is NOT going to. */
+  const comparisons = useMemo(
+    () =>
+      READ_CHAIN_IDS.filter((id) => id !== chainId).map((id) => {
+        const m = markets[id];
+        return {
+          chainId: id,
+          cost: m?.gasPriceWei ? gasToCost(gas.totalGas, m.gasPriceWei, m.ethUsd) : null,
+        };
+      }),
+    [chainId, markets, gas],
+  );
 
   // --- Tag handling ---
   // Delimiters: Enter, half/full-width comma (,) and semicolon (;).
@@ -527,7 +572,14 @@ export default function Publisher() {
 
       <SectionHeader label={t('publish.costHeading')} />
       <div className="mb-6">
-        <CostPanel estimate={costEstimate} market={market} chainId={chainId} />
+        <CostPanel
+          estimate={costEstimate}
+          market={market}
+          chainId={chainId}
+          history={history}
+          comparisons={comparisons}
+          onPublishThere={savePublishChainId}
+        />
       </div>
 
       <div className="pt-6">

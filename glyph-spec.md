@@ -120,6 +120,12 @@ At ~0.23 gwei and ETH ≈ $1,690: **≈ $0.033 per post, ≈ $33 for a thousand*
 
 **When you publish is the biggest lever on cost** (a factor of 100). Schedule images for a gas trough.
 
+> **When to publish, seen from the chain.** `gasHistory.js` samples one block header an hour for the
+> last day (`eth_getBlockByNumber`, at most four in flight, held ten minutes) and reads `baseFeePerGas`
+> off each. That is the whole source: no gas oracle, no price feed, nothing to be blocked beyond the
+> node the reader already uses. Each chain is sampled at its own measured pace, so an hour is ~300
+> blocks on Ethereum and ~1,800 on Taiko. A header the node refuses is dropped, not fatal.
+>
 > Live cost estimate in the front end (`price.js`): it pulls `eth_gasPrice` from the node and ETH/USD from CoinGecko's public API (cached 60s), estimates the payload at brotli ≈ 0.45× the raw size, and shows a live "≈$X.XX body + $Y.YY per image" panel. CoinGecko is the one off-chain HTTP dependency; when it is blocked, rate-limited or offline the panel degrades to `ethUsd=null` and shows ETH only.
 
 ---
@@ -453,6 +459,7 @@ To reference another article from a body, the link target is written as the targ
 | ETH price source | CoinGecko's public API (degrading to ETH-only offline) | Simple and automatic; the one off-chain HTTP dependency, and not fatal when it fails |
 | Editor | CodeMirror source editing plus a live preview | Markdown syntax highlighting and see-as-you-write; the preview reuses the renderer |
 | Permanence fallback | on-chain anchor + IndexedDB cache + your own backup | Three layers of redundancy, against future rolling history expiry |
+| When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
 | Local cache | IndexedDB, never expiring | The content is immutable; a cache hit costs no RPC; ten thousand posts is ~20 MB |

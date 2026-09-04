@@ -100,7 +100,12 @@ characters of it (contracts and transaction hashes still use `0x1234…abcd`). O
 language, theme and settings controls fold into the ⋯ menu and everything else stays on one row.
 **Console**: every node request and every local cache hit writes one console line, labelled with the chain;
 `?log=0` turns it off.
-**Cost estimate**: gas (from the node) plus ETH/USD (from CoinGecko) shown live before publishing.
+**Cost estimate**: gas (from the node) plus ETH/USD (from CoinGecko) shown live before publishing —
+with the two things that actually move the price. WHEN: the last day of base fees, sampled one block
+header an hour from the chain itself, drawn as a small line with the cheapest hour named and what this
+post would have cost then. WHERE: the same draft priced on the other network, with one click to send
+it there instead. Both degrade quietly — no USD when CoinGecko is unreachable, no line when a node
+will not serve headers.
 
 ## Testing
 

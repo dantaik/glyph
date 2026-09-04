@@ -10,6 +10,7 @@
 
 import { decodeEventLog, decodeFunctionData, hexToBytes } from 'viem';
 import { abi, POST_EVENT } from './abi';
+import { mapLimit } from './async';
 import { getChain } from './chains';
 import { getClient } from './clients';
 import { GLYPH_ADDRESS } from './config';
@@ -105,21 +106,6 @@ function logToMeta(log, block) {
     // (geth ≥ 1.14 and Erigon do); otherwise looked up, see withTimes().
     ts: log.blockTimestamp != null ? Number(log.blockTimestamp) : null,
   };
-}
-
-/** Run `fn` over `items` with at most `limit` in flight; results in order. */
-async function mapLimit(items, limit, fn) {
-  const out = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    for (;;) {
-      const i = next++;
-      if (i >= items.length) return;
-      out[i] = await fn(items[i], i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
 }
 
 const short = (s) => `${String(s).slice(0, 10)}…`;

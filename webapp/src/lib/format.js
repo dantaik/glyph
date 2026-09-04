@@ -154,6 +154,24 @@ const absFormat = () => {
   return fmt;
 };
 
+const CLOCK_FMTS = new Map();
+const clockFormat = () => {
+  const locale = getLocale();
+  let fmt = CLOCK_FMTS.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+    CLOCK_FMTS.set(locale, fmt);
+  }
+  return fmt;
+};
+
+/** Seconds since the epoch → `04:00`, the hour of the day alone; null-safe. */
+export function fmtClock(ts) {
+  if (ts == null) return null;
+  const date = new Date(Number(ts) * 1000);
+  return Number.isNaN(date.getTime()) ? null : clockFormat().format(date);
+}
+
 /** Seconds since the epoch → `September 3, 2026 at 15:04`; null-safe. */
 export function fmtAbsTime(ts) {
   if (ts == null) return null;

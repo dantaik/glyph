@@ -16,6 +16,7 @@ import * as scanner from './scanner';
 import * as rpcLog from './rpcLog';
 import { makeForeverCache, makeTtlCache } from './ttlCache';
 import { createChainIO } from './chainIO';
+import { baseFeeHistory } from './gasHistory';
 import { FeedController } from './feed';
 import { AuthorListController } from './authorList';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
@@ -23,6 +24,9 @@ import { createRefResolver } from './glyphRefs';
 
 /** Posts per page, on the feed and on author lists. */
 export const PAGE_SIZE = 20;
+
+/** How long the base-fee history is held before it is sampled again. */
+const GAS_HISTORY_TTL_MS = 10 * 60_000;
 
 /** Blocks between the two samples the chain clock measures block time over. */
 const CLOCK_SAMPLE = 1000n;
@@ -170,6 +174,16 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
 
   const count = (author) => volatile(`count:${addrKey(author)}`, () => io.count(author));
 
+  // The last day of base fees, sampled from block headers. Held for ten
+  // minutes: the shape of a day does not change by the minute, and this is
+  // two dozen header reads.
+  const gasHistory = makeTtlCache(() => GAS_HISTORY_TTL_MS);
+  const readerFacade = {};
+  const baseFees = (opts = {}) =>
+    gasHistory(`baseFees:${opts.hours ?? 24}:${opts.samples ?? 25}`, () =>
+      baseFeeHistory(readerFacade, opts),
+    );
+
   /** Rewrite `0x<txhash>/<n>` article refs to in-app links (glyphRefs.js). */
   const resolveGlyphRefs = createRefResolver(findMetaByTx, id);
 
@@ -301,7 +315,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     return { markdown: out, urls };
   }
 
-  return {
+  return Object.assign(readerFacade, {
     chainId: id,
     chain,
     store,
@@ -317,7 +331,8 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     ensName,
     loadPostBody,
     loadPostText,
+    baseFees,
     resolveGlyphRefs,
     resolveImages,
-  };
+  });
 }
