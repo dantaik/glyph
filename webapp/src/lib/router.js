@@ -71,6 +71,7 @@ export function readParams() {
     }
   }
   if (route.match(/^\/search\/?$/)) out.search = '1';
+  if (route.match(/^\/following\/?$/)) out.following = '1';
   return out;
 }
 
@@ -111,6 +112,7 @@ function buildUrl(next) {
       k === 'settings' ||
       k === 'tag' ||
       k === 'search' ||
+      k === 'following' ||
       k === 'authorFromQuery'
     )
       continue;
@@ -119,19 +121,18 @@ function buildUrl(next) {
   // Dev demo mode (fixtures) follows in-app navigation.
   if (next.fixtures == null && state.fixtures) sp.set('fixtures', state.fixtures);
   const search = sp.toString();
-  const route = next.tx
-    ? `/tx/${next.tx}${next.txEvent != null ? '/' + next.txEvent : ''}`
-    : next.author
-      ? `/author/${next.author}`
-      : next.tag
-        ? `/tag/${encodeURIComponent(next.tag)}`
-        : next.search
-          ? '/search'
-          : next.scan
-            ? '/scan'
-            : next.settings
-              ? '/settings'
-              : '/';
+  // The path a state map describes. These are mutually exclusive surfaces,
+  // so this reads as a list rather than as a nest of ternaries.
+  const route = (() => {
+    if (next.tx) return `/tx/${next.tx}${next.txEvent != null ? `/${next.txEvent}` : ''}`;
+    if (next.author) return `/author/${next.author}`;
+    if (next.tag) return `/tag/${encodeURIComponent(next.tag)}`;
+    if (next.following) return '/following';
+    if (next.search) return '/search';
+    if (next.scan) return '/scan';
+    if (next.settings) return '/settings';
+    return '/';
+  })();
   // A post is on one chain: its URL must say which. Everything else carries
   // the chain only as a filter.
   const chain = next.tx ? (next.chain ?? null) : inheritedChain(next);

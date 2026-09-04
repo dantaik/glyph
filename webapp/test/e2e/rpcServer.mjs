@@ -16,6 +16,7 @@
 // Scenarios — the worlds are stretched 20× in blocks, so Taiko spans two
 // sweep budgets and the frontier shows on the first page:
 //   default     both chains
+//   following   both chains; a private call log, for specs that count requests
 //   empty       both chains, no posts
 //   taiko-down  Taiko answers HTTP 503
 //   flaky       the first two requests to each chain are 429s
@@ -48,6 +49,7 @@ const SCALE = 20;
 
 const SCENARIOS = {
   default: {},
+  following: {},
   empty: { empty: true },
   'taiko-down': { down: [167000] },
   flaky: { flaky: 2 },
@@ -289,6 +291,7 @@ function oracleOf(s) {
       title: p.title,
       author: p.author,
       index: Number(p.index),
+      ts: p.ts,
       href: `/${CHAINS[p.chainId].slug}/tx/${p.txHash}/0`,
       probe: probeOf(c.bodies.get(p.txHash), p.title),
       tags: [...(c.bodies.get(p.txHash)?.tags ?? [])],

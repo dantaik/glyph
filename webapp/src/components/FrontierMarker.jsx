@@ -1,4 +1,4 @@
-import { chainName, fmtRelTime, friendlyError } from '../lib/format';
+import { chainName, fmtRelTime, friendlyError, shortAddr } from '../lib/format';
 import { t } from '../lib/i18n';
 import { Hint } from './Text';
 const ACTION =
@@ -12,10 +12,15 @@ const ACTION =
  * the one that failed. A row of the list it sits in (an `li`).
  *
  * `frontier`: { ts, leaders: [{ chainId, state: 'covered'|'scanning'|'error'|'idle', error, exact }] }
- * `variant`: 'feed' (scans) or 'author' (walks).
+ * `variant`: 'feed' (scans), 'author' (walks), or 'following' (walks over
+ * several authors, where naming the authors is more use than naming the
+ * chains they happen to be on).
  */
 export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, variant = 'feed' }) {
-  const names = frontier.leaders.map((l) => chainName(l.chainId)).join(t('frontier.join'));
+  const names =
+    variant === 'following'
+      ? [...new Set(frontier.leaders.map((l) => shortAddr(l.author)))].join(t('frontier.join'))
+      : [...new Set(frontier.leaders.map((l) => chainName(l.chainId)))].join(t('frontier.join'));
   const states = new Set(frontier.leaders.map((l) => l.state));
   let text;
   let action = null;
@@ -25,18 +30,18 @@ export default function FrontierMarker({ frontier, busy, onLoadMore, onRetry, va
     action = { label: t('common.retry'), onClick: onRetry };
   } else if (states.has('scanning') || states.has('idle')) {
     text =
-      variant === 'author'
-        ? t('frontier.authorScanning', { names })
-        : t('frontier.feedScanning', { names });
+      variant === 'feed'
+        ? t('frontier.feedScanning', { names })
+        : t('frontier.authorScanning', { names });
   } else {
     const exact = frontier.leaders.every((l) => l.exact);
     const when = Number.isFinite(frontier.ts) ? fmtRelTime(new Date(frontier.ts * 1000), { exact }) : null;
     text =
-      variant === 'author'
-        ? t('frontier.authorIncomplete', { names })
-        : t('frontier.feedIncomplete', { names, when: when ?? t('frontier.here') });
+      variant === 'feed'
+        ? t('frontier.feedIncomplete', { names, when: when ?? t('frontier.here') })
+        : t('frontier.authorIncomplete', { names });
     action = {
-      label: variant === 'author' ? t('frontier.continueReading') : t('frontier.continueScanning'),
+      label: variant === 'feed' ? t('frontier.continueScanning') : t('frontier.continueReading'),
       onClick: onLoadMore,
     };
   }

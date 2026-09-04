@@ -12,6 +12,7 @@ import { DEFAULT_CHAIN_ID } from './chains';
 import { READ_CHAIN_IDS } from './config';
 import { getReader } from './data';
 import { MergedAuthorList } from './mergedAuthorList';
+import { FollowFeed } from './followFeed';
 import { MergedFeed } from './mergedFeed';
 import { PAGE_SIZE } from './reader';
 import { compareMerged, timeRows } from './timeline';
@@ -88,6 +89,20 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     return { total: complete ? total : null, byChain };
   }
 
+  // One FollowFeed per set of followed authors, kept so that changing the
+  // list does not throw away the walks for the authors that stayed. The
+  // walks themselves belong to the readers, so nothing is walked twice.
+  const followFeeds = new Map();
+  function followFeed(addresses) {
+    const key = [...addresses].map((a) => String(a).toLowerCase()).sort().join(',');
+    let feed = followFeeds.get(key);
+    if (!feed) {
+      feed = new FollowFeed({ readers: list, addresses, pageSize });
+      followFeeds.set(key, feed);
+    }
+    return feed;
+  }
+
   const ens = ensReader ?? byId.get(DEFAULT_CHAIN_ID) ?? null;
   const ensName = (address) => (ens ? ens.ensName(address) : Promise.resolve(null));
 
@@ -122,6 +137,7 @@ export function createView(readers, { pageSize = PAGE_SIZE, ensReader = null } =
     readers: list,
     reader,
     feed,
+    followFeed,
     authorList,
     counts,
     ensName,

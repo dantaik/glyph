@@ -261,6 +261,32 @@ Drop images into the area below or click to upload; click an image or its name t
   'publish.waitForBlock': 'It appears in the list once the block is confirmed',
   'publish.writeAnother': 'Write another',
 
+  // --- The authors this reader follows -------------------------------------
+  'following.follow': 'Follow',
+  'following.following': 'Following',
+  'following.followTitle': 'Keep up with this author, in this browser',
+  'following.unfollowTitle': 'Stop following this author',
+  'following.title': 'Following',
+  'following.subtitle': ({ count }) => `${count} author${count === 1 ? '' : 's'}`,
+  'following.neverPublished': ({ count }) =>
+    count === 1 ? ' · 1 has not published yet' : ` · ${count} have not published yet`,
+  'following.allPosts': 'All posts',
+  'following.link': ({ count }) => `Following ${count}`,
+  'following.empty': 'You are not following anyone yet',
+  'following.emptyBody':
+    'Follow an author from their page and their posts appear here. It costs one read per author — no block ranges are scanned at all.',
+  'following.goRead': 'Go and find someone',
+  'following.nothingYet': 'Nothing from them yet',
+  'following.nothingYetBody': 'The authors you follow have not published anything that has been read here.',
+  'following.write': 'Write something yourself',
+  'following.newSince': ({ when }) => `Read up to here ${when}`,
+  'following.reading': 'Reading their posts…',
+  'following.settingsHeading': 'Following',
+  'following.settingsNote':
+    'Kept in this browser only, and carried in the settings file. Following someone costs nothing and tells them nothing.',
+  'following.none': 'Nobody yet.',
+  'following.remove': ({ address }) => `Stop following ${address}`,
+
   // --- Finding things among what this browser has read ---------------------
   'tag.title': ({ tag }) => `Tagged ${tag}`,
   'tag.scope': ({ count }) => `Among the ${count} posts this browser has read`,
@@ -399,6 +425,10 @@ Drop images into the area below or click to upload; click an image or its name t
   'settingsFile.themeShape': 'theme should be light, dark or null (follow the system).',
   'settingsFile.lang': ({ lang }) => `Language: ${lang}`,
   'settingsFile.langShape': 'lang should be en or zh.',
+  'settingsFile.following': ({ count }) =>
+    count === 0 ? 'Following: nobody' : `Following: ${count} author${count === 1 ? '' : 's'}`,
+  'settingsFile.followingShape': 'following should be a list of addresses.',
+  'settingsFile.followingDropped': ({ count }) => `Ignoring ${count} entries that are not addresses.`,
   'settingsFile.log': ({ state }) => `Console log: ${state}`,
   'settingsFile.on': 'on',
   'settingsFile.off': 'off',

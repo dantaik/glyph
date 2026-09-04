@@ -10,7 +10,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { makeRowTimeResolver } from './rowTimes';
-import { compareMerged, frontierOf, splitAtFrontier, timeRows } from './timeline';
+import { compareMerged, frontierOf, splitAtFrontier, timeRows, walkBound } from './timeline';
 
 export class MergedAuthorList {
   #author;
@@ -72,26 +72,8 @@ export class MergedAuthorList {
       const s = c.list.getSnapshot();
       const clock = this.#clocks.get(c.chainId) ?? null;
       const rows = timeRows(s.rows, c.chainId, clock);
-      return { c, s, rows, bound: this.#bound(s, rows) };
+      return { c, s, rows, bound: walkBound(s, rows) };
     });
-  }
-
-  /**
-   * How far down in time the author's list on this chain is known: to its
-   * oldest walked row while more remain; all the way when the walk reached
-   * their first post (or they never wrote here); not at all until the
-   * first walk answers.
-   */
-  #bound(s, rows) {
-    if (rows.length) {
-      if (!s.hasMore) return -Infinity;
-      const oldest = rows[rows.length - 1];
-      return oldest.ts ?? Infinity;
-    }
-    if (s.job) return Infinity;
-    if (s.error) return Infinity;
-    if (s.refreshedAt === 0) return Infinity; // never asked yet
-    return -Infinity; // asked, and the author has nothing on this chain
   }
 
   getSnapshot = () => {

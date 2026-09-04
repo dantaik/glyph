@@ -22,8 +22,10 @@ import {
   saveRescanDelay,
   saveRpcUrls,
 } from './config';
+import { getFollowing, setFollowing } from './following';
 import { getThemePref, setThemePref } from './theme';
 import { LANG_NAMES, getLang, isLang, setLang, t } from './i18n';
+import { ADDRESS_RE } from './router';
 import * as rpcLog from './rpcLog';
 
 export const SETTINGS_FORMAT = 1;
@@ -44,6 +46,7 @@ export function collectSettings() {
     lang: getLang(),
     theme: getThemePref(),
     log: rpcLog.isEnabled(),
+    following: getFollowing(),
   };
 }
 
@@ -158,6 +161,18 @@ export function parseSettingsFile(text) {
       problems.push(t('settingsFile.themeShape'));
     }
   }
+  if (doc.following != null) {
+    if (!Array.isArray(doc.following)) {
+      problems.push(t('settingsFile.followingShape'));
+    } else {
+      const good = doc.following.filter((a) => typeof a === 'string' && ADDRESS_RE.test(a.trim()));
+      if (good.length < doc.following.length) {
+        problems.push(t('settingsFile.followingDropped', { count: doc.following.length - good.length }));
+      }
+      settings.following = good.map((a) => a.trim().toLowerCase());
+      summary.push(t('settingsFile.following', { count: settings.following.length }));
+    }
+  }
   if (doc.log != null) {
     if (typeof doc.log === 'boolean') {
       settings.log = doc.log;
@@ -185,4 +200,5 @@ export function applySettings(settings) {
   if (settings.lang != null) setLang(settings.lang);
   if ('theme' in settings) setThemePref(settings.theme);
   if (settings.log != null) rpcLog.setEnabled(settings.log);
+  if (settings.following != null) setFollowing(settings.following);
 }

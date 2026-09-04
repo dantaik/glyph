@@ -401,6 +401,16 @@ spaces between them, so the posts this app was written for are exactly the ones 
 fail on. Every such surface states its scope ("among the N posts this browser has read") and offers
 the ordinary paging control as the way to widen it.
 
+**The following feed: the cheap path, used as designed.** A reader who follows authors rather than
+browsing needs no range scan at all. The contract keeps a head pointer per author (`latestBlock`) and
+every post names the block of that author's previous one, so a followed author's list is one head read
+plus a walk down single blocks. `followFeed.js` merges one such walk per (author, chain) by time, using
+the very same `AuthorListController` the author pages use — so following somebody and then opening them
+costs nothing more — and marks the frontier where the merge stops being complete, naming the author and
+chain whose walk sits there. `loadMore()` deepens whichever walk is furthest behind, at most three per
+click. The followed list lives in this browser (`glyph.following.v1`), costs no gas and is invisible to
+the author: following is a decision about what you read, not a fact about them.
+
 **The home feed (no address): the newest N across authors** — the one deliberate range scan in the whole design, used **only for address-less discovery**; the single-author path is unaffected:
 
 ```js
@@ -510,6 +520,7 @@ To reference another article from a body, the link target is written as the targ
 | When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
+| Following | A list of addresses in this browser; `/following` merges one author-list walk per (author, chain) and needs no range scan | Following is a decision about what you read, not a fact about the author, so it costs no gas and tells them nothing; and it is the path the head pointer and the reverse linked list were put in the contract for |
 | Local cache | IndexedDB, never expiring | The content is immutable; a cache hit costs no RPC; ten thousand posts is ~20 MB |
 | Scan coverage | localStorage records **a set of ranges** already scanned, rather than one frontier | Paging back only fills unread gaps; a range already scanned is never scanned again |
 | Request de-duplication | indexed within a session by (author, index) / (txHash, event index) | One post is requested from the node at most once per session, whichever page it is reached from |

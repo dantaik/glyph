@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { chainName, fmtBlock, friendlyError } from '../lib/format';
 import { t } from '../lib/i18n';
+import { useFollowing } from '../lib/following';
 import { useMergedFeed } from '../lib/mergedFeed';
 import { hrefFor } from '../lib/router';
 import { rowKey } from '../lib/timeline';
@@ -29,6 +30,7 @@ import { Hint } from './Text';
  */
 export default function HomeFeed({ view, navigate, currentChain = null, onStartWriting }) {
   const feed = useMergedFeed(view.feed);
+  const following = useFollowing();
   const { rows, gaps, frontier, done, job, scanning, note, chains, allErrored } = feed;
   const single = chains.length === 1;
   const loading = rows.length === 0 && !allErrored && chains.some((c) => c.job === 'refresh');
@@ -42,6 +44,23 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
   const noteText = note
     ? t('feed.note', { chain: chainName(note.chainId), blocks: fmtBlock(note.fetched) })
     : null;
+
+  /** The way to the following feed, once there is anyone in it. */
+  const followingLink = following.length > 0 && (
+    <>
+      <span className="select-none" aria-hidden="true"> · </span>
+      <a
+        href={hrefFor({ following: '1' })}
+        onClick={(e) => {
+          e.preventDefault();
+          navigate({ following: '1' });
+        }}
+        className="hover:text-accent transition-colors"
+      >
+        {t('following.link', { count: following.length })}
+      </a>
+    </>
+  );
 
   const subtitle = single ? (
     <>
@@ -57,9 +76,13 @@ export default function HomeFeed({ view, navigate, currentChain = null, onStartW
       >
         {t('feed.viewAll')}
       </a>
+      {followingLink}
     </>
   ) : (
-    t('feed.subtitleAll', { count: chains.length })
+    <>
+      {t('feed.subtitleAll', { count: chains.length })}
+      {followingLink}
+    </>
   );
 
   const marker = () =>

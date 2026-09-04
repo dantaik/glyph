@@ -6,6 +6,7 @@ import { useMergedAuthorList } from '../lib/mergedAuthorList';
 import { hrefFor } from '../lib/router';
 import { rowKey } from '../lib/timeline';
 import AddressLabel from './Address';
+import FollowButton from './FollowButton';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import ArticleListItem from './ArticleListItem';
@@ -74,6 +75,7 @@ export default function AuthorPage({ view, author, navigate, currentChain = null
           )
         }
         titleAttr={author}
+        right={<FollowButton author={author} />}
         subtitle={
           single ? (
             <>

@@ -102,5 +102,31 @@ export function splitAtFrontier(rows, tStar) {
 /** Rows on the complete side of the frontier. */
 export const countAbove = (rows, tStar) => splitAtFrontier(rows, tStar) + 1;
 
+/**
+ * How far down in time an author's list on one chain is known.
+ *
+ * A walk that has reached the author's first post knows everything, so it
+ * is complete to the beginning of time (`-Infinity`); one still holding
+ * rows knows down to its oldest; one that has not answered yet knows
+ * nothing, and nothing at all can be called complete while it is out
+ * (`+Infinity`).
+ *
+ * Shared by the author page and the following feed, which merge the same
+ * kind of walk for different reasons.
+ *
+ * @param snapshot the AuthorListController snapshot
+ * @param rows      that snapshot's rows, already timed (see timeRows)
+ */
+export function walkBound(snapshot, rows) {
+  if (rows.length) {
+    if (!snapshot.hasMore) return -Infinity;
+    return rows[rows.length - 1].ts ?? Infinity;
+  }
+  if (snapshot.job) return Infinity;
+  if (snapshot.error) return Infinity;
+  if (snapshot.refreshedAt === 0) return Infinity; // never asked yet
+  return -Infinity; // asked, and there is nothing here
+}
+
 /** Row identity across chains, for React keys and de-duplication. */
 export const rowKey = (r) => `${r.chainId}:${String(r.txHash).toLowerCase()}:${r.eventIndex ?? 0}`;

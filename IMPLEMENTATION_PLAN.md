@@ -53,7 +53,7 @@ never delete or skip a test to get there.
 | 5 | Markdown round trip and the raw view | ☑ | #16 | |
 | 6 | Front-matter relations and the body index | ☑ | #16 | |
 | 7 | Tags and search over what this browser has read | ☑ | #16 | |
-| 8 | The following feed | ☐ | | |
+| 8 | The following feed | ☑ | #16 | |
 | 9 | ENS identity: names in URLs, avatars, profiles | ☐ | | |
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☐ | | |
 | 11 | Archive bundles: export and import | ☐ | | |
@@ -105,6 +105,13 @@ Deviations and decisions made during implementation (append here, newest last):
   A remembered WalletConnect choice is deliberately NOT reconnected on load:
   opening the write tab must never put a QR code on screen nobody asked for,
   so it reconnects on the next connect instead.
+- **Phase 8.** The end-to-end test needed its own mock-node scenario
+  (`following`) because the call log it inspects is shared between the
+  workers running the other specs in parallel, and a `__reset` in one test
+  erased the counts another was still reading. The clock-refresh pattern was
+  copied rather than extracted into a shared `ClockSet`: the three merged
+  controllers hold clocks for different reasons, and the extraction would
+  have coupled them for four lines of duplication.
 
 ## 2. What Xueni is, in one page
 

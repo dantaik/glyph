@@ -6,6 +6,7 @@ import { LANGS, LANG_NAMES, setLang, useLang, useT } from '../lib/i18n';
 import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
 import BackButton from './BackButton';
 import BackupSection from './BackupSection';
+import FollowingSection from './FollowingSection';
 import ListHeader from './ListHeader';
 import SectionHeader from './SectionHeader';
 import { Micro, Note } from './Text';
@@ -209,6 +210,8 @@ export default function SettingsPage({ navigate }) {
         </label>
         <Note className="mt-2 max-w-2xl">{t('settings.rescanNote')}</Note>
       </section>
+
+      <FollowingSection navigate={navigate} />
 
       <BackupSection />
 

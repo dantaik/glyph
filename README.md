@@ -59,6 +59,13 @@ a substring, so Chinese works without word splitting. Both cover the posts this 
 so in their subtitle, and offer the ordinary "read earlier posts" as the way to cover more. Neither
 asks anything of a server: no node can filter on the inside of compressed calldata, and an index that
 went looking would be a crawler.
+**Following**: "Follow" on an author's page (or under any post of theirs) keeps them in a list held in this
+browser and nowhere else, and `/following` — one click from the home feed — shows their newest posts merged
+across both chains. It is the cheap path the contract was designed for: the home feed has to sweep block
+ranges because there is no global head pointer, but every author has one of their own, and each of their
+posts names the block of the previous one. So this feed costs one head read per author per chain and then a
+walk down single blocks, with no range scan anywhere. A divider marks where you got to last time. The list
+costs no gas, tells the author nothing, can be pruned on `/settings`, and travels in the settings file.
 **Relations**: a post can say what it is to other posts, in its own front-matter and therefore on chain:
 a reply (`re`), a replacement for an earlier version (`supersedes` — the only honest kind of edit on an
 immutable chain), a continuation (`prev`), a place in a `series`, and the `lang` it is written in. Fill
@@ -115,7 +122,7 @@ button, or the ⋯ menu on a phone) or from `/settings`. The choice applies imme
 browser, and travels in the settings file. It changes the interface only — a post stays on-chain in the
 language it was written in.
 **Backup and restore**: "Export settings" on `/settings` writes the endpoint lists, rescan delay, publish
-target, language, theme and log switch to one JSON file; "Import settings" lists what it would
+target, language, theme, followed authors and log switch to one JSON file; "Import settings" lists what it would
 change first and applies it on confirmation, with no reload.
 **Interface**: an author is shown as a blockies icon generated from their address plus the last 6
 characters of it (contracts and transaction hashes still use `0x1234…abcd`). On a narrow screen the

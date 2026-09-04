@@ -6,6 +6,7 @@ import AuthorPage from './AuthorPage';
 import HomeFeed from './HomeFeed';
 import PostLocator from './PostLocator';
 import PostRoute from './PostRoute';
+import FollowingPage from './FollowingPage';
 import ScanPage from './ScanPage';
 import SearchPage from './SearchPage';
 import TagPage from './TagPage';
@@ -43,6 +44,15 @@ export default function Reader({ onStartWriting }) {
   }, [tx, params.chain, params.txEvent, headless, navigate]);
 
   if (params.scan) return <ScanPage navigate={navigate} />;
+  if (params.following)
+    return (
+      <FollowingPage
+        view={view}
+        navigate={navigate}
+        currentChain={params.chain}
+        onStartWriting={onStartWriting}
+      />
+    );
   if (params.tag) return <TagPage view={view} tag={params.tag} navigate={navigate} currentChain={params.chain} />;
   if (params.search) return <SearchPage view={view} query={params.q ?? ''} navigate={navigate} currentChain={params.chain} />;
   if (tx && params.chain == null) {

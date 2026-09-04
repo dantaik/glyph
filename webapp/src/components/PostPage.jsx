@@ -20,6 +20,7 @@ import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
 import AddressLabel from './Address';
 import BackButton from './BackButton';
+import FollowButton from './FollowButton';
 import { BTN_OUTLINE_PILL } from './formStyles';
 import { ArticleTitle, Meta, Micro } from './Text';
 import PostNav from './PostNav';
@@ -246,6 +247,8 @@ export default function PostPage({
               {ensName || <AddressLabel address={meta.author} size={14} tailClassName="text-xs" />}
             </a>
           </span>
+          <Dot />
+          <FollowButton author={meta.author} compact />
           <Dot />
           <ChainChip chainId={reader.chainId} navigate={navigate} />
           <Dot />

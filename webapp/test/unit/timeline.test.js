@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareMerged, countAbove, frontierOf, rowKey, splitAtFrontier, timeRows } from '../../src/lib/timeline';
+import { compareMerged, countAbove, frontierOf, rowKey, splitAtFrontier, timeRows, walkBound } from '../../src/lib/timeline';
 
 const clock = { block: 1000n, ts: 10_000, secondsPerBlock: 10 };
 const row = (block, extra = {}) => ({ block: BigInt(block), logIndex: 0, txHash: `0x${block}`, eventIndex: 0, ts: null, ...extra });
@@ -101,5 +101,32 @@ describe('timeline.timeRows — exact times are anchors', () => {
   it('with no clock, rows without a time stay timeless and exact ones keep theirs', () => {
     const out = timeRows([row(990), row(980, { ts: 9950 }), row(970)], 1, null);
     expect(out.map((r) => r.ts)).toEqual([null, 9950, null]);
+  });
+});
+
+describe('timeline.walkBound', () => {
+  const snap = (extra = {}) => ({ hasMore: false, job: null, error: null, refreshedAt: 1, ...extra });
+  const timed = (...ts) => ts.map((t) => ({ ts: t }));
+
+  it('a walk that reached the author\'s first post knows everything', () => {
+    expect(walkBound(snap({ hasMore: false }), timed(900, 500))).toBe(-Infinity);
+  });
+
+  it('a walk with more to read knows down to its oldest row', () => {
+    expect(walkBound(snap({ hasMore: true }), timed(900, 500))).toBe(500);
+  });
+
+  it('an oldest row with no time yet bounds nothing', () => {
+    expect(walkBound(snap({ hasMore: true }), [{ ts: 900 }, { ts: null }])).toBe(Infinity);
+  });
+
+  it('a walk still out, or failed, or never asked, bounds nothing', () => {
+    expect(walkBound(snap({ job: 'refresh' }), [])).toBe(Infinity);
+    expect(walkBound(snap({ error: new Error('down') }), [])).toBe(Infinity);
+    expect(walkBound(snap({ refreshedAt: 0 }), [])).toBe(Infinity);
+  });
+
+  it('an author who has answered and written nothing is complete, not pending', () => {
+    expect(walkBound(snap(), [])).toBe(-Infinity);
   });
 });
