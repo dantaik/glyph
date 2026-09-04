@@ -98,8 +98,8 @@ costs no gas, tells the author nothing, can be pruned on `/settings`, and travel
 **Relations**: a post can say what it is to other posts, in its own front-matter and therefore on chain:
 a reply (`re`), a replacement for an earlier version (`supersedes` — the only honest kind of edit on an
 immutable chain), a continuation (`prev`), a place in a `series`, and the `lang` it is written in. Fill
-them in the folded "Relations" section of the Write tab, or press "Reply" under a post to start one
-with the reference already there. Reading, the forward half comes from the post itself and is always
+them in the folded "Relations" section of the Write tab, or choose "Reply" in a post's share menu to
+start one with the reference already there. Reading, the forward half comes from the post itself and is always
 there; the backward half — its replies, what continues it, whether a newer version exists — is drawn
 from the posts this browser has read, and says so.
 **The letter as the chain holds it**: every post page has "Raw", which shows the exact decompressed
@@ -207,7 +207,16 @@ JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-en
 bodies are brotli-compressed `publish()` calldata, so viem, chainIO and the brotli WASM all really run.
 During development, `npm run dev` and then `/?fixtures=1` shows the same demo data from memory. GitHub
 Actions (`.github/workflows/ci.yml`) runs all three steps on every PR, and the `cli` job runs the
-command-line tool's tests against that same mock node (`cd cli && npm test`).
+command-line tool's tests against that same mock node (`cd cli && npm test`). The macOS application has
+its own workflow (`.github/workflows/desktop.yml`), which builds on a `v*` tag and on a pull request
+that touches `desktop/`; its image-encoding crate is tested with `cd desktop/src-tauri/transcode &&
+cargo test`.
+
+Two of the end-to-end specs are worth knowing about. `following.spec.js` inspects the mock node's call
+log and asserts that reading a followed author never issued an `eth_getLogs` spanning more than one
+block, which is the claim the contract's head pointer exists to make. `archive.spec.js` exports a bundle
+in one browser, imports it into a second, opens that author's page and one of their posts there, and
+asserts that not one transaction was read.
 
 Most of the demo world is written in English. Two of its posts are deliberately left in Chinese: they are
 the multi-byte-title fixtures — one title is exactly 27 bytes of UTF-8, the other is a `bytes32` title cut

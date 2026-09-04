@@ -1,13 +1,15 @@
 // publish.js — Author side (browser).
 //
 // Flow:
-//   1. process each image (downscale + WebP q60) → bytes
+//   1. process each image (downscale + WebP q60) → bytes, unless this
+//      browser has published those exact bytes on this chain before
 //   2. store each image as a plain self-tx → txhash → rewrite upload:KEY → eth:0x<hash>
-//   3. encode { tags, markdown } into a versioned binary payload, brotli q11
+//   3. encode { meta, tags, markdown } as front-matter + Markdown, brotli q11
 //   4. encode title to bytes32 (UTF-8, zero-padded)
 //   5. publish(title, payload)
 //
-// Requires a browser wallet (window.ethereum).
+// Needs a wallet to sign, whichever one the reader chose (wallet.js): an
+// announced extension, or WalletConnect where a build carries a project id.
 
 import { createWalletClient, custom, toHex } from 'viem';
 import { GLYPH_ADDRESS } from './config';

@@ -18,10 +18,13 @@
 3. [Cost](#3-cost)
 4. [The contract, `Blog.sol`](#4-the-contract-blogsol) (contract name `Glyph`)
 5. [Payload encoding (`payload.js`)](#5-payload-encoding-payloadjs)
+   · [5.1 Front-matter keys](#51-front-matter-keys)
 6. [The publish pipeline, `publish.js`](#6-the-publish-pipeline-publishjs)
 7. [The reader, `blogReader.js`](#7-the-reader-blogreaderjs)
 8. [The Markdown subset, and rendering](#8-the-markdown-subset-and-rendering)
+   · [8.1 Cross-article references](#81-cross-article-references)
 9. [Permanence and self-hosting](#9-permanence-and-self-hosting)
+   · [9.1 The archive bundle](#91-the-archive-bundle)
 10. [Design decision record](#10-design-decision-record)
 11. [Appendix: constants, dependencies, deployment](#11-appendix-constants-dependencies-deployment)
 
@@ -86,7 +89,9 @@ B. opening one post
 
 > **Why isn't the body in the event?** One `eth_getLogs` pulls all of `log.data` back to the client. For "show a page of 20 titles" to be cheap, the body must not be in the event — this was the key architectural change in v2. Putting the body in the publish transaction's calldata (which the contract never reads) both saves the ~20% extra gas that LOG data costs and gives the title-list query a fixed bandwidth.
 
-**Author discovery is out-of-band.** The front end takes the author's address from the URL (`?author=0x…`); the contract keeps no "author directory" at all, and stays minimal. **When the home page is opened with no address**, the front end falls back to one bounded scan of recent blocks to list the newest N posts network-wide (best-effort, see §7) — without changing the contract.
+**Author discovery is out-of-band.** The front end takes the author's address from the URL (`/author/0x…`, or `/author/<name>.eth` resolved through ENS); the contract keeps no "author directory" at all, and stays minimal. **When the home page is opened with no address**, the front end falls back to one bounded scan of recent blocks to list the newest N posts network-wide (best-effort, see §7) — without changing the contract. A reader who follows authors rather than browsing skips that scan entirely (§7, "The following feed").
+
+**Where the same code runs.** One payload layer, three surfaces. The browser app (`webapp/`) is the reference implementation. The command-line tool (`cli/`) imports its `payloadText`, `title`, `abi`, `chains` and `limits` modules directly rather than reimplementing them, which is why those modules are kept free of any import plain Node cannot follow. The macOS application (`desktop/`) is a Tauri shell around the same built `dist/`, adding only what a WKWebView cannot do: encode WebP from a canvas, and save a file. Nothing in any of them talks to a server.
 
 ---
 
@@ -580,6 +585,7 @@ code, and any tool that reads JSON can read it decades from now.
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
 | Desktop app | Tauri 2 around the same `webapp/dist`, macOS first | The reader is a static single-page app, so a desktop version is a window plus the two things WebKit cannot do — encode WebP from a canvas, and honour `<a download>`; Tauri's shell is ~10 MB against Electron's ~200 MB and has no bundled browser to keep patched |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
+| The command line | A separate package (`cli/`) that IMPORTS the web app's payload, title, ABI, chain and limit modules rather than reimplementing them | Two encoders of one format drift apart, and the drift would be silent and on chain. Those modules are therefore kept free of any import plain Node cannot follow, and a test builds a bundle with one side and reads it with the other |
 | Archive bundles | One JSON file: the exact stored text of what has been read, the images, and which author lists are complete | The local cache is the only copy a reader controls, and until it is a file it is a browser profile a cleared cache takes away. It is also the answer to history expiry: a reader in 2040 opens a bundle instead of running an archive node |
 | Getting a post off this page | A share menu: the canonical link, an `<iframe>` for `?headless=1`, and the Markdown reference `[title](0x…)` | A quotation written as a reference goes on chain with the quoting post and stays resolvable as long as both transactions exist, which is the only citation this journal can honestly offer |
 | A printed post | `@media print`: the interface hidden by a `data-noprint` attribute, the chain and full transaction hash printed under the letter | On paper a link is not a link; a copy that cannot be traced back to the chain holding it is just a piece of paper |
