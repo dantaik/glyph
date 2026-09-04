@@ -8,6 +8,11 @@
 // caller fetches from chain and calls setCached*. No eviction — posts are
 // permanent and small (~1-2 KB brotli), so even 10,000 posts fit in ~20 MB.
 //
+// A third store, `drafts`, holds what is being written rather than what has
+// been read: one record, not chain-scoped, keyed by a plain string (see
+// drafts.js). It shares this database because it shares the problem —
+// structured data, possibly holding Blobs, that has to outlive the page.
+//
 // Keys carry the chain id so that nothing read on one chain is ever served
 // for another. Entries written before keys were scoped are keyed by hash
 // alone; a transaction hash identifies one transaction on one chain, so
@@ -15,7 +20,8 @@
 // asked for instead of being fetched again.
 
 const DB_NAME = 'glyph-cache';
-const DB_VERSION = 1;
+/** 1: bodies + images. 2: adds `drafts`. */
+const DB_VERSION = 2;
 
 /** Lazily-opened singleton connection, reused by every cache op. */
 let dbPromise = null;
@@ -32,6 +38,9 @@ function openDB() {
         }
         if (!db.objectStoreNames.contains('images')) {
           db.createObjectStore('images');
+        }
+        if (!db.objectStoreNames.contains('drafts')) {
+          db.createObjectStore('drafts');
         }
       };
       req.onsuccess = () => {
@@ -143,6 +152,52 @@ export async function cachePersists() {
   } catch {
     idbDenied = true;
     return false;
+  }
+}
+
+// --- Records under a plain key (the draft store) --------------------
+//
+// The same database and the same fallback, without the chain scoping: a
+// draft belongs to the person writing it, not to a chain.
+
+const plainMemKey = (storeName, key) => `${storeName}::${key}`;
+
+/** One record, or null when there is none (or no IndexedDB to ask). */
+export async function readRecord(storeName, key) {
+  if (idbDenied) return memory.get(plainMemKey(storeName, key)) ?? null;
+  try {
+    return (await get(storeName, key)) ?? null;
+  } catch {
+    idbDenied = true;
+    return memory.get(plainMemKey(storeName, key)) ?? null;
+  }
+}
+
+/** Store one record, falling back to memory where IndexedDB is refused. */
+export async function writeRecord(storeName, key, value) {
+  const memoryKey = plainMemKey(storeName, key);
+  if (idbDenied) {
+    memory.delete(memoryKey);
+    memory.set(memoryKey, value);
+    return;
+  }
+  try {
+    await put(storeName, key, value);
+  } catch {
+    idbDenied = true;
+    memory.delete(memoryKey);
+    memory.set(memoryKey, value);
+  }
+}
+
+/** Forget one record. */
+export async function deleteRecord(storeName, key) {
+  memory.delete(plainMemKey(storeName, key));
+  if (idbDenied) return;
+  try {
+    await del(storeName, key);
+  } catch {
+    idbDenied = true;
   }
 }
 

@@ -210,6 +210,10 @@ export default {
     'Publishing will ask to connect a wallet; the post is written permanently to the contract on the chosen network.',
   'wallet.none': 'No wallet detected — please install a browser wallet such as MetaMask.',
 
+  // --- The draft kept between visits ---------------------------------------
+  'draft.restored': ({ when }) => `Draft restored from ${when}`,
+  'draft.discard': 'Discard',
+
   // --- Writing and publishing ---------------------------------------------
   'publish.placeholderBody': `# A heading
 

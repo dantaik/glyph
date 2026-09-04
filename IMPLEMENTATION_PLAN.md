@@ -46,7 +46,7 @@ never delete or skip a test to get there.
 | Phase | Title | Status | PR | Notes |
 |---|---|---|---|---|
 | 0 | Groundwork: shared refactors and two doc fixes | ☑ | #16 | |
-| 1 | Draft autosave | ☐ | | |
+| 1 | Draft autosave | ☑ | #16 | |
 | 2 | Wallets: EIP-6963 discovery, optional WalletConnect | ☐ | | |
 | 3 | Cost awareness: base-fee history and both chains side by side | ☐ | | |
 | 4 | Images: on-chain refs in the preview, a reuse ledger, paste and drop | ☐ | | |
@@ -75,6 +75,11 @@ Deviations and decisions made during implementation (append here, newest last):
   test therefore stubs the compression boundary and is about chainIO's own
   wiring; real brotli is exercised end to end by the Playwright suite against
   the mock node, which compresses with `node:zlib`.
+- **Phase 1.** The end-to-end test found a real race the plan had not
+  foreseen: a debounced save scheduled before publishing could land after
+  the publish had cleared the draft, putting a letter that was already on
+  chain back in the editor. Fixed with an epoch the save checks before it
+  writes, bumped whenever the draft is deliberately forgotten.
 
 ## 2. What Xueni is, in one page
 

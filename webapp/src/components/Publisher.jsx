@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   embedImages,
   publishPost,
@@ -10,7 +10,8 @@ import { getClient } from '../lib/clients';
 import { getReader } from '../lib/data';
 import { resolvePublishChain, usePublishChainId } from '../lib/config';
 import { useWallet } from '../lib/wallet';
-import { chainName, etherscanTxUrl } from '../lib/format';
+import { chainName, etherscanTxUrl, fmtRelTime } from '../lib/format';
+import { clearDraft, isEmptyDraft, loadDraft, saveDraft, takePendingDraftPatch } from '../lib/drafts';
 import { t, useLang } from '../lib/i18n';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
@@ -18,7 +19,7 @@ import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
 import WalletPanel from './WalletPanel';
-import { BTN_PRIMARY, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { BTN_PRIMARY, BTN_QUIET, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
 import { Body, Meta, Micro } from './Text';
 import {
   getMarketState,
@@ -36,6 +37,13 @@ import {
 const MarkdownEditor = lazy(() => import('./MarkdownEditor'));
 
 const PLACEHOLDER_TITLE = '';
+
+/**
+ * How long after the last keystroke the draft is written. Long enough that
+ * typing a sentence is one write, short enough that nothing is lost to a
+ * closed tab.
+ */
+const DRAFT_SAVE_DELAY_MS = 500;
 
 /**
  * The starting draft, in the language the tab was opened in. Read as a
@@ -56,6 +64,11 @@ export default function Publisher() {
   const [txHash, setTxHash] = useState(null);
   const [isFirstPost, setIsFirstPost] = useState(true);
   const [market, setMarket] = useState({ gasPriceWei: null, ethUsd: null });
+  // Front-matter beyond the tags — the language, the relations. Empty until
+  // the Relations fields fill it; carried in the draft either way.
+  const [meta, setMeta] = useState({});
+  // Set when what is on screen came back from storage: drives the notice.
+  const [restoredAt, setRestoredAt] = useState(null);
   useLang(); // the phrases below are read at render time
   const { account, chainId: walletChainId, connect } = useWallet();
   // The chain to publish on: the one picked here, else the wallet's own
@@ -66,6 +79,72 @@ export default function Publisher() {
   const chainId = resolvePublishChain(pickedChain, walletChainId);
   const reader = getReader(chainId);
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
+
+  // --- The draft, kept across the tab ------------------------------------
+  //
+  // Read once on mount, written a moment after every change. `hydrated`
+  // gates the write: without it the empty form this component starts with
+  // would overwrite the stored letter in the instant before the read
+  // returns.
+  const hydrated = useRef(false);
+  const skipSave = useRef(false);
+  // Bumped whenever the draft is deliberately forgotten. A save scheduled
+  // before that moment must not land after it: publishing takes a second or
+  // two, a debounced write is half a second out, and on a busy machine the
+  // timer can fire after the publish has already cleared the draft — which
+  // would put a letter that is now on chain back in the editor.
+  const draftEpoch = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await loadDraft().catch(() => null);
+      // "Reply to this post" hands over its fields in memory (drafts.js).
+      const patch = takePendingDraftPatch();
+      if (cancelled) return;
+      const restoring = Boolean(stored) && !isEmptyDraft(stored);
+      if (restoring) {
+        setTitle(stored.title ?? '');
+        setTags(stored.tags ?? []);
+        setMarkdown(stored.markdown ?? '');
+        setFiles(stored.files ?? {});
+        setMeta(stored.meta ?? {});
+        setRestoredAt(stored.updatedAt ?? null);
+      }
+      if (patch) {
+        if (patch.title != null) setTitle(patch.title);
+        if (patch.markdown != null) setMarkdown(patch.markdown);
+        if (patch.tags != null) setTags(patch.tags);
+        if (patch.meta) setMeta((cur) => ({ ...cur, ...patch.meta }));
+      }
+      hydrated.current = true;
+      // Restoring is not itself a change worth writing back: saving here
+      // would only move `updatedAt` forward, and the notice would claim the
+      // letter was written a moment ago. A patch IS a change, so it saves.
+      if (restoring && !patch) skipSave.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated.current) return undefined;
+    if (skipSave.current) {
+      skipSave.current = false;
+      return undefined;
+    }
+    const draft = { title, tags, markdown, meta, files };
+    const epoch = draftEpoch.current;
+    const id = setTimeout(() => {
+      if (draftEpoch.current !== epoch) return; // published or discarded since
+      // An untouched form is not a draft: it is never stored, so opening the
+      // write tab and leaving does not leave something to restore.
+      if (isEmptyDraft(draft)) clearDraft().catch(() => {});
+      else saveDraft(draft).catch(() => {});
+    }, DRAFT_SAVE_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [title, tags, markdown, meta, files]);
 
   // Stable preview URLs for uploaded files — shared by the dropzone
   // thumbnails and the editor's live preview pane.
@@ -215,11 +294,26 @@ export default function Publisher() {
     markdown.trim() &&
     uploadRefs.every((k) => files[k]);
 
-  const resetDraft = () => {
+  /** Forget the stored draft, and any save still on its way to it. */
+  const forgetDraft = () => {
+    draftEpoch.current += 1;
+    clearDraft().catch(() => {});
+  };
+
+  /** Back to an empty form, and nothing left in storage. */
+  const emptyTheForm = () => {
+    forgetDraft();
     setTitle(PLACEHOLDER_TITLE);
     setTags([]);
+    setTagsInput('');
     setMarkdown(placeholderBody());
     setFiles({});
+    setMeta({});
+    setRestoredAt(null);
+  };
+
+  const resetDraft = () => {
+    emptyTheForm();
     setStatus('idle');
     setStatusMsg('');
     setTxHash(null);
@@ -269,11 +363,29 @@ export default function Publisher() {
       setTxHash(hash);
       setStatus('done');
       setStatusMsg(t('publish.done'));
+      // It is on chain now; keeping a copy of it here would only offer to
+      // restore something already published.
+      forgetDraft();
+      setRestoredAt(null);
     } catch (err) {
       setStatus('error');
       setStatusMsg(err.message || t('publish.failed'));
     }
   };
+
+  // While images are being paid for, or a publish is waiting to be signed,
+  // leaving costs money or loses a signature. Every other moment is covered
+  // by the autosave above, so a warning then would be noise.
+  const inFlight = status === 'processing' || status === 'signing';
+  useEffect(() => {
+    if (!inFlight) return undefined;
+    const warn = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // older browsers want this to show their own prompt
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [inFlight]);
 
   // --- Render ---
   return (
@@ -283,6 +395,23 @@ export default function Publisher() {
         picked={pickedChain != null}
         disabled={status === 'processing' || status === 'signing'}
       />
+
+      {restoredAt != null && (
+        <div
+          role="status"
+          data-draft-restored=""
+          className="mb-8 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-paper-raised px-4 py-2.5"
+        >
+          <Meta as="span">
+            {t('draft.restored', {
+              when: fmtRelTime(new Date(restoredAt), { exact: true }) ?? '',
+            })}
+          </Meta>
+          <button type="button" onClick={emptyTheForm} className={BTN_QUIET}>
+            {t('draft.discard')}
+          </button>
+        </div>
+      )}
 
       <SectionHeader label={t('publish.titleHeading')} />
       <div className="mb-10">
