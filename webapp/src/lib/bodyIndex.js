@@ -108,7 +108,13 @@ export function createBodyIndex(chainId, { store = null } = {}) {
    * Done once per session, lazily: the index is only interesting when
    * something asks it a question.
    */
-  function warm() {
+  /**
+   * Read the cached bodies into the index. `force` re-reads: an archive
+   * import writes bodies straight into the cache, and the index has to be
+   * told rather than wait for the next visit.
+   */
+  function warm({ force = false } = {}) {
+    if (force) warmed = null;
     if (!warmed) {
       warmed = getCachedBodies(id)
         .then((entries) => {

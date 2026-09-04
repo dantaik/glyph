@@ -17,6 +17,7 @@
 // sweep budgets and the frontier shows on the first page:
 //   default     both chains
 //   following   both chains; a private call log, for specs that count requests
+//   archive     the same, for the archive spec
 //   empty       both chains, no posts
 //   taiko-down  Taiko answers HTTP 503
 //   flaky       the first two requests to each chain are 429s
@@ -61,6 +62,7 @@ const SCALE = 20;
 const SCENARIOS = {
   default: {},
   following: {},
+  archive: {},
   empty: { empty: true },
   'taiko-down': { down: [167000] },
   flaky: { flaky: 2 },

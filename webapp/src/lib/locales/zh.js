@@ -291,6 +291,31 @@ export default {
   'lightbox.close': '关闭',
   'lightbox.image': '文章中的图片',
 
+  // --- 存档包：把这台浏览器读过的一切装成一个文件 ---------------------------
+  'archive.heading': '存档',
+  'archive.note':
+    '一个文件，装着这台浏览器读过的每篇文章在链上的原文，以及它们引用的图片。它是数据，不是程序：任何能读 JSON 的工具都能读它。导入到另一台浏览器，这些文章不需要任何节点就能打开——将来公共节点不再提供今天的 calldata 时，靠的就是它。',
+  'archive.exportBrowser': '导出这里读过的全部',
+  'archive.exportAuthor': '导出这位作者',
+  'archive.counts': ({ posts, images }) => `${posts} 篇文章，${images} 张图片`,
+  'archive.nothingRead': '这台浏览器还没读过任何文章。',
+  'archive.import': '导入存档……',
+  'archive.pickFile': '选择存档文件',
+  'archive.exporting': ({ done, total }) => `正在读取 ${done} / ${total}……`,
+  'archive.walking': '正在把这位作者一路读到第一篇……',
+  'archive.chainLine': ({ chain, posts, images }) => `${chain}：${posts} 篇文章，${images} 张图片`,
+  'archive.completeAuthors': ({ count }) => `${count} 位作者，完整`,
+  'archive.applied': ({ posts, images, skipped }) =>
+    `新增 ${posts} 篇文章和 ${images} 张图片，其中 ${skipped} 篇本来就在。`,
+  'archive.notJson': '不是有效的 JSON 文件。',
+  'archive.notArchive': '这不是存档文件（缺少 glyph.archive 标记）。',
+  'archive.wrongVersion': ({ version }) => `不支持版本 ${version} 的存档。`,
+  'archive.wrongContract': ({ contract }) => `这个存档来自另一份合约部署（${contract}）。`,
+  'archive.droppedPosts': ({ count }) => `忽略 ${count} 篇格式错误或链未知的文章。`,
+  'archive.droppedImages': ({ count }) => `忽略 ${count} 张格式错误或链未知的图片。`,
+  'archive.empty': '文件里没有可以导入的文章。',
+  'archive.failed': ({ reason }) => `无法读取存档：${reason}`,
+
   // --- 在已读过的文章里查找 -------------------------------------------------
   'tag.title': ({ tag }) => `标签：${tag}`,
   'tag.scope': ({ count }) => `在本浏览器已读过的 ${count} 篇文章中`,

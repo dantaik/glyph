@@ -56,7 +56,7 @@ never delete or skip a test to get there.
 | 8 | The following feed | ☑ | #16 | |
 | 9 | ENS identity: names in URLs, avatars, profiles | ☑ | #16 | |
 | 10 | Reader polish: keyboard, lightbox, print, share and embed | ☑ | #16 | |
-| 11 | Archive bundles: export and import | ☐ | | |
+| 11 | Archive bundles: export and import | ☑ | #16 | |
 | 12 | The command-line tool | ☑ | #16 | |
 | 13 | The macOS desktop app | ☐ | | |
 | 14 | Closing sweep and deletion of this plan | ☐ | | |
@@ -135,6 +135,17 @@ Deviations and decisions made during implementation (append here, newest last):
   The locale files in this commit already carry Phase 13's `desktop.*` keys,
   which the parallel session was writing at the time; they are inert strings
   until that phase wires them, and both dictionaries stay in step.
+- **Phase 11.** `cache.js` gained no `hasBody`/`hasImage`/`iterate`: the
+  importer needs to know whether a record exists, which `getCachedBody`
+  already answers, and the index already had its own iterator. What it did
+  gain is `warm({ force })`, because an import writes bodies straight into
+  the cache and the index has to be told rather than wait for a reload.
+  `archive.test.js` re-imports the module graph per case: the memory cache
+  the jsdom fallback uses lives at module scope, and two tests sharing one
+  is two tests sharing a browser — which is the very thing under test.
+  A new `archiveInterop.test.js` builds a bundle with `cli/src/archive.js`
+  and parses it with the web app's reader, so the two implementations of
+  one format cannot drift apart unnoticed.
 
 ## 2. What Xueni is, in one page
 

@@ -7,6 +7,7 @@ import { hrefFor } from '../lib/router';
 import { rowKey } from '../lib/timeline';
 import AddressLabel from './Address';
 import AuthorProfile from './AuthorProfile';
+import ExportAuthorButton from './ExportAuthorButton';
 import FollowButton from './FollowButton';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
@@ -86,7 +87,12 @@ export default function AuthorPage({ view, author, displayName = null, navigate,
           )
         }
         titleAttr={author}
-        right={<FollowButton author={author} />}
+        right={
+          <span className="inline-flex items-center gap-2">
+            <ExportAuthorButton view={view} author={author} />
+            <FollowButton author={author} />
+          </span>
+        }
         subtitle={
           single ? (
             <>

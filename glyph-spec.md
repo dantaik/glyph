@@ -488,12 +488,56 @@ To reference another article from a body, the link target is written as the targ
   - Once rolling expiry ships, an ordinary full node may drop history older than roughly a year, and fetching old calldata will then mean going to an **archive node, the Portal Network, or ERA files**.
   - The data itself does not disappear — archive nodes and decentralised data providers keep it — but no arbitrary node is guaranteed to serve it instantly.
 - **A three-layer backup strategy**:
-  1. **The IndexedDB local cache**: every body and image you have visited is cached permanently in the browser, at zero network latency.
-  2. **Your own backup**: keep the original images and the original drafts yourself. When you need to, verify them against the on-chain txhash / block hash.
+  1. **The archive bundle** (§9.1): one file holding the exact stored text of everything this browser
+     has read, or one author's complete output, plus the images those posts refer to. Exported from
+     `/settings` or an author's page, or written by `xueni export`; imported into any browser, where
+     those posts then open with no node at all.
+  2. **The IndexedDB local cache**: every body and image you have visited is cached permanently in the
+     browser, at zero network latency. It is what the bundle is made from, and what a cleared browser
+     profile takes away — which is the whole reason the bundle exists.
   3. **The on-chain anchor**: the bytes are anchored to Ethereum, and you hold a copy you can verify.
-  - The simplest way to take a copy is "Download .md" on any post page: it saves the exact document the
-    chain holds, which "Import .md…" reads back.
+     "Download .md" on any post page saves the exact document the chain holds, and `xueni verify` diffs
+     a file against the transaction that carries it.
 - **If you want every full node to keep it**: **SSTORE2** (storing the bytes as contract code, in **state**) would do it, at roughly 5× the cost of calldata and under the 24KB contract limit (EIP-170). The conclusion: **calldata + local cache + your own backup** is the more practical answer.
+
+### 9.1 The archive bundle
+
+One JSON document, UTF-8, extension `.xueni.json`. Deliberately data and not the app: it carries no
+code, and any tool that reads JSON can read it decades from now.
+
+```json
+{
+  "glyph": { "archive": 1 },
+  "exportedAt": "2026-09-04T12:00:00.000Z",
+  "contract": "0x000000AE2f2249c497cfc5F262dd1491634C361C",
+  "scope": { "kind": "author", "address": "0x…" },
+  "posts": [
+    { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 5,
+      "block": 25945650, "prevBlock": 25901234, "logIndex": 12, "ts": 1757000000,
+      "title": "A letter before the solstice",
+      "text": "---\ntags: letters home\n---\n\nXiaoman, …", "compressedBytes": 1432 }
+  ],
+  "images": [{ "chainId": 1, "txHash": "0x…", "mime": "image/webp", "base64": "UklGR…" }],
+  "authors": [{ "chainId": 1, "address": "0x…", "head": 25945650, "complete": true }]
+}
+```
+
+- `scope.kind` is `browser` (everything cached) or `author` (with `address`).
+- `posts[].text` is the exact **decompressed** document, so nothing has to be decoded to read a bundle.
+  Every number is a plain JSON number; block heights and timestamps sit far below 2^53, and no BigInt
+  can survive a file.
+- `authors[]` records, per chain, the lists that were walked to the author's FIRST post
+  (`complete: true`) and the head they were walked from. That is what lets an importing browser claim
+  it has the whole of that author rather than a sample.
+- Images are base64 because the format must stay one plain JSON file. A WebP image is around 40 KB,
+  about 55 KB encoded.
+- **What an import claims, and what it does not.** Each row proves its own block for its own author,
+  and a `complete` author proves that author's whole list — so those pages then need no node. Nothing
+  in a bundle proves anything about the FEED, which is a claim about every author at once, so the home
+  feed goes on scanning exactly as before. Records already present are never overwritten: what a post
+  says is fixed by the transaction carrying it, so a second copy could only be wrong. A bundle whose
+  `contract` differs from this build's is refused rather than merged, because it describes a different
+  journal.
 
 ---
 
@@ -532,6 +576,7 @@ To reference another article from a body, the link target is written as the targ
 | When and where to publish | A day of base fees sampled from block headers, and the same draft priced on every read chain | Timing is a factor of ~100 on cost and the chain is another; both answers come from the nodes already in use, so neither adds an off-chain dependency |
 | Wallet transport | EIP-6963 discovery of installed wallets; WalletConnect optional, behind a build-time project id | `window.ethereum` is a race between extensions with no way to say which you meant; WalletConnect is the only way to sign where there is no extension, and is the wallet transport only — never content |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
+| Archive bundles | One JSON file: the exact stored text of what has been read, the images, and which author lists are complete | The local cache is the only copy a reader controls, and until it is a file it is a browser profile a cleared cache takes away. It is also the answer to history expiry: a reader in 2040 opens a bundle instead of running an archive node |
 | Getting a post off this page | A share menu: the canonical link, an `<iframe>` for `?headless=1`, and the Markdown reference `[title](0x…)` | A quotation written as a reference goes on chain with the quoting post and stays resolvable as long as both transactions exist, which is the only citation this journal can honestly offer |
 | A printed post | `@media print`: the interface hidden by a `data-noprint` attribute, the chain and full transaction hash printed under the letter | On paper a link is not a link; a copy that cannot be traced back to the chain holding it is just a piece of paper |
 | Identity | ENS, read from mainnet: forward for `/author/<name>.eth`, reverse for bylines, text records for a profile | The contract deliberately knows only addresses; ENS is a registry with no owner on the same chain, so naming authors costs no server and no new trust. A reverse record is verified forward before it is believed |

@@ -24,6 +24,9 @@ import { createRefResolver } from './glyphRefs';
 import { getBodyIndex } from './bodyIndex';
 import { createEns } from './ens';
 
+/** An `![alt](eth:0x…)` image reference: what a body says an image is. */
+const IMAGE_REF_RE = /!\[([^\]]*)\]\(eth:(0x[0-9a-fA-F]{64})[^)]*\)/g;
+
 /** Posts per page, on the feed and on author lists. */
 export const PAGE_SIZE = 20;
 
@@ -295,13 +298,29 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
   }
 
   /**
+   * The bytes of an image, cache-first — what the archive needs, since a
+   * bundle carries the image itself rather than a reference to it.
+   */
+  async function loadImageBytes(hash) {
+    const blob = await loadImageBlob(hash);
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  /**
+   * Every image an article refers to, as `0x…` transaction hashes.
+   * Deliberately the same pattern `resolveImages` matches, so what an
+   * archive carries is exactly what a rendered post would ask for.
+   */
+  const imageRefsIn = (markdown) =>
+    [...new Set([...String(markdown ?? '').matchAll(IMAGE_REF_RE)].map((m) => m[2].toLowerCase()))];
+
+  /**
    * Resolve `eth:0x<txhash>` image refs to blob URLs.
    * @returns {Promise<{ markdown: string, urls: string[] }>} rewritten
    *   markdown plus the fresh object URLs — the caller must revoke them.
    */
   async function resolveImages(markdown) {
-    const re = /!\[([^\]]*)\]\(eth:(0x[0-9a-fA-F]{64})[^)]*\)/g;
-    const matches = [...markdown.matchAll(re)];
+    const matches = [...markdown.matchAll(IMAGE_REF_RE)];
     // Settled, not all: an image the node can't serve must not take the whole
     // article down with it — its ref is left alone and renders as alt text.
     const results = await Promise.allSettled(matches.map((m) => loadImageBlob(m[2])));
@@ -340,5 +359,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     baseFees,
     resolveGlyphRefs,
     resolveImages,
+    loadImageBytes,
+    imageRefsIn,
   });
 }

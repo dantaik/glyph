@@ -136,6 +136,15 @@ does not change, so one post's metadata, title, body and images are never reques
 button, or the ⋯ menu on a phone) or from `/settings`. The choice applies immediately, is kept in this
 browser, and travels in the settings file. It changes the interface only — a post stays on-chain in the
 language it was written in.
+**Archive**: "Export everything read here" on `/settings` writes one `.xueni.json` file holding the exact
+stored text of every post this browser has read and the images they refer to; an author page has "Export
+this author", which first walks their list back to their first post so the bundle can say it is complete.
+Import one into another browser and those posts open with no node at all: the local cache is the only
+copy a reader controls, and until it is a file it is a browser profile that a cleared cache takes away.
+It is also the answer to history expiry (EIP-4444) — a reader years from now, whose endpoints no longer
+serve calldata from today, opens a bundle instead of running an archive node. `xueni export` writes the
+same format from a terminal. An import claims only what it can prove: the posts it carries and the
+authors it says are complete, never the home feed, which is a claim about every author at once.
 **Backup and restore**: "Export settings" on `/settings` writes the endpoint lists, rescan delay, publish
 target, language, theme, followed authors and log switch to one JSON file; "Import settings" lists what it would
 change first and applies it on confirmation, with no reload.

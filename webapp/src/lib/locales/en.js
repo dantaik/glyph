@@ -308,6 +308,35 @@ Drop images into the area below or click to upload; click an image or its name t
   'lightbox.close': 'Close',
   'lightbox.image': 'Image from this post',
 
+  // --- Archive bundles: what this browser has read, as one file ------------
+  'archive.heading': 'Archive',
+  'archive.note':
+    'One file holding the exact stored text of every post this browser has read, and the images they refer to. It is data, not the app: any tool that reads JSON can read it. Import one into another browser and those posts open with no node at all — which is the answer to a future where public endpoints no longer serve calldata from today.',
+  'archive.exportBrowser': 'Export everything read here',
+  'archive.exportAuthor': 'Export this author',
+  'archive.counts': ({ posts, images }) =>
+    `${posts} post${posts === 1 ? '' : 's'}, ${images} image${images === 1 ? '' : 's'}`,
+  'archive.nothingRead': 'Nothing has been read in this browser yet.',
+  'archive.import': 'Import an archive…',
+  'archive.pickFile': 'Choose an archive file',
+  'archive.exporting': ({ done, total }) => `Reading ${done} of ${total}…`,
+  'archive.walking': 'Reading this author back to their first post…',
+  'archive.chainLine': ({ chain, posts, images }) =>
+    `${chain}: ${posts} post${posts === 1 ? '' : 's'}, ${images} image${images === 1 ? '' : 's'}`,
+  'archive.completeAuthors': ({ count }) =>
+    count === 1 ? '1 author, complete' : `${count} authors, complete`,
+  'archive.applied': ({ posts, images, skipped }) =>
+    `Added ${posts} post${posts === 1 ? '' : 's'} and ${images} image${images === 1 ? '' : 's'}. ${skipped} were already here.`,
+  'archive.notJson': 'Not a valid JSON file.',
+  'archive.notArchive': 'This is not an archive file (the glyph.archive marker is missing).',
+  'archive.wrongVersion': ({ version }) => `Archive version ${version} is not supported.`,
+  'archive.wrongContract': ({ contract }) =>
+    `This archive is from a different deployment of the contract (${contract}).`,
+  'archive.droppedPosts': ({ count }) => `Ignoring ${count} posts that are malformed or on an unknown chain.`,
+  'archive.droppedImages': ({ count }) => `Ignoring ${count} images that are malformed or on an unknown chain.`,
+  'archive.empty': 'The file holds no posts that can be imported.',
+  'archive.failed': ({ reason }) => `Could not read the archive: ${reason}`,
+
   // --- Finding things among what this browser has read ---------------------
   'tag.title': ({ tag }) => `Tagged ${tag}`,
   'tag.scope': ({ count }) => `Among the ${count} posts this browser has read`,
