@@ -60,6 +60,22 @@ export class MalformedPayloadError extends CodecError {
   }
 }
 
+/**
+ * A payload that would decompress past the bound a reader allows — a
+ * decompression bomb, or a document larger than any post has business
+ * being — or a document a writer was asked to write past that bound.
+ */
+export class DocumentTooLargeError extends CodecError {
+  /** @param {number} limit the bound in bytes of UTF-8 */
+  constructor(limit) {
+    super(`the document is larger than the ${limit}-byte bound (a decompression bomb, or raise maxDocumentBytes)`, {
+      code: 'DOCUMENT_TOO_LARGE',
+    });
+    this.name = 'DocumentTooLargeError';
+    this.limit = limit;
+  }
+}
+
 /** Bytes that are not a `publish(bytes32,bytes)` call. */
 export class MalformedCallDataError extends CodecError {
   constructor(message, details = {}) {

@@ -2,7 +2,16 @@
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { InvalidPostError, MalformedCallDataError, UnsupportedFormatVersionError, callDataToPost as convertWith, postToCallData as toCallDataWith } from '../src/index.js';
+import {
+  DocumentTooLargeError,
+  InvalidPostError,
+  MalformedCallDataError,
+  UnsupportedFormatVersionError,
+  callDataToPost as convertWith,
+  encodePublishCallData,
+  encodeTitle,
+  postToCallData as toCallDataWith,
+} from '../src/index.js';
 import { callDataToPost, encodePost, normalisePost, postToCallData, nodeBrotli } from '../src/node.js';
 
 const HASH = `0x${'ab'.repeat(32)}`;
@@ -70,6 +79,14 @@ describe('postToCallData / callDataToPost', () => {
 
   test('refuses calldata that is not a publish() call', () => {
     assert.throws(() => callDataToPost('0xdeadbeef'), MalformedCallDataError);
+  });
+
+  test('refuses a decompression bomb published as a post, and passes the bound through', () => {
+    const bomb = nodeBrotli.compress(new Uint8Array(8 * 1024 * 1024).fill(0x20));
+    const callData = encodePublishCallData({ title: encodeTitle('a bomb'), payload: bomb });
+    assert.throws(() => callDataToPost(callData), (e) => e instanceof DocumentTooLargeError && e.code === 'DOCUMENT_TOO_LARGE');
+    assert.equal(callDataToPost(callData, { maxDocumentBytes: 16 * 1024 * 1024 }).markdown.length, 8 * 1024 * 1024);
+    assert.throws(() => postToCallData({ title: 'big', markdown: 'x'.repeat(100) }, { maxDocumentBytes: 50 }), DocumentTooLargeError);
   });
 
   test('the environment-agnostic entry wants a codec', () => {

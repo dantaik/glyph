@@ -1,6 +1,6 @@
 # Xueni post codec — specification
 
-**Format version 1 · specification revision 1.0 · 2026-09**
+**Format version 1 · specification revision 1.1 · 2026-09**
 
 This document states, normatively, how a **post** as a person sees it — a title, some tags, a
 Markdown body, a little metadata — becomes the **call data** of the `publish(bytes32,bytes)` call
@@ -27,6 +27,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be read as in RF
 7. [Errors](#7-errors)
 8. [Versioning](#8-versioning)
 9. [Conformance](#9-conformance)
+10. [Security considerations](#10-security-considerations)
 - [Appendix A — test vectors](#appendix-a--test-vectors)
 - [Appendix B — grammar summary](#appendix-b--grammar-summary)
 - [Appendix C — the reference implementation](#appendix-c--the-reference-implementation)
@@ -49,6 +50,7 @@ Two numbers, kept apart on purpose:
 | Revision | Format | Date | Change |
 | --- | --- | --- | --- |
 | 1.0 | 1 | 2026-09 | First normative statement of the format in use since deployment. |
+| 1.1 | 1 | 2026-09 | Security considerations (§10). A writer refuses control characters in the title, the tags and the values (§3) and a document over the size bound; a reader bounds decompression (§5.4). Bidirectional controls are reported (§10.3). The wire format is unchanged. |
 
 ## 1. Scope and terms
 
@@ -74,9 +76,10 @@ implementation MAY provide one direction only. Both directions are pure: they de
 their input (and, for a writer, the compressor it is given).
 
 Out of scope, and specified elsewhere: images (each one its own transaction, referenced from the body
-as `eth:0x…`, glyph-spec §6); the Markdown subset and its rendering (glyph-spec §8); what a chain
-slug in a post reference resolves to (the application's registry, glyph-spec §5.1); transaction size
-and gas ceilings (glyph-spec §11 — informative note in §6.4).
+as `eth:0x…`, glyph-spec §6); the Markdown subset and how it is rendered (glyph-spec §8) — except for
+the security requirements §10 places on a renderer; what a chain slug in a post reference resolves to
+(the application's registry, glyph-spec §5.1); transaction size and gas ceilings (glyph-spec §11 —
+informative note in §6.4).
 
 ## 2. Format version 1 at a glance
 
@@ -119,7 +122,9 @@ decompressing anything.
 - **Encoding.** The UTF-8 bytes of the title, right-padded with `0x00` to 32 bytes, as a `bytes32`.
 - **Constraints.** The UTF-8 encoding MUST be at most **32 bytes** (32 ASCII letters, about ten
   Chinese characters, eight four-byte emoji). The title MUST NOT contain U+0000, because the padding
-  is zero bytes and a reader cannot tell a NUL inside the title from the padding after it. A title
+  is zero bytes and a reader cannot tell a NUL inside the title from the padding after it, and MUST
+  NOT contain any other control character except TAB — C0 (U+0001–U+001F), DEL (U+007F) or C1
+  (U+0080–U+009F) — because a title is printed by terminals and shown in lists (§10.3). A title
   MAY be empty (32 zero bytes). A writer MUST NOT truncate a title on its own: a title silently cut is
   a title nobody meant. An editor that offers to cut one SHOULD cut at a grapheme boundary, never
   inside a character or an emoji sequence.
@@ -131,7 +136,8 @@ decompressing anything.
 ### 3.2 The tags
 
 A list of free-form labels, in the order the author gave them. A writer MUST trim each tag and drop
-the empty ones, and MUST refuse a tag that contains a comma (the separator) or a line break. Because
+the empty ones, and MUST refuse a tag that contains a comma (the separator), a line break, or any
+other control character except TAB (§10.3). Because
 of the reader's bracket rule (§4.2, step 6), the **first tag MUST NOT begin with `[`** and the
 **last tag MUST NOT end with `]`**; a writer MUST refuse such a list. Tags are not deduplicated and
 their case is not changed.
@@ -139,8 +145,10 @@ their case is not changed.
 ### 3.3 The body
 
 The Markdown body, as a string. It is carried **byte for byte**: a writer MUST NOT alter it in any
-way — not its line endings, not its trailing whitespace, not a byte-order mark it begins with. What
-the body may contain is the Markdown subset of glyph-spec §8; this specification does not check it.
+way — not its line endings, not its trailing whitespace, not a byte-order mark it begins with. A
+writer MUST refuse a body containing a control character other than TAB, LF, FF or CR (C0, DEL or
+C1, §10.3); refusing is not altering. What the body may contain beyond that is the Markdown subset of
+glyph-spec §8; this specification does not check it, and §10.2 says what a renderer must do with it.
 
 ### 3.4 The metadata
 
@@ -153,7 +161,7 @@ so a writer MUST refuse a post whose `meta` contains it. (A reader MAY still enc
 by a tool that follows a static-site convention; it is treated as any other unknown key.)
 
 **Values.** A value is a string; a writer MUST trim it, MUST omit a key whose trimmed value is empty,
-and MUST refuse a value containing CR or LF. A writer MAY accept a number (written in decimal) or a
+and MUST refuse a value containing CR or LF, or any other control character except TAB (§10.3). A writer MAY accept a number (written in decimal) or a
 list of strings (written joined with `", "`) where a caller's convenience wants it; on the wire and
 in the canonical post they are strings.
 
@@ -300,7 +308,9 @@ decoder needs no side data and the stream is self-describing for as long as brot
 
 A writer MUST compress with **quality 11**. Every other parameter of the reference encoder is at its
 default (window `lgwin = 22`, generic mode): these are what the reference implementation uses, and a
-binding for another brotli library SHOULD match them (see §5.3 for what happens if it does not).
+binding for another brotli library SHOULD match them (see §5.3 for what happens if it does not). A
+writer MUST refuse a document larger than the size bound of §5.4, so that what it writes, every
+reader reads.
 
 ### 5.2 Version detection, and the envelope
 
@@ -345,6 +355,16 @@ Decompress the stream; decode the bytes as UTF-8 in replacement mode (§3.1), **
 byte-order mark** — the document the reader shows must be the bytes the chain holds; then parse
 (§4.2). A payload that is not a brotli stream is malformed and MUST be refused. A payload whose bytes
 are not valid UTF-8 is still a document (with U+FFFD where the damage is) and MUST NOT be refused.
+
+**The size bound.** Brotli expands without limit: the reference test suite compresses 64 MiB of
+spaces into 106 bytes, so a payload well inside any transaction ceiling can decompress into tens of
+gigabytes and take a reader's memory with it (§10.4). A reader MUST bound the decompressed size
+**while decompressing** — stopping when the bound is passed, never allocating first and measuring
+after — and MUST refuse a payload that passes it. It MUST accept every document of up to 1 MiB
+(1,048,576 bytes), and MAY set its bound anywhere at or above that. The reference bound is
+`MAX_DOCUMENT_BYTES` = 4 MiB (4,194,304 bytes), on both sides: a writer refuses a document over it
+(§5.1), a reader refuses a payload that would decompress past it, and the refusal is
+`DOCUMENT_TOO_LARGE`, distinct from a malformed payload.
 
 Readers SHOULD report the payload's size in bytes alongside the post: it is what the post cost to
 store, and the raw view, archives and the command-line tool all carry it as `compressedBytes`.
@@ -428,8 +448,9 @@ problem it finds in a post rather than the first:
 
 | Situation | Direction | Reference code |
 | --- | --- | --- |
-| The post cannot be written as given (§3): title over 32 bytes or with a NUL, a lone surrogate anywhere, a key outside the grammar or reserved, a value with a line break, a tag with a comma, the bracket rule | write | `INVALID_POST`, with one problem per field: `TITLE_TOO_LONG`, `TITLE_NUL`, `MALFORMED_UNICODE`, `KEY_SYNTAX`, `KEY_RESERVED`, `VALUE_LINE_BREAK`, `TAG_COMMA`, `TAG_BRACKET`, `TYPE` |
-| A value that does not fit its defined key's grammar (§3.4) | write, advisory | warnings: `TITLE_EMPTY`, `LANG_SHAPE`, `REF_SYNTAX`, `SERIES_LENGTH`, `PART_SHAPE`, `PART_WITHOUT_SERIES` |
+| The post cannot be written as given (§3): title over 32 bytes or with a NUL, a lone surrogate anywhere, a key outside the grammar or reserved, a value with a line break, a tag with a comma, the bracket rule, a control character (§10.3) | write | `INVALID_POST`, with one problem per field: `TITLE_TOO_LONG`, `TITLE_NUL`, `MALFORMED_UNICODE`, `KEY_SYNTAX`, `KEY_RESERVED`, `VALUE_LINE_BREAK`, `TAG_COMMA`, `TAG_BRACKET`, `CONTROL_CHAR`, `TYPE` |
+| A value that does not fit its defined key's grammar (§3.4), or text that can read differently from how it is stored (§10.3) | write, advisory | warnings: `TITLE_EMPTY`, `LANG_SHAPE`, `REF_SYNTAX`, `SERIES_LENGTH`, `PART_SHAPE`, `PART_WITHOUT_SERIES`, `BIDI_CONTROL` |
+| A payload that would decompress past the reader's bound, or a document a writer is asked to write past it (§5.4) | both | `DOCUMENT_TOO_LARGE`, carrying the bound |
 | A format version the implementation does not have (§5.2) | both | `UNSUPPORTED_FORMAT_VERSION`, carrying the version |
 | An empty payload, a malformed envelope, or bytes that are not a brotli stream (§5.2, §5.4) | read | `MALFORMED_PAYLOAD` |
 | Call data that is not a `publish()` call, or is cut short (§6.3) | read | `MALFORMED_CALLDATA` |
@@ -463,13 +484,16 @@ a version outside the versions it implements MUST refuse. The reference library 
 A **conforming reader**:
 
 - reads call data per §6.3, the payload per §5.2 and §5.4, and the document per §4.2, exactly;
+- bounds decompression while decompressing, as §5.4 requires;
 - never fails on invalid UTF-8, on an unknown key, on a value that does not fit its grammar;
 - refuses, with the reason, what §6.3, §5.2 and §5.4 say to refuse, and an unknown version by name;
+- never executes, evaluates or interprets any part of a post, and hands every field on as data (§10);
 - gives back, for every vector in Appendix A, the vector's post, document and title.
 
 A **conforming writer**:
 
-- accepts a post only within §3, and reports every problem it finds;
+- accepts a post only within §3 — control characters included — and reports every problem it finds;
+- refuses a document over the size bound of §5.4;
 - produces the document of §4.1, the payload of §5.1 (quality 11, no dictionary), the call data of
   §6.2, and the bytes32 of §3.1;
 - satisfies the round-trip identities of §3.5 for every post it accepts;
@@ -480,6 +504,123 @@ The reference implementation's test suite (`npm test` in this directory) exercis
 and in addition holds the library to the web application's own modules byte for byte, on fuzzed
 input, so that the implementation in use on the chain and this specification cannot drift apart
 unnoticed.
+
+## 10. Security considerations
+
+### 10.1 The threat model
+
+Anyone can call `publish()` with any bytes. Every field of a post — the title, the tags, every
+front-matter value, the whole body, the payload's very structure — is therefore **attacker-controlled
+input**, read by a program running with the reader's own privileges: a browser tab that also holds a
+wallet session, a terminal, a script with a filesystem. Nothing in the format makes a post safe; what
+makes a reader safe is treating every one of those fields as data and never as code, and bounding
+what reading one may cost.
+
+This section states what a conforming reader and writer MUST do about that. The codec's own part is
+narrow and total: it never executes, evaluates, fetches or interprets anything; every input path is
+validated before it is followed; and its outputs are strings and bytes, never markup. A caller that
+concatenates those strings into HTML, a shell command or a URL has left the codec's guarantee behind,
+and the rules below are for that caller.
+
+### 10.2 Script injection through the body
+
+The body is Markdown that a reader renders to HTML and puts into a page. That is the one place a post
+becomes something a browser executes, and it has been exploited: `marked` does not escape a `"` in an
+image's alt text, so `![x" onerror="alert(1)](https://x)` left the attribute and became a live event
+handler. A reader that renders the body:
+
+- MUST NOT pass raw HTML through. The Markdown subset (glyph-spec §8) has no raw HTML; a renderer
+  MUST drop or escape any it meets.
+- MUST sanitize the **rendered HTML** against an allowlist of tags and attributes **after**
+  rendering, not the Markdown before — the alt-text breakout is invisible to a Markdown-level
+  filter. The allowlist is what the subset can legitimately produce: headings, paragraphs, emphasis,
+  code, blockquotes, lists, tables, `a` with `href` and `title`, `img` with `src` and `alt`, `hr`,
+  `br`; no event handlers, no `style`, no `data-*` attributes, no `form`, `iframe`, `object`,
+  `embed`, `script`, `svg`, `math`.
+- MUST allow only these URL schemes: for a link, `https:`, `http:`, `mailto:`, a fragment `#…` and an
+  in-app path `/…`; for an image, `https:`, `http:`, `blob:` (an on-chain image the reader resolved,
+  §10.5) and `data:image/`. Everything else — `javascript:`, `vbscript:`, `data:text/html`, a scheme
+  hidden behind whitespace or an HTML entity — MUST be removed, not merely escaped.
+- MUST rewrite an in-article post reference (`[text](0x<64 hex>[/n])`, glyph-spec §8.1) to the
+  reader's own path only after checking it against the reference grammar of §3.4; the target's title,
+  when used as the link text, is text (§10.3).
+
+The reference reader does this with a two-layer render: `marked` with raw HTML stripped and URL
+schemes allowed by pattern, then DOMPurify over the result with exactly the allowlist above
+(`webapp/src/lib/renderMarkdown.js`); its test file, `webapp/test/unit/renderMarkdown.test.js`, is a
+corpus of the injections it has to neutralise, and a second renderer SHOULD pass the same corpus.
+
+### 10.3 Injection through the title, the tags and the front-matter
+
+The title, every tag and every front-matter value are **text**, and a reader MUST handle them as
+text: a DOM text node or an escaped string in a page, a quoted or escaped argument in a shell, a
+percent-encoded segment in a URL (`/tag/<name>`). In particular:
+
+- `lang` MUST be checked against the language-tag grammar (§3.4) before it is put into an attribute.
+- `re`, `supersedes` and `prev` MUST be parsed as post references (§3.4) before a link is built from
+  them; the chain slug's grammar (`[a-z0-9-]+`) is what keeps it out of a path or a query string.
+- `series` and `part` are shown, never interpreted.
+- An unknown key is kept and MAY be shown, as text, under its key.
+
+**Control characters.** A title or a value printed to a terminal can carry escape sequences that
+move the cursor, rewrite earlier lines or, in some terminals, run commands — the command-line reader
+prints titles in lists. So a writer MUST refuse a title, a tag or a value containing a control
+character other than TAB (C0, DEL, C1 — `CONTROL_CHAR`), and a body containing one other than TAB, LF,
+FF or CR; and because a foreign writer may not, a reader that prints to a terminal MUST strip or
+escape control characters before printing, and a reader that renders MUST NOT let one reach a place
+where it means something.
+
+**Bidirectional controls.** U+202A–U+202E and U+2066–U+2069 can make a stored string read in a
+different order from the one it is stored in — a title, a tag or a reference can be shown reversed,
+and a code block can show one program while holding another ("Trojan Source"). A writer SHOULD report
+them (`BIDI_CONTROL`, a warning: some scripts have legitimate uses); a reader SHOULD render titles,
+tags, values and code in bidi isolation (`unicode-bidi: isolate`, or a fresh line in a terminal), and
+a reader that prints to a terminal SHOULD strip them.
+
+### 10.4 Resource exhaustion
+
+**Decompression bombs.** Brotli's expansion is unbounded in practice: 106 bytes decompress to 64 MiB,
+and the 128 KiB a transaction can carry to tens of gigabytes. A reader that decompresses first and
+looks afterwards has already lost the tab. The rule is §5.4: bound the decompressed size **during**
+decompression and stop when it is passed. The reference implementation does it with `node:zlib`'s
+`maxOutputLength` in Node and with brotli-wasm's streaming decompressor in the browser, and refuses
+with `DOCUMENT_TOO_LARGE` in under a hundred milliseconds where a plain decompression of the same
+payload takes a second and 64 MiB. The bound is applied to writers too (§5.1), so a conforming writer
+cannot produce a post a conforming reader refuses.
+
+**Call data.** A reader MUST validate the offset and the length of §6.3 against the data it has before
+it allocates or copies anything, and MUST refuse sizes it cannot represent. Decoding is linear in the
+size of the call data and allocates at most one copy of the payload; parsing the document is one pass
+over its lines; nothing recurses. A title is 32 bytes by construction.
+
+**Many posts.** Reading a post is bounded, but a reader that reads many — a feed, an archive import —
+is bounded only by how many it reads; that is the application's budget (glyph-spec §7), not the
+codec's.
+
+### 10.5 Images
+
+An image is a transaction whose calldata is WebP bytes, referenced as `eth:0x<txhash>`. The bytes
+are as untrusted as everything else. A reader MUST serve them under a MIME type **it chooses**
+(`image/webp`) — never a type sniffed from the bytes, and never as a document: an `<img>` cannot run
+script whatever the bytes are, but the same bytes opened as a page (a `blob:` URL in a new tab, an
+`<object>`, an SVG served as `image/svg+xml`) can. A command-line reader writes them as files with a
+fixed extension. The codec never touches image bytes; the reference is `chainIO.js` and `publish.js`.
+
+### 10.6 Keys and signing
+
+A post cannot cause a transaction: nothing in one is executed (§10.2), so a page showing a hostile
+post holds a wallet session exactly as safely as a page showing an empty one. The codec never sees a
+key: it produces call data and stops; what signs it is the wallet's business (`wallet.js`,
+`publish.js`), and a reader needs no key at all.
+
+### 10.7 What the codec guarantees, and what it does not
+
+Guaranteed by this specification and checked by the reference suite: no input to the codec can make
+it execute anything, allocate more than the bound, read outside the data it was given, or hand back a
+field of a type other than the one documented; a post the writer accepts is one every reader reads
+back exactly (§3.5); a payload the reader refuses is refused with the reason. Not guaranteed, because
+it is not the codec's to guarantee: that the strings it returns are shown safely — that is §10.2,
+§10.3 and §10.5, and they bind the reader, not the codec.
 
 ---
 
@@ -558,19 +699,22 @@ first colon, blank lines between entries, CR before LF.
 ## Appendix C — the reference implementation
 
 `xueni-codec`, in this directory: plain ECMAScript modules with no runtime dependency. The
-compressor is an argument — `{ brotli }`, an object with `compress` and `decompress` over
-`Uint8Array` — so that the same module runs in a browser (over `brotli-wasm`) and in Node (over
-`node:zlib`, bound for you by `xueni-codec/node`).
+compressor is an argument — `{ brotli }`, an object with `compress(bytes)` and
+`decompress(bytes, { maxOutputBytes })` over `Uint8Array` — so that the same module runs in a browser
+(over `brotli-wasm`) and in Node (over `node:zlib`, bound for you by `xueni-codec/node`). A codec's
+`decompress` MUST stop once its output passes `maxOutputBytes` and throw an error whose `code` is
+`OUTPUT_TOO_LARGE`; the two bindings shipped here do (§10.4), and the payload layer measures the
+result as well, so a codec that ignores the option still cannot hand a bomb through.
 
 | Layer | Functions |
 | --- | --- |
 | Post (§3) | `validatePost`, `postProblems`, `normalisePost`; `parsePostRef`, `formatPostRef` |
 | Title (§3.1) | `encodeTitle`, `decodeTitle`, `titleByteLength`, `fitTitle`, `TITLE_MAX_BYTES` |
 | Document (§4) | `buildDocument`, `parseDocument`, `splitFrontMatter`, `parseTags`, `FRONT_MATTER_KEYS`, `RESERVED_KEYS` |
-| Payload (§5) | `encodePayload`, `decodePayload`, `detectFormatVersion`, `FORMAT_VERSION`, `SUPPORTED_FORMAT_VERSIONS`, `VERSION_ENVELOPE_BYTE`, `REFERENCE_BROTLI` |
+| Payload (§5) | `encodePayload`, `decodePayload` (both taking `{ maxDocumentBytes }`), `detectFormatVersion`, `FORMAT_VERSION`, `SUPPORTED_FORMAT_VERSIONS`, `VERSION_ENVELOPE_BYTE`, `REFERENCE_BROTLI`, `MAX_DOCUMENT_BYTES` |
 | Call data (§6) | `encodePublishCallData`, `decodePublishCallData`, `isPublishCallData`, `PUBLISH_SELECTOR`, `POST_EVENT_TOPIC` |
 | The whole trip | `postToCallData`, `callDataToPost`, `encodePost` |
-| Errors (§7) | `CodecError`, `InvalidPostError`, `UnsupportedFormatVersionError`, `MalformedPayloadError`, `MalformedCallDataError` |
+| Errors (§7) | `CodecError`, `InvalidPostError`, `UnsupportedFormatVersionError`, `MalformedPayloadError`, `MalformedCallDataError`, `DocumentTooLargeError` |
 
 See [`README.md`](./README.md) for usage.
 

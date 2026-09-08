@@ -4,7 +4,9 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { brotliCompressSync, constants } from 'node:zlib';
 import {
+  DocumentTooLargeError,
   FORMAT_VERSION,
+  MAX_DOCUMENT_BYTES,
   MalformedPayloadError,
   SUPPORTED_FORMAT_VERSIONS,
   UnsupportedFormatVersionError,
@@ -108,5 +110,58 @@ describe('encodePayload / decodePayload', () => {
     const identity = { compress: (b) => new Uint8Array([...b]), decompress: (b) => new Uint8Array([...b]) };
     assert.deepEqual(encodeWith('hi', { brotli: identity }), new Uint8Array([0x68, 0x69]));
     assert.deepEqual(decodeWith(new Uint8Array([0x68, 0x69]), { brotli: identity }), { version: 1, text: 'hi' });
+  });
+});
+
+describe('the size bound (SPEC §5.4, §10.4)', () => {
+  const q11 = { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } };
+  // Sixteen mebibytes of spaces: a document no post has business being, in
+  // a payload that would fit in any transaction thirty times over.
+  const bomb = new Uint8Array(brotliCompressSync(Buffer.alloc(16 * 1024 * 1024, 0x20), q11));
+
+  test('is 4 MiB, and brotli really does expand that far', () => {
+    assert.equal(MAX_DOCUMENT_BYTES, 4 * 1024 * 1024);
+    assert.ok(bomb.length < 64, `16 MiB compressed to ${bomb.length} bytes`);
+  });
+
+  test('a decompression bomb is refused by name, without being decompressed', () => {
+    const started = Date.now();
+    assert.throws(
+      () => decodePayload(bomb),
+      (e) => e instanceof DocumentTooLargeError && e.code === 'DOCUMENT_TOO_LARGE' && e.limit === MAX_DOCUMENT_BYTES,
+    );
+    assert.ok(Date.now() - started < 2000, 'refusing a bomb must not cost the time of decompressing it');
+  });
+
+  test('the bound is the caller\'s: lower it, raise it, or lift it where the bytes are trusted', () => {
+    const small = encodePayload('# A small document\n');
+    assert.throws(() => decodePayload(small, { maxDocumentBytes: 4 }), DocumentTooLargeError);
+    assert.equal(decodePayload(small, { maxDocumentBytes: 1024 }).text, '# A small document\n');
+    assert.throws(() => decodePayload(bomb, { maxDocumentBytes: 8 * 1024 * 1024 }), DocumentTooLargeError);
+    assert.equal(decodePayload(bomb, { maxDocumentBytes: 32 * 1024 * 1024 }).text.length, 16 * 1024 * 1024);
+    assert.equal(decodePayload(bomb, { maxDocumentBytes: Infinity }).text.length, 16 * 1024 * 1024);
+  });
+
+  test('a document exactly at the bound passes and one byte over does not', () => {
+    const text = 'x'.repeat(1000);
+    assert.equal(decodePayload(encodePayload(text), { maxDocumentBytes: 1000 }).text, text);
+    assert.throws(() => decodePayload(encodePayload(text), { maxDocumentBytes: 999 }), DocumentTooLargeError);
+  });
+
+  test('the writer refuses a document over the bound, so every reader reads what it writes', () => {
+    assert.throws(() => encodePayload('x'.repeat(11), { maxDocumentBytes: 10 }), (e) => e instanceof DocumentTooLargeError && e.limit === 10);
+    assert.throws(() => encodePayload(' '.repeat(MAX_DOCUMENT_BYTES + 1)), DocumentTooLargeError);
+    assert.ok(encodePayload(' '.repeat(MAX_DOCUMENT_BYTES)).length > 0);
+  });
+
+  test('a codec that ignores the option is still not allowed to hand a bomb through', () => {
+    const ignores = { compress: (b) => b, decompress: (b) => new Uint8Array(b.length * 100) };
+    assert.throws(() => decodeWith(new Uint8Array(100), { brotli: ignores, maxDocumentBytes: 5000 }), DocumentTooLargeError);
+  });
+
+  test('a bound that is not a positive number is refused up front', () => {
+    for (const bad of [0, -1, NaN, '4MiB', null]) {
+      assert.throws(() => decodePayload(encodePayload('x'), { maxDocumentBytes: bad }), TypeError, String(bad));
+    }
   });
 });

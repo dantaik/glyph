@@ -12,11 +12,10 @@
 // reader will make sense of — a `part` that is not a number, a `re` that is
 // not a reference — and the writer leaves that decision to the author.
 
-import { FRONT_MATTER_KEYS, RESERVED_KEYS, frontMatterEntries, parseTags } from './document.js';
+import { FRONT_MATTER_KEYS, RESERVED_KEYS, bodyProblems, frontMatterEntries, parseTags } from './document.js';
 import { InvalidPostError } from './errors.js';
 import { LANG_RE, PART_RE, POST_REF_KEYS, SERIES_MAX_CHARS, parsePostRef } from './refs.js';
 import { titleProblems } from './title.js';
-import { isWellFormed } from './utf8.js';
 
 /**
  * @typedef {object} Post
@@ -66,9 +65,7 @@ export function postProblems(post) {
   if (post.tags != null) merged.tags = post.tags;
   const { entries, problems: metaProblems } = frontMatterEntries(merged);
   problems.push(...metaProblems);
-  if (typeof post.markdown === 'string' && !isWellFormed(post.markdown)) {
-    problems.push({ level: 'error', path: 'markdown', code: 'MALFORMED_UNICODE', message: 'contains a lone surrogate' });
-  }
+  if (post.markdown != null) problems.push(...bodyProblems(post.markdown));
 
   // The advisory checks: the value of every DEFINED key has a shape.
   const written = Object.fromEntries(entries);

@@ -85,9 +85,9 @@ Everything below is exported from `xueni-codec`; `xueni-codec/node` re-exports i
 
 | Function | |
 | --- | --- |
-| `postToCallData(post, { brotli, version? })` | `0x…` call data. Throws `InvalidPostError` with every problem, or `UnsupportedFormatVersionError`. |
-| `callDataToPost(callData, { brotli })` | `{ version, title, tags, markdown, meta, text, compressedBytes }`. Throws `MalformedCallDataError`, `MalformedPayloadError`, `UnsupportedFormatVersionError`. |
-| `encodePost(post, { brotli, version? })` | `{ version, title, text, payload, callData }` — every intermediate form, for a dry run or a cost estimate. |
+| `postToCallData(post, { brotli, version?, maxDocumentBytes? })` | `0x…` call data. Throws `InvalidPostError` with every problem, `UnsupportedFormatVersionError`, or `DocumentTooLargeError`. |
+| `callDataToPost(callData, { brotli, maxDocumentBytes? })` | `{ version, title, tags, markdown, meta, text, compressedBytes }`. Throws `MalformedCallDataError`, `MalformedPayloadError`, `UnsupportedFormatVersionError`, `DocumentTooLargeError`. |
+| `encodePost(post, { brotli, version?, maxDocumentBytes? })` | `{ version, title, text, payload, callData }` — every intermediate form, for a dry run or a cost estimate. |
 
 **The post** — `validatePost(post)` → `{ ok, problems }`, every problem at once, each
 `{ level: 'error' | 'warning', path, code, message }`; `postProblems(post)` the list alone;
@@ -103,9 +103,10 @@ never cuts on its own); `TITLE_MAX_BYTES`.
 `{ meta, tags, markdown }`; `splitFrontMatter(text)` → `{ matched, meta, body }` (the reader, exactly
 as every existing reader behaves); `parseTags`; `FRONT_MATTER_KEYS`, `RESERVED_KEYS`, `KEY_RE`.
 
-**The payload** — `encodePayload(text, { brotli, version? })` → bytes; `decodePayload(bytes, { brotli })`
-→ `{ version, text }`; `detectFormatVersion(bytes)`; `FORMAT_VERSION` (written by default),
-`SUPPORTED_FORMAT_VERSIONS` (read), `VERSION_ENVELOPE_BYTE`, `REFERENCE_BROTLI`.
+**The payload** — `encodePayload(text, { brotli, version?, maxDocumentBytes? })` → bytes;
+`decodePayload(bytes, { brotli, maxDocumentBytes? })` → `{ version, text }`; `detectFormatVersion(bytes)`;
+`FORMAT_VERSION` (written by default), `SUPPORTED_FORMAT_VERSIONS` (read), `VERSION_ENVELOPE_BYTE`,
+`REFERENCE_BROTLI`, `MAX_DOCUMENT_BYTES` (4 MiB, the default bound on both sides).
 
 **The call data** — `encodePublishCallData({ title, payload })` → hex; `decodePublishCallData(hex | bytes)`
 → `{ title, payload }`; `isPublishCallData`; `PUBLISH_SELECTOR` (`0x70a74532`), `PUBLISH_SIGNATURE`,
@@ -113,7 +114,33 @@ as every existing reader behaves); `parseTags`; `FRONT_MATTER_KEYS`, `RESERVED_K
 
 **Errors** — all `CodecError`s with a stable `.code`: `InvalidPostError` (`.problems`),
 `UnsupportedFormatVersionError` (`.version`, `.supported`), `MalformedPayloadError`,
-`MalformedCallDataError`.
+`MalformedCallDataError`, `DocumentTooLargeError` (`.limit`).
+
+## Security
+
+Every byte of a post is put on chain by a stranger, so the codec treats every field as hostile
+input and never as code; SPEC §10 says what that means for the codec and for whoever renders what
+it returns. Three things the library does about it:
+
+- **Decompression is bounded, while decompressing.** Brotli turns 106 bytes into 64 MiB, so a
+  payload that fits any transaction can decompress into more memory than a browser tab has. Every
+  reading function takes `maxDocumentBytes` (default `MAX_DOCUMENT_BYTES`, 4 MiB) and refuses with
+  `DocumentTooLargeError` the moment the output passes it — `node:zlib` stops at `maxOutputLength`,
+  and the brotli-wasm binding decodes through the streaming API a chunk at a time — rather than
+  decompressing first and measuring after. The writer refuses a document over the same bound, so a
+  conforming writer cannot produce a post a conforming reader refuses. Pass `Infinity` only for bytes
+  you trust, which bytes from the chain never are.
+- **Control characters are refused.** A title, a tag or a front-matter value with a C0 control
+  (other than TAB), DEL or a C1 control is an error (`CONTROL_CHAR`) — a terminal printing a list of
+  titles would obey an escape sequence in one — and so is a body with one other than TAB, LF, FF or
+  CR. Bidirectional controls (U+202A–U+202E, U+2066–U+2069), which can make a title or a code block
+  read differently from how it is stored, are reported as a warning (`BIDI_CONTROL`), because some
+  scripts use them honestly.
+- **Nothing is executed or interpreted.** The codec's outputs are strings and bytes; what a reader
+  must do before putting them into a page (an allowlist sanitizer over the *rendered* HTML, text
+  nodes for the title and the values, a fixed MIME type for images) is SPEC §10.2–§10.5. In this
+  repository that reader is `webapp/src/lib/renderMarkdown.js`, and its test file is the corpus of
+  injections it has to neutralise.
 
 ## Versions
 

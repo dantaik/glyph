@@ -22,7 +22,7 @@
 // binds `node:zlib` (./brotli/node.js), a browser binds brotli-wasm
 // (./brotli/wasm.js). Given the same codec the functions here are pure.
 
-import { MalformedPayloadError, UnsupportedFormatVersionError } from './errors.js';
+import { DocumentTooLargeError, MalformedPayloadError, UnsupportedFormatVersionError } from './errors.js';
 import { toBytes } from './hex.js';
 import { utf8Decode, utf8Encode } from './utf8.js';
 
@@ -36,6 +36,16 @@ export const SUPPORTED_FORMAT_VERSIONS = Object.freeze([1]);
 export const VERSION_ENVELOPE_BYTE = 0x91;
 
 /**
+ * The most a document may be, in bytes of UTF-8, on either side: a writer
+ * refuses to write a larger one and a reader refuses to decompress past it.
+ * Brotli expands without practical limit — 106 bytes become 64 MiB — so a
+ * reader that decompressed first and measured afterwards would already have
+ * lost the tab. 4 MiB is thirty times the largest payload a transaction can
+ * carry; no real post comes near it. (SPEC §5.4, §10.4.)
+ */
+export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
+
+/**
  * The brotli parameters of the reference writer. Quality 11 is the format's
  * one stated parameter; the rest are the encoder's defaults, named here so
  * that a binding for another brotli library can match them.
@@ -45,8 +55,21 @@ export const REFERENCE_BROTLI = Object.freeze({ quality: 11, lgwin: 22, mode: 'g
 /**
  * @typedef {object} BrotliCodec
  * @property {(bytes: Uint8Array) => Uint8Array} compress   a raw brotli stream
- * @property {(bytes: Uint8Array) => Uint8Array} decompress the bytes it held
+ * @property {(bytes: Uint8Array, options?: { maxOutputBytes?: number }) => Uint8Array} decompress
+ *   the bytes it held. MUST stop once the output passes `maxOutputBytes` and
+ *   throw an error whose `code` is `'OUTPUT_TOO_LARGE'` — the point is not to
+ *   allocate the bomb. Both bindings shipped here do; the payload layer
+ *   measures the result as well, so a codec that ignores the option still
+ *   cannot hand one through, only late.
  */
+
+/** A positive number of bytes, or Infinity for no bound at all. */
+function assertBound(maxDocumentBytes) {
+  if (typeof maxDocumentBytes !== 'number' || Number.isNaN(maxDocumentBytes) || maxDocumentBytes <= 0) {
+    throw new TypeError('maxDocumentBytes must be a positive number of bytes (Infinity for no bound)');
+  }
+  return maxDocumentBytes;
+}
 
 /** @param {unknown} brotli @returns {BrotliCodec} */
 export function assertBrotli(brotli) {
@@ -81,26 +104,34 @@ export function detectFormatVersion(payload) {
 /**
  * The payload for a document.
  * @param {string} text the document (see document.js)
- * @param {{ brotli: BrotliCodec, version?: number }} options
+ * @param {{ brotli: BrotliCodec, version?: number, maxDocumentBytes?: number }} options
  * @returns {Uint8Array}
  * @throws {UnsupportedFormatVersionError} for a version this library does not write
+ * @throws {DocumentTooLargeError} for a document over the bound every reader applies
  */
-export function encodePayload(text, { brotli, version = FORMAT_VERSION } = {}) {
+export function encodePayload(text, { brotli, version = FORMAT_VERSION, maxDocumentBytes = MAX_DOCUMENT_BYTES } = {}) {
   if (version !== 1) throw new UnsupportedFormatVersionError(version, SUPPORTED_FORMAT_VERSIONS);
+  const bound = assertBound(maxDocumentBytes);
   const codec = assertBrotli(brotli);
-  return codec.compress(utf8Encode(String(text ?? '')));
+  const bytes = utf8Encode(String(text ?? ''));
+  if (bytes.length > bound) throw new DocumentTooLargeError(bound);
+  return codec.compress(bytes);
 }
 
 /**
  * The document a payload holds, and the version it was written in.
  * @param {Uint8Array | string} payload
- * @param {{ brotli: BrotliCodec }} options
+ * @param {{ brotli: BrotliCodec, maxDocumentBytes?: number }} options
+ *   `maxDocumentBytes` bounds the decompressed size (default MAX_DOCUMENT_BYTES;
+ *   Infinity for none — only where the bytes are trusted, which on chain they never are)
  * @returns {{ version: number, text: string }}
  * @throws {UnsupportedFormatVersionError} for a version this library does not read
  * @throws {MalformedPayloadError} for bytes that are not a payload of a known version
+ * @throws {DocumentTooLargeError} for a payload that would decompress past the bound
  */
-export function decodePayload(payload, { brotli } = {}) {
+export function decodePayload(payload, { brotli, maxDocumentBytes = MAX_DOCUMENT_BYTES } = {}) {
   const bytes = toBytes(payload, 'payload');
+  const bound = assertBound(maxDocumentBytes);
   const version = detectFormatVersion(bytes);
   if (!SUPPORTED_FORMAT_VERSIONS.includes(version)) {
     throw new UnsupportedFormatVersionError(version, SUPPORTED_FORMAT_VERSIONS);
@@ -108,9 +139,13 @@ export function decodePayload(payload, { brotli } = {}) {
   const codec = assertBrotli(brotli);
   let document;
   try {
-    document = codec.decompress(bytes);
+    document = codec.decompress(bytes, { maxOutputBytes: bound });
   } catch (cause) {
+    if (cause?.code === 'OUTPUT_TOO_LARGE') throw new DocumentTooLargeError(bound);
     throw new MalformedPayloadError(`not a brotli stream: ${cause?.message ?? cause}`, { cause });
   }
+  // A codec that ignored the option has already paid for the bomb; the
+  // reader still does not get it.
+  if (document.length > bound) throw new DocumentTooLargeError(bound);
   return { version, text: utf8Decode(document) };
 }

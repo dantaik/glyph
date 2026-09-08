@@ -9,6 +9,7 @@
 
 import { InvalidPostError } from './errors.js';
 import { bytesToHex, toBytes } from './hex.js';
+import { BIDI_CONTROL_RE, CONTROL_RE } from './refs.js';
 import { isWellFormed, utf8ByteLength, utf8Decode, utf8Encode } from './utf8.js';
 
 export const TITLE_MAX_BYTES = 32;
@@ -35,6 +36,11 @@ export function titleProblems(title) {
     // The padding is zero bytes, and a reader strips trailing zeros: a NUL
     // inside the title could not be told from the padding after it.
     problems.push({ level: 'error', path: 'title', code: 'TITLE_NUL', message: 'must not contain U+0000' });
+  } else if (CONTROL_RE.test(title)) {
+    problems.push({ level: 'error', path: 'title', code: 'CONTROL_CHAR', message: 'contains a control character (a terminal would obey it)' });
+  }
+  if (BIDI_CONTROL_RE.test(title)) {
+    problems.push({ level: 'warning', path: 'title', code: 'BIDI_CONTROL', message: 'contains bidirectional control characters, which can make it read differently from how it is stored' });
   }
   const bytes = utf8ByteLength(title);
   if (bytes > TITLE_MAX_BYTES) {

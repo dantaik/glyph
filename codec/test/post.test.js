@@ -54,6 +54,45 @@ describe('validatePost', () => {
   });
 });
 
+describe('control characters and bidirectional controls (SPEC §10.3)', () => {
+  const ESC = String.fromCharCode(0x1b);
+  const BEL = String.fromCharCode(0x07);
+  const CSI = String.fromCharCode(0x9b); // C1
+  const RLO = String.fromCharCode(0x202e);
+  const FSI = String.fromCharCode(0x2068);
+
+  test('a terminal escape anywhere but the body is an error, in every field at once', () => {
+    const { ok, problems } = validatePost({ title: `t${ESC}[2J`, tags: [`a${BEL}`], markdown: 'fine', meta: { series: `s${CSI}`, lang: 'zh' } });
+    assert.equal(ok, false);
+    assert.deepEqual(byCode(problems), ['error:title:CONTROL_CHAR', 'error:tags:CONTROL_CHAR', 'error:meta.series:CONTROL_CHAR']);
+  });
+
+  test('a NUL in the title keeps its own code, and a line break in a value its own', () => {
+    assert.deepEqual(byCode(validatePost({ title: `a${String.fromCharCode(0)}b` }).problems), ['error:title:TITLE_NUL']);
+    assert.deepEqual(byCode(validatePost({ title: 't', meta: { lang: 'zh\nen' } }).problems), ['error:meta.lang:VALUE_LINE_BREAK']);
+    assert.deepEqual(byCode(validatePost({ title: 'a\nb' }).problems), ['error:title:CONTROL_CHAR']);
+  });
+
+  test('TAB is allowed everywhere; the body may also hold LF, FF and CR', () => {
+    assert.equal(validatePost({ title: 'a\tb', tags: ['x\ty'], markdown: 'one\r\ntwo\f\tthree', meta: { series: 'a\tb' } }).ok, true);
+    assert.deepEqual(byCode(validatePost({ title: 't', markdown: `x${BEL}` }).problems), ['error:markdown:CONTROL_CHAR']);
+    assert.deepEqual(byCode(validatePost({ title: 't', markdown: `x${String.fromCharCode(0x0b)}` }).problems), ['error:markdown:CONTROL_CHAR']);
+  });
+
+  test('bidirectional controls are warned about, not refused', () => {
+    const { ok, problems } = validatePost({ title: `a${RLO}b`, tags: [`t${FSI}`], markdown: `code ${RLO} here`, meta: { series: `s${FSI}` } });
+    assert.equal(ok, true);
+    assert.deepEqual(byCode(problems), ['warning:title:BIDI_CONTROL', 'warning:tags:BIDI_CONTROL', 'warning:meta.series:BIDI_CONTROL', 'warning:markdown:BIDI_CONTROL']);
+    // Ordinary marks (LRM, RLM) are not controls and pass silently.
+    assert.deepEqual(validatePost({ title: `a${String.fromCharCode(0x200f)}b` }).problems, []);
+  });
+
+  test('the writer refuses what validatePost calls an error, and writes what it only warns about', () => {
+    assert.throws(() => normalisePost({ title: `t${ESC}` }), InvalidPostError);
+    assert.equal(normalisePost({ title: `t${RLO}` }).title, `t${RLO}`);
+  });
+});
+
 describe('normalisePost', () => {
   test('is the canonical form a reader gets back', () => {
     const post = normalisePost({ title: ' T ', tags: [' a ', '', 'b'], markdown: ' body ', meta: { lang: ' zh ', part: 3, empty: '', tags: ['ignored'] } });

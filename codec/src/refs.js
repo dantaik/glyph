@@ -64,3 +64,24 @@ export const PART_RE = /^[1-9][0-9]*$/;
 
 /** The longest a series name may be, in Unicode code points. */
 export const SERIES_MAX_CHARS = 64;
+
+/**
+ * Control characters no title, tag or value may carry: C0 except TAB, DEL,
+ * and C1. A terminal that prints one obeys it — cursor movement, a rewritten
+ * line, in some terminals a command — and a list of titles is printed by
+ * terminals (SPEC §10.3). Line breaks are in the set too; a value's line-break
+ * rule reports them under its own code first.
+ */
+export const CONTROL_RE = /[\u0000-\u0008\u000A-\u001F\u007F-\u009F]/;
+
+/** The same set for a body, which may of course hold LF, FF and CR. */
+export const BODY_CONTROL_RE = /[\u0000-\u0008\u000B\u000E-\u001F\u007F-\u009F]/;
+
+/**
+ * Bidirectional embeddings, overrides and isolates: U+202A–U+202E and
+ * U+2066–U+2069. They make a string read in another order than it is stored
+ * in, which is how a title or a code block can show one thing and hold
+ * another. Some scripts use them honestly, so a writer warns rather than
+ * refuses (SPEC §10.3).
+ */
+export const BIDI_CONTROL_RE = /[\u202A-\u202E\u2066-\u2069]/;

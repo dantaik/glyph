@@ -25,6 +25,7 @@
 // that way is refused with the reason, not written approximately.
 
 import { InvalidPostError } from './errors.js';
+import { BIDI_CONTROL_RE, BODY_CONTROL_RE, CONTROL_RE } from './refs.js';
 import { isWellFormed } from './utf8.js';
 
 /**
@@ -186,6 +187,13 @@ export function frontMatterEntries(meta) {
       problems.push({ level: 'error', path, code: 'VALUE_LINE_BREAK', message: 'a value fits on one line' });
       return;
     }
+    if (CONTROL_RE.test(line)) {
+      problems.push({ level: 'error', path, code: 'CONTROL_CHAR', message: 'contains a control character (a terminal would obey it)' });
+      return;
+    }
+    if (BIDI_CONTROL_RE.test(line)) {
+      problems.push({ level: 'warning', path, code: 'BIDI_CONTROL', message: 'contains bidirectional control characters, which can make it read differently from how it is stored' });
+    }
     if (key === 'tags') {
       const tags = (Array.isArray(value) ? value.map((v) => str(v)) : line.split(',')).map((v) => v.trim()).filter(Boolean);
       for (const tag of tags) {
@@ -217,6 +225,30 @@ export function frontMatterEntries(meta) {
 }
 
 /**
+ * What is wrong with a body, as problems: the wrong type, a lone surrogate,
+ * a control character no Markdown file has business holding (SPEC §10.3),
+ * and — as a warning — bidirectional controls.
+ * @param {unknown} markdown
+ * @returns {import('./post.js').Problem[]}
+ */
+export function bodyProblems(markdown) {
+  if (typeof markdown !== 'string') {
+    return [{ level: 'error', path: 'markdown', code: 'TYPE', message: 'must be a string' }];
+  }
+  const problems = [];
+  if (!isWellFormed(markdown)) {
+    problems.push({ level: 'error', path: 'markdown', code: 'MALFORMED_UNICODE', message: 'contains a lone surrogate' });
+  }
+  if (BODY_CONTROL_RE.test(markdown)) {
+    problems.push({ level: 'error', path: 'markdown', code: 'CONTROL_CHAR', message: 'contains a control character other than TAB, LF, FF or CR' });
+  }
+  if (BIDI_CONTROL_RE.test(markdown)) {
+    problems.push({ level: 'warning', path: 'markdown', code: 'BIDI_CONTROL', message: 'contains bidirectional control characters, which can make text or code read differently from how it is stored' });
+  }
+  return problems;
+}
+
+/**
  * Build the document a payload holds. THE WRITER.
  *
  * Known keys are written in FRONT_MATTER_KEYS order and the rest after them
@@ -237,11 +269,7 @@ export function frontMatterEntries(meta) {
 export function buildDocument({ markdown, tags, meta } = {}) {
   const problems = [];
   if (markdown == null) markdown = '';
-  if (typeof markdown !== 'string') {
-    problems.push({ level: 'error', path: 'markdown', code: 'TYPE', message: 'must be a string' });
-  } else if (!isWellFormed(markdown)) {
-    problems.push({ level: 'error', path: 'markdown', code: 'MALFORMED_UNICODE', message: 'contains a lone surrogate' });
-  }
+  problems.push(...bodyProblems(markdown));
   const merged = { ...(meta ?? {}) };
   if (tags != null) merged.tags = tags;
   const { entries, problems: metaProblems } = frontMatterEntries(merged);

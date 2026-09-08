@@ -9,7 +9,7 @@
 
 import { decodePublishCallData, encodePublishCallData } from './calldata.js';
 import { buildDocument, parseDocument } from './document.js';
-import { FORMAT_VERSION, decodePayload, encodePayload } from './payload.js';
+import { FORMAT_VERSION, MAX_DOCUMENT_BYTES, decodePayload, encodePayload } from './payload.js';
 import { normalisePost } from './post.js';
 import { decodeTitle, encodeTitle } from './title.js';
 
@@ -26,16 +26,17 @@ import { decodeTitle, encodeTitle } from './title.js';
  * Every form of a post on its way to the chain. What a dry run, a cost
  * estimate and a raw view all need at once.
  * @param {import('./post.js').Post} post
- * @param {{ brotli: import('./payload.js').BrotliCodec, version?: number }} options
+ * @param {{ brotli: import('./payload.js').BrotliCodec, version?: number, maxDocumentBytes?: number }} options
  * @returns {EncodedPost}
  * @throws {import('./errors.js').InvalidPostError} for a post that cannot be written
  * @throws {import('./errors.js').UnsupportedFormatVersionError} for a version this library does not write
+ * @throws {import('./errors.js').DocumentTooLargeError} for a document over the bound
  */
-export function encodePost(post, { brotli, version = FORMAT_VERSION } = {}) {
+export function encodePost(post, { brotli, version = FORMAT_VERSION, maxDocumentBytes = MAX_DOCUMENT_BYTES } = {}) {
   const canonical = normalisePost(post);
   const title = encodeTitle(canonical.title);
   const text = buildDocument(canonical);
-  const payload = encodePayload(text, { brotli, version });
+  const payload = encodePayload(text, { brotli, version, maxDocumentBytes });
   return { version, title, text, payload, callData: encodePublishCallData({ title, payload }) };
 }
 
@@ -61,15 +62,16 @@ export const postToCallData = (post, options) => encodePost(post, options).callD
 /**
  * The post a `publish()` call published.
  * @param {string | Uint8Array} callData the transaction's `input`
- * @param {{ brotli: import('./payload.js').BrotliCodec }} options
+ * @param {{ brotli: import('./payload.js').BrotliCodec, maxDocumentBytes?: number }} options
  * @returns {DecodedPost}
  * @throws {import('./errors.js').MalformedCallDataError} for calldata that is not a publish() call
  * @throws {import('./errors.js').MalformedPayloadError} for a payload that is not a post
  * @throws {import('./errors.js').UnsupportedFormatVersionError} for a version this library does not read
+ * @throws {import('./errors.js').DocumentTooLargeError} for a payload that would decompress past the bound
  */
-export function callDataToPost(callData, { brotli } = {}) {
+export function callDataToPost(callData, { brotli, maxDocumentBytes = MAX_DOCUMENT_BYTES } = {}) {
   const { title, payload } = decodePublishCallData(callData);
-  const { version, text } = decodePayload(payload, { brotli });
+  const { version, text } = decodePayload(payload, { brotli, maxDocumentBytes });
   const { meta, tags, markdown } = parseDocument(text);
   return { version, title: decodeTitle(title), tags, markdown, meta, text, compressedBytes: payload.length };
 }

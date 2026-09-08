@@ -209,7 +209,9 @@ const post = callDataToPost(tx.input);                              // { title, 
 
 The web app and the CLI still encode through `webapp/src/lib/payloadText.js` and `title.js`; the
 codec's test suite holds itself to those modules byte for byte, on fuzzed input, so the three cannot
-drift apart unnoticed.
+drift apart unnoticed. The spec's §10 is the security model — every field of a post is a stranger's
+bytes — and the library enforces the parts that are its own: decompression is bounded while it
+happens (a 106-byte payload can otherwise unpack to 64 MiB), and control characters are refused.
 
 ## Testing
 

@@ -7,7 +7,14 @@
 //
 // The specification these functions implement is SPEC.md, next to this file.
 
-export { CodecError, InvalidPostError, MalformedCallDataError, MalformedPayloadError, UnsupportedFormatVersionError } from './errors.js';
+export {
+  CodecError,
+  DocumentTooLargeError,
+  InvalidPostError,
+  MalformedCallDataError,
+  MalformedPayloadError,
+  UnsupportedFormatVersionError,
+} from './errors.js';
 
 // The post, and what makes one writable.
 export { normalisePost, postProblems, validatePost } from './post.js';
@@ -15,8 +22,8 @@ export { normalisePost, postProblems, validatePost } from './post.js';
 // The document: front-matter + Markdown.
 export { FRONT_MATTER_KEYS, KEY_RE, RESERVED_KEYS, buildDocument, frontMatterEntries, parseDocument, parseTags, splitFrontMatter } from './document.js';
 
-// The values of the defined keys.
-export { LANG_RE, PART_RE, POST_REF_KEYS, POST_REF_RE, SERIES_MAX_CHARS, formatPostRef, parsePostRef } from './refs.js';
+// The values of the defined keys, and the characters no field should carry.
+export { BIDI_CONTROL_RE, CONTROL_RE, LANG_RE, PART_RE, POST_REF_KEYS, POST_REF_RE, SERIES_MAX_CHARS, formatPostRef, parsePostRef } from './refs.js';
 
 // The title as a bytes32.
 export { TITLE_MAX_BYTES, decodeTitle, encodeTitle, fitTitle, titleByteLength, titleProblems } from './title.js';
@@ -24,6 +31,7 @@ export { TITLE_MAX_BYTES, decodeTitle, encodeTitle, fitTitle, titleByteLength, t
 // The payload, and the format version.
 export {
   FORMAT_VERSION,
+  MAX_DOCUMENT_BYTES,
   REFERENCE_BROTLI,
   SUPPORTED_FORMAT_VERSIONS,
   VERSION_ENVELOPE_BYTE,

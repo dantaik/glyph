@@ -14,7 +14,18 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { brotliCompressSync, constants } from 'node:zlib';
-import { buildDocument, encodeTitle, decodeTitle, fromBrotliWasm, parseTags, splitFrontMatter, titleByteLength } from '../src/index.js';
+import {
+  DocumentTooLargeError,
+  MalformedPayloadError,
+  buildDocument,
+  decodePayload,
+  decodeTitle,
+  encodeTitle,
+  fromBrotliWasm,
+  parseTags,
+  splitFrontMatter,
+  titleByteLength,
+} from '../src/index.js';
 import { nodeBrotli } from '../src/node.js';
 
 const require = createRequire(import.meta.url);
@@ -176,6 +187,34 @@ describe('brotli-wasm agrees with node:zlib', () => {
   test('both refuse the version envelope byte', { skip }, () => {
     assert.throws(() => wasm.decompress(new Uint8Array([0x91, 2, 0x0b])));
     assert.throws(() => nodeBrotli.decompress(new Uint8Array([0x91, 2, 0x0b])));
+  });
+
+  test('the browser codec bounds decompression while decompressing, like the Node one', { skip }, () => {
+    const bomb = nodeBrotli.compress(new Uint8Array(16 * 1024 * 1024).fill(0x20));
+    for (const brotli of [wasm, nodeBrotli]) {
+      const started = Date.now();
+      assert.throws(() => decodePayload(bomb, { brotli }), (e) => e instanceof DocumentTooLargeError && e.limit === 4 * 1024 * 1024);
+      assert.ok(Date.now() - started < 2000);
+      assert.throws(() => brotli.decompress(bomb, { maxOutputBytes: 1024 }), (e) => e.code === 'OUTPUT_TOO_LARGE');
+      // Lifted, the same bytes decompress in full.
+      assert.equal(decodePayload(bomb, { brotli, maxDocumentBytes: Infinity }).text.length, 16 * 1024 * 1024);
+    }
+  });
+
+  test('the browser codec, streaming, still decodes every ordinary document exactly', { skip }, () => {
+    const docs = ['', 'x', '# Hello\n\nA body.\n', '雪泥鸿爪 '.repeat(5000), 'a'.repeat(70 * 1024), Array.from({ length: 200000 }, (_, i) => String(i % 97)).join(' ')];
+    for (const doc of docs) {
+      const bytes = new TextEncoder().encode(doc);
+      const payload = nodeBrotli.compress(bytes);
+      assert.deepEqual(wasm.decompress(payload, { maxOutputBytes: 4 * 1024 * 1024 }), bytes);
+      assert.equal(decodePayload(payload, { brotli: wasm }).text, doc);
+    }
+  });
+
+  test('the browser codec refuses a stream cut short, and garbage, as malformed', { skip }, () => {
+    const payload = nodeBrotli.compress(new TextEncoder().encode('# A document long enough to be cut.\n'.repeat(50)));
+    assert.throws(() => decodePayload(payload.subarray(0, payload.length - 4), { brotli: wasm }), MalformedPayloadError);
+    assert.throws(() => decodePayload(new Uint8Array([0xff, 0xfe, 0xfd, 0xfc]), { brotli: wasm }), MalformedPayloadError);
   });
 });
 
