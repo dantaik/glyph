@@ -20,6 +20,7 @@
     "@walletconnect/ethereum-provider": "^2.24.0",
     "blo": "^2.0.0",
     "brotli-wasm": "^3.0.1",
+    "dompurify": "^3.4.15",
     "lucide-react": "^1.17.0",
     "marked": "^15.0.0",
     "react": "^19.1.0",
