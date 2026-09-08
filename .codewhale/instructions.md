@@ -26,6 +26,10 @@ See `README.md` and `glyph-spec.md`.
   i18n + locales/{en,zh} (the interface language store and its dictionaries;
   `t()` outside React, `useT()` / `useLang()` inside it)
 - `webapp/src/components/` — Reader/Publisher UI
+- `codec/` — `xueni-codec`: the normative, versioned specification of the post ⇄ `publish()` calldata
+  conversion (`codec/SPEC.md`) and its reference library — pure functions, no I/O, no dependencies;
+  `src/index.js` is environment-agnostic (brotli injected), `src/node.js` binds `node:zlib`;
+  `test/vectors.json` are the spec's test vectors
 - `cli/` — `xueni`, the command-line tool (publish, fetch, author, export, verify);
   plain Node over viem, sharing `webapp/src/lib/payloadText.js`, `chains.js` and
   `limits.js` so the bytes are identical to the web app's
@@ -37,6 +41,8 @@ See `README.md` and `glyph-spec.md`.
 
 **Workflows:**
 
+- Codec: `cd codec && npm install && npm test` (the interop tests want `webapp`'s dependencies installed
+  too, and skip when they are not); `npm run vectors` regenerates the test vectors
 - Contracts: `cd contracts && forge install foundry-rs/forge-std && forge build`
 - CLI: `cd cli && npm install && npm test` (its tests boot `webapp/test/e2e/rpcServer.mjs`,
   so `webapp`'s dependencies must be installed too)

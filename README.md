@@ -192,6 +192,27 @@ node bin/xueni.js publish letter.md --chain taiko --dry-run
 `PRIVATE_KEY` comes from the environment and is never an argument. See [`cli/README.md`](cli/README.md)
 for every command and option.
 
+## The post codec
+
+The conversion between a post as a person sees it — title, tags, body, front-matter — and the
+calldata of the `publish()` call that stores it is specified, normatively and with a format version,
+in [`codec/SPEC.md`](codec/SPEC.md), and implemented as pure functions in [`codec/`](codec/README.md)
+(`xueni-codec`): no wallet, no node, no I/O — a post in, `0x…` out, and back. Version 1 is the format
+every post so far uses; a later version is marked by a leading byte no brotli stream can begin with, so
+an older reader fails loudly on a newer post rather than showing garbage.
+
+```js
+import { postToCallData, callDataToPost } from 'xueni-codec/node';   // ../codec/src/node.js from inside this repo
+const callData = postToCallData({ title, tags, markdown, meta });   // what a wallet signs
+const post = callDataToPost(tx.input);                              // { title, tags, markdown, meta, text, compressedBytes }
+```
+
+The web app and the CLI still encode through `webapp/src/lib/payloadText.js` and `title.js`; the
+codec's test suite holds itself to those modules byte for byte, on fuzzed input, so the three cannot
+drift apart unnoticed. The spec's §10 is the security model — every field of a post is a stranger's
+bytes — and the library enforces the parts that are its own: decompression is bounded while it
+happens (a 106-byte payload can otherwise unpack to 64 MiB), and control characters are refused.
+
 ## Testing
 
 ```bash
@@ -207,7 +228,9 @@ JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-en
 bodies are brotli-compressed `publish()` calldata, so viem, chainIO and the brotli WASM all really run.
 During development, `npm run dev` and then `/?fixtures=1` shows the same demo data from memory. GitHub
 Actions (`.github/workflows/ci.yml`) runs all three steps on every PR, and the `cli` job runs the
-command-line tool's tests against that same mock node (`cd cli && npm test`). The macOS application has
+command-line tool's tests against that same mock node (`cd cli && npm test`). The `codec` job runs the
+post codec's conformance suite (`cd codec && npm test`), which includes its test vectors and the
+byte-for-byte checks against the web app's payload modules. The macOS application has
 its own workflow (`.github/workflows/desktop.yml`), which builds on a `v*` tag and on a pull request
 that touches `desktop/`; its image-encoding crate is tested with `cd desktop/src-tauri/transcode &&
 cargo test`.

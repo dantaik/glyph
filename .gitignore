@@ -1,5 +1,6 @@
 # Dependencies
 webapp/node_modules/
+codec/node_modules/
 .context/qa/node_modules/
 
 # QA screenshot artifacts (regenerable via .context/qa/qa-shots.mjs)
