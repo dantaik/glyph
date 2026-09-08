@@ -91,6 +91,8 @@ B. opening one post
 
 **Author discovery is out-of-band.** The front end takes the author's address from the URL (`/author/0x…`, or `/author/<name>.eth` resolved through ENS); the contract keeps no "author directory" at all, and stays minimal. **When the home page is opened with no address**, the front end falls back to one bounded scan of recent blocks to list the newest N posts network-wide (best-effort, see §7) — without changing the contract. A reader who follows authors rather than browsing skips that scan entirely (§7, "The following feed").
 
+**The conversion is specified.** The seam between a post as a person sees it and the calldata of the `publish()` call — the document grammar, the payload's format version, the calldata layout — is stated normatively, with test vectors, in [`codec/SPEC.md`](./codec/SPEC.md); `codec/` (`xueni-codec`) is its reference implementation, a pure library with no I/O and no dependencies. What follows in §5 is the design narrative of that seam; where the two differ, the codec specification is the one to build against.
+
 **Where the same code runs.** One payload layer, three surfaces. The browser app (`webapp/`) is the reference implementation. The command-line tool (`cli/`) imports its `payloadText`, `title`, `abi`, `chains` and `limits` modules directly rather than reimplementing them, which is why those modules are kept free of any import plain Node cannot follow. The macOS application (`desktop/`) is a Tauri shell around the same built `dist/`, adding only what a WKWebView cannot do: encode WebP from a canvas, and save a file. Nothing in any of them talks to a server.
 
 ---
@@ -189,6 +191,10 @@ contract Blog {
 ---
 
 ## 5. Payload encoding (`payload.js`)
+
+> **Normative reference: [`codec/SPEC.md`](./codec/SPEC.md).** This section describes the design; the
+> exact rules — what a writer must refuse, how a reader splits the front-matter, how a format version is
+> detected — live there, with a version number and test vectors, and `codec/` implements them.
 
 Decompressed, the payload is simply **a human-readable Markdown document**, with the tags in an optional **YAML-style front-matter** block:
 
@@ -586,6 +592,7 @@ code, and any tool that reads JSON can read it decades from now.
 | Desktop app | Tauri 2 around the same `webapp/dist`, macOS first | The reader is a static single-page app, so a desktop version is a window plus the two things WebKit cannot do — encode WebP from a canvas, and honour `<a download>`; Tauri's shell is ~10 MB against Electron's ~200 MB and has no bundled browser to keep patched |
 | The draft being written | IndexedDB (`drafts`), one record, written half a second after the last change | A reload, a wallet leaving and returning, or a closed tab used to lose the letter — including image transactions already paid for |
 | The command line | A separate package (`cli/`) that IMPORTS the web app's payload, title, ABI, chain and limit modules rather than reimplementing them | Two encoders of one format drift apart, and the drift would be silent and on chain. Those modules are therefore kept free of any import plain Node cannot follow, and a test builds a bundle with one side and reads it with the other |
+| The post ⇄ calldata conversion | A normative, versioned specification (`codec/SPEC.md`) and a pure reference library (`codec/`) with no I/O and no dependencies; format version 1 is the format already on chain, unmarked, and later versions are enveloped behind a byte no brotli stream can begin with | The conversion is the one seam every surface shares, and a design narrative is not something a second implementation can be checked against; a spec with vectors is. A version marker that costs version-1 posts nothing keeps every existing post as it is |
 | Archive bundles | One JSON file: the exact stored text of what has been read, the images, and which author lists are complete | The local cache is the only copy a reader controls, and until it is a file it is a browser profile a cleared cache takes away. It is also the answer to history expiry: a reader in 2040 opens a bundle instead of running an archive node |
 | Getting a post off this page | A share menu: the canonical link, an `<iframe>` for `?headless=1`, and the Markdown reference `[title](0x…)` | A quotation written as a reference goes on chain with the quoting post and stays resolvable as long as both transactions exist, which is the only citation this journal can honestly offer |
 | A printed post | `@media print`: the interface hidden by a `data-noprint` attribute, the chain and full transaction hash printed under the letter | On paper a link is not a link; a copy that cannot be traced back to the chain holding it is just a piece of paper |

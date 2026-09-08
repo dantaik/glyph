@@ -1,0 +1,29 @@
+{
+  "name": "xueni-codec",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Xueni post codec: the specification, and pure functions converting a post to its publish() calldata and back.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./node": "./src/node.js",
+    "./brotli-wasm": "./src/brotli/wasm.js"
+  },
+  "files": [
+    "src",
+    "SPEC.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "vectors": "node scripts/make-vectors.mjs"
+  },
+  "devDependencies": {
+    "brotli-wasm": "^3.0.1",
+    "viem": "^2.27.0"
+  }
+}
