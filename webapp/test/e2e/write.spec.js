@@ -3,7 +3,10 @@ import { toFunctionSelector } from 'viem';
 import { prepare } from './app.mjs';
 
 const PUBLISH = toFunctionSelector('publish(bytes32,bytes)');
-const GLYPH = '0x000000ae2f2249c497cfc5f262dd1491634c361c';
+// The mock node has the second contract deployed on both chains, so a post
+// goes there — through the same two-argument call v1 takes, since no hook
+// was chosen. hooks.spec.js covers the other calls.
+const XUENI = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
 
 test.describe('the write tab', () => {
   test('publishes to the chosen chain through the wallet, after it is switched there', async ({ page }) => {
@@ -27,7 +30,7 @@ test.describe('the write tab', () => {
     await expect(page.getByText('Published to Ethereum')).toBeVisible({ timeout: 30_000 });
     const sent = await page.evaluate(() => window.__wallet.calls.filter((c) => c.method === 'eth_sendTransaction'));
     expect(sent).toHaveLength(1);
-    expect(sent[0].params[0].to.toLowerCase()).toBe(GLYPH);
+    expect(sent[0].params[0].to.toLowerCase()).toBe(XUENI);
     expect(sent[0].params[0].data.startsWith(PUBLISH)).toBe(true);
 
     // The pick outlives the page.

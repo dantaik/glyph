@@ -42,16 +42,20 @@ describe('export', () => {
       const files = readdirSync(join(out, slug)).filter((f) => f.endsWith('.md'));
       assert.equal(files.length, oracle.counts[author].byChain[String(chainId)]);
       // <yyyy-mm-dd>-<index>-<title>.md — the date sorts, the index is the
-      // post's identity, and the title makes the directory readable.
-      for (const file of files) assert.match(file, /^\d{4}-\d{2}-\d{2}-\d+-.+\.md$/u);
+      // post's identity, and the title makes the directory readable. A post
+      // on the second contract ends in `.v2.md`, because index 0 exists on
+      // both contracts.
+      for (const file of files) assert.match(file, /^\d{4}-\d{2}-\d{2}-\d+-.+?(\.v2)?\.md$/u);
     }
   });
 
   test('each .md holds exactly the text the archive holds', async () => {
+    assert.ok(archive.posts.some((p) => p.version === 2), 'the fixtures put a post on the second contract');
     for (const post of archive.posts) {
       const slug = post.chainId === 1 ? 'ethereum' : 'taiko';
-      const files = readdirSync(join(out, slug)).filter((f) => f.includes(`-${post.index}-`));
-      assert.equal(files.length, 1, `one file for index ${post.index} on ${slug}`);
+      const onV2 = (post.version ?? 1) === 2;
+      const files = readdirSync(join(out, slug)).filter((f) => f.includes(`-${post.index}-`) && f.endsWith('.v2.md') === onV2);
+      assert.equal(files.length, 1, `one file for index ${post.index} on ${slug}${onV2 ? ' (v2)' : ''}`);
       assert.equal(readFileSync(join(out, slug, files[0]), 'utf8'), post.text);
     }
   });
@@ -67,40 +71,63 @@ describe('export', () => {
 
   test('every post in the archive has the documented fields, as plain numbers', async () => {
     assert.equal(archive.posts.length, oracle.counts[author].total);
+    const documented = [
+      'chainId',
+      'txHash',
+      'eventIndex',
+      'author',
+      'index',
+      'block',
+      'prevBlock',
+      'logIndex',
+      'ts',
+      'title',
+      'text',
+      'compressedBytes',
+    ];
     for (const post of archive.posts) {
-      assert.deepEqual(Object.keys(post), [
-        'chainId',
-        'txHash',
-        'eventIndex',
-        'author',
-        'index',
-        'block',
-        'prevBlock',
-        'logIndex',
-        'ts',
-        'title',
-        'text',
-        'compressedBytes',
-      ]);
+      // A post on the second contract says so, and names the contract and
+      // the hook it went through — the same three fields the web app
+      // writes. A post on the first carries exactly the fields it always did.
+      const onV2 = (post.version ?? 1) === 2;
+      assert.deepEqual(Object.keys(post), onV2 ? [...documented, 'version', 'contract', 'hook'] : documented);
       for (const key of ['chainId', 'eventIndex', 'index', 'block', 'prevBlock', 'logIndex', 'ts', 'compressedBytes']) {
         assert.equal(typeof post[key], 'number', `${key} should be a plain JSON number`);
       }
       assert.match(post.txHash, /^0x[0-9a-f]{64}$/);
       assert.equal(typeof post.text, 'string');
+      if (onV2) {
+        assert.equal(post.version, 2);
+        assert.match(post.contract, /^0x[0-9a-f]{40}$/);
+        assert.ok(post.hook === null || /^0x[0-9a-f]{40}$/.test(post.hook), 'the hook is an address or null');
+      }
     }
+    // The bundle says which contract each version lives on.
+    assert.match(archive.contracts[1], /^0x[0-9a-fA-F]{40}$/);
+    assert.match(archive.contracts[2], /^0x[0-9a-fA-F]{40}$/);
   });
 
   test('every walked author is marked complete, with the head it was walked from', async () => {
     assert.equal(archive.authors.length, 2, 'one entry per chain the author writes on');
     for (const entry of archive.authors) {
-      assert.deepEqual(Object.keys(entry), ['chainId', 'address', 'head', 'complete']);
+      assert.deepEqual(Object.keys(entry), ['chainId', 'address', 'head', 'heads', 'complete']);
       assert.equal(entry.complete, true);
       assert.equal(entry.address.toLowerCase(), author.toLowerCase());
       assert.ok(entry.head > 0);
       // The head is the block of that chain's newest post — what the
-      // contract's latestBlock() returned when the walk started.
+      // contract's latestBlock() returned when the walk started — and
+      // `heads` says the same per contract, for the contracts the author
+      // wrote on there.
       const newest = archive.posts.filter((p) => p.chainId === entry.chainId).map((p) => p.block);
       assert.equal(entry.head, Math.max(...newest));
+      assert.ok(Object.keys(entry.heads).length > 0);
+      for (const [version, head] of Object.entries(entry.heads)) {
+        const onThat = archive.posts
+          .filter((p) => p.chainId === entry.chainId && (p.version ?? 1) === Number(version))
+          .map((p) => p.block);
+        assert.equal(head, Math.max(...onThat), `head of v${version} on chain ${entry.chainId}`);
+      }
+      assert.equal(entry.head, Math.max(...Object.values(entry.heads)));
     }
   });
 

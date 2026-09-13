@@ -19,6 +19,9 @@ export const encodePost = (post, options) => core.encodePost(post, withBrotli(op
 /** @type {typeof core.postToCallData} */
 export const postToCallData = (post, options) => core.postToCallData(post, withBrotli(options));
 
+/** @type {typeof core.encodeRelayedPost} */
+export const encodeRelayedPost = (post, options) => core.encodeRelayedPost(post, withBrotli(options));
+
 /** @type {typeof core.callDataToPost} */
 export const callDataToPost = (callData, options) => core.callDataToPost(callData, withBrotli(options));
 

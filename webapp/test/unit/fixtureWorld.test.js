@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { AUTHORS, WORLDS, WORLD_CHAIN_IDS, buildWorld, buildWorlds, expectedMergedOrder, txOf } from '../../src/lib/fixtureWorld';
+import {
+  AUTHORS,
+  DEMO_RELAYER,
+  DEMO_UNKNOWN_HOOK,
+  WORLDS,
+  WORLD_CHAIN_IDS,
+  buildWorld,
+  buildWorlds,
+  expectedMergedOrder,
+  txOf,
+} from '../../src/lib/fixtureWorld';
+import { DEFAULT_MULTI_HOOK_ADDRESS } from '../../src/lib/chains';
 import { createFixtureIO } from '../../src/lib/fixtures';
 
 const NOW = 1_800_000_000;
@@ -71,6 +82,54 @@ describe('fixtureWorld', () => {
     // The long article is referenced from another letter on the same chain.
     const ref = eth.bodyByTx.get(txOf(1, AUTHORS[1], 3n)).markdown;
     expect(ref).toContain(`](${txOf(1, AUTHORS[0], 2n)})`);
+  });
+
+  it('keeps the second contract as streams of their own', () => {
+    // Without asking, a world is the v1 journal alone.
+    expect(buildWorld(1, { now: NOW }).posts.every((p) => p.version === 1)).toBe(true);
+    expect(expectedMergedOrder(buildWorlds(WORLD_CHAIN_IDS, { now: NOW, v2: true }))).toHaveLength(23);
+    const worlds = buildWorlds(WORLD_CHAIN_IDS, { now: NOW, v2: true });
+    const eth = worlds.get(1);
+    const taiko = worlds.get(167000);
+    // v1 lists are untouched by the v2 posts…
+    expect(eth.byAuthor.get(AUTHORS[0].toLowerCase()).every((p) => p.version === 1)).toBe(true);
+    // …and each v2 stream starts at index 0 with its own chain of blocks.
+    const a0v2 = eth.byStream.get(`${AUTHORS[0].toLowerCase()}@2`);
+    expect(a0v2.map((p) => [Number(p.index), Number(p.prevBlock), p.version])).toEqual([[0, 0, 2]]);
+    expect(a0v2[0].hook).toBe(DEFAULT_MULTI_HOOK_ADDRESS.toLowerCase());
+    const a1v2 = eth.byStream.get(`${AUTHORS[1].toLowerCase()}@2`);
+    expect(a1v2[0].relayer).toBe(DEMO_RELAYER);
+    expect(a1v2[0].hook).toBeNull();
+    expect(taiko.byStream.get(`${AUTHORS[3].toLowerCase()}@2`)[0].hook).toBe(DEMO_UNKNOWN_HOOK);
+    // The same index on the two contracts is a different transaction.
+    expect(txOf(1, AUTHORS[0], 0, 2)).not.toBe(txOf(1, AUTHORS[0], 0));
+    expect(eth.posts.filter((p) => p.version === 2)).toHaveLength(2);
+    expect(taiko.posts.filter((p) => p.version === 2)).toHaveLength(1);
+  });
+
+  it('the fixture I/O reads each contract as its own stream', async () => {
+    expect(createFixtureIO(1, '1', { now: NOW, delay: 0 }).versions).toEqual([1]);
+    const io = createFixtureIO(1, '1', { now: NOW, delay: 0, v2: true });
+    expect(io.versions).toEqual([1, 2]);
+    expect(await io.latestBlock(AUTHORS[0], 1)).toBe(2870n);
+    expect(await io.latestBlock(AUTHORS[0], 2)).toBe(2560n);
+    expect(await io.count(AUTHORS[0], 1)).toBe(5n);
+    expect(await io.count(AUTHORS[0], 2)).toBe(1n);
+    expect(await io.count(AUTHORS[2], 2)).toBe(0n);
+    expect(await io.latestBlock(AUTHORS[2], 2)).toBe(0n);
+    const rows = await io.authorPostsInBlock(AUTHORS[0], 2560n);
+    expect(rows.map((r) => [r.version, r.hook])).toEqual([[2, DEFAULT_MULTI_HOOK_ADDRESS.toLowerCase()]]);
+    expect(rows[0].relayer).toBeUndefined();
+    const relayed = await io.postBody(txOf(1, AUTHORS[1], 0, 2));
+    expect(relayed.form).toBe('publishFor');
+    expect(relayed.relayed.author).toBe(AUTHORS[1].toLowerCase());
+    expect(relayed.sender).toBe(DEMO_RELAYER);
+    const hooked = await io.postBody(txOf(1, AUTHORS[0], 0, 2));
+    expect(hooked.form).toBe('publishWithHook');
+    expect(hooked.hookData).toBe('0xc0ffee');
+    expect(hooked.relayed).toBeNull();
+    const plain = await io.postBody(txOf(1, AUTHORS[0], 0));
+    expect([plain.form, plain.hook, plain.relayed]).toEqual(['publish', null, null]);
   });
 
   it('scale stretches blocks without moving the clock', () => {

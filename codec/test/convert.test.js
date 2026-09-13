@@ -12,7 +12,7 @@ import {
   encodeTitle,
   postToCallData as toCallDataWith,
 } from '../src/index.js';
-import { callDataToPost, encodePost, normalisePost, postToCallData, nodeBrotli } from '../src/node.js';
+import { callDataToPost, encodePost, encodeRelayedPost, normalisePost, postToCallData, nodeBrotli } from '../src/node.js';
 
 const HASH = `0x${'ab'.repeat(32)}`;
 
@@ -36,9 +36,10 @@ describe('postToCallData / callDataToPost', () => {
       const callData = postToCallData(post);
       assert.match(callData, /^0x70a74532[0-9a-f]+$/);
       const back = callDataToPost(callData);
-      const { version, text, compressedBytes, ...fields } = back;
+      const { version, text, compressedBytes, call, ...fields } = back;
       assert.equal(version, 1);
       assert.deepEqual(fields, normalisePost(post));
+      assert.deepEqual(call, { form: 'publish', title: call.title, payload: call.payload, hook: null, hookData: new Uint8Array(0), relayed: null });
       assert.equal(typeof text, 'string');
       assert.ok(compressedBytes > 0);
       assert.equal(compressedBytes, nodeBrotli.compress(new TextEncoder().encode(text)).length);
@@ -53,6 +54,42 @@ describe('postToCallData / callDataToPost', () => {
     assert.deepEqual(enc.payload, nodeBrotli.compress(new TextEncoder().encode(enc.text)));
     assert.equal(enc.callData, postToCallData({ title: 'A letter', tags: ['home'], markdown: 'Body.\n', meta: { lang: 'en' } }));
     assert.equal(callDataToPost(enc.callData).text, enc.text);
+  });
+
+  test('a hook rides along, and comes back with the post', () => {
+    const post = { title: 'Through a hook', tags: ['home'], markdown: 'Body.\n', meta: {} };
+    const hook = '0x00000000000000000000000000000000000000ab';
+    const enc = encodePost(post, { hook, hookData: '0xc0ffee' });
+    assert.equal(enc.callData.slice(0, 10), '0xcf5f0bff');
+    assert.equal(enc.text, '---\ntags: home\n---\n\nBody.\n');
+    const back = callDataToPost(enc.callData);
+    assert.equal(back.title, 'Through a hook');
+    assert.equal(back.call.form, 'publishWithHook');
+    assert.equal(back.call.hook, hook);
+    assert.deepEqual(back.call.hookData, new Uint8Array([0xc0, 0xff, 0xee]));
+    assert.equal(back.call.relayed, null);
+    // The same post without a hook is the plain call, and the same document.
+    assert.equal(postToCallData(post).slice(0, 10), '0x70a74532');
+    assert.equal(callDataToPost(postToCallData(post)).text, enc.text);
+  });
+
+  test('a relayed post carries the author of record, and comes back with it', () => {
+    const post = { title: 'Relayed', tags: [], markdown: 'Body.\n', meta: {} };
+    const author = '0x8a1f3b52C9e44E1a9b1f0d2C7a44E0b1D2e3F4a5';
+    const signature = new Uint8Array(65).fill(7);
+    const enc = encodeRelayedPost(post, { author, deadline: 1_800_000_000, signature });
+    assert.equal(enc.callData.slice(0, 10), '0x80e41e43');
+    assert.equal(enc.author, author);
+    assert.deepEqual(enc.payload, encodePost(post).payload);
+    const back = callDataToPost(enc.callData);
+    assert.equal(back.title, 'Relayed');
+    assert.equal(back.markdown, 'Body.\n');
+    assert.equal(back.call.form, 'publishFor');
+    assert.equal(back.call.hook, null);
+    assert.deepEqual(back.call.relayed, { author: author.toLowerCase(), deadline: '1800000000', signature });
+    // With a hook too.
+    const hooked = encodeRelayedPost(post, { author, deadline: 1, signature, hook: '0x00000000000000000000000000000000000000ab', hookData: new Uint8Array([1]) });
+    assert.equal(callDataToPost(hooked.callData).call.hook, '0x00000000000000000000000000000000000000ab');
   });
 
   test('the calldata is deterministic: the same post, the same bytes, whatever the field order', () => {

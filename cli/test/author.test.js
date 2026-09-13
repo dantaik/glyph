@@ -33,14 +33,20 @@ describe('author', () => {
     assert.equal(rows.length, expected);
     assert.ok(rows.every((r) => r.chainId === 1));
     assert.ok(rows.every((r) => r.author.toLowerCase() === author.toLowerCase()));
-    // Newest first, and the walk descends the author's own index.
-    assert.deepEqual(
-      rows.map((r) => r.index),
-      [...rows.map((r) => r.index)].sort((a, b) => b - a),
-    );
-    // The list is contiguous down to the author's first post: that is what
-    // following prevBlock to the end means.
-    assert.equal(rows[rows.length - 1].index, 0);
+    // The author has a list on each contract, and the fixtures put a post on
+    // the second one, so the listing is the two walks merged — newest first
+    // overall, and within each contract's list the walk descends the
+    // author's own index there.
+    assert.ok(rows.some((r) => r.version === 2), 'the fixtures should have a post on the second contract');
+    for (const version of new Set(rows.map((r) => r.version))) {
+      const indexes = rows.filter((r) => r.version === version).map((r) => r.index);
+      assert.deepEqual(indexes, [...indexes].sort((a, b) => b - a));
+      // Each list is contiguous down to the author's first post there: that
+      // is what following prevBlock to the end means.
+      assert.equal(indexes[indexes.length - 1], 0, `walked v${version} to the author's first post`);
+    }
+    const blocks = rows.map((r) => r.block);
+    assert.deepEqual(blocks, [...blocks].sort((a, b) => b - a));
   });
 
   test('the plain listing carries the index, title, chain, block, date and full hash', async () => {

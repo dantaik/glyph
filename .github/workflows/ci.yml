@@ -71,3 +71,19 @@ jobs:
         working-directory: codec
       - run: npm test
         working-directory: codec
+
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      # forge-std is not vendored (contracts/lib is ignored); install the
+      # version foundry.lock pins, without touching the checkout's git state.
+      - run: forge install foundry-rs/forge-std@v1.16.2 --no-git
+      - run: forge build --sizes
+      - run: forge test -vv

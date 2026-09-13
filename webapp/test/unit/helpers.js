@@ -79,15 +79,19 @@ export function fakeChain({
   fail = null,
   legacyRows = false,
   baseFee = null,
+  // The contract versions the chain is read on. A post with `version: 2`
+  // (and maybe a `hook`) is on the second contract, with its own index
+  // sequence and its own prevBlock chain per author.
+  versions = null,
 } = {}) {
   const sorted = [...posts]
-    .map((p) => ({ ...p, index: BigInt(p.index), block: BigInt(p.block) }))
+    .map((p) => ({ ...p, index: BigInt(p.index), block: BigInt(p.block), version: Number(p.version ?? 1) }))
     .sort((a, b) => (a.block === b.block ? Number(a.index - b.index) : a.block < b.block ? -1 : 1));
   const headBlock = BigInt(head ?? (sorted.length ? sorted[sorted.length - 1].block + 5n : 100n));
-  const lastBlock = new Map(); // author -> block of their previous post
+  const lastBlock = new Map(); // author@version -> block of their previous post there
   let logCounter = new Map(); // block -> next logIndex
   const rows = sorted.map((p) => {
-    const key = String(p.author).toLowerCase();
+    const key = `${String(p.author).toLowerCase()}@${p.version}`;
     const prevBlock = lastBlock.get(key) ?? 0n;
     lastBlock.set(key, p.block);
     const b = String(p.block);
@@ -99,12 +103,18 @@ export function fakeChain({
       block: p.block,
       prevBlock,
       title: p.title ?? `post ${key.slice(-4)}#${p.index}`,
-      txHash: hashOf(chainId, p.author, p.index),
+      txHash: p.version === 1 ? hashOf(chainId, p.author, p.index) : hashOf(chainId, `${p.author}v${p.version}`, p.index),
       eventIndex: 0,
       logIndex,
+      version: p.version,
+      hook: p.hook ? String(p.hook).toLowerCase() : null,
     };
   });
-  const byAuthor = (author) => rows.filter((r) => r.author.toLowerCase() === String(author).toLowerCase());
+  const byAuthor = (author, version = null) =>
+    rows.filter(
+      (r) =>
+        r.author.toLowerCase() === String(author).toLowerCase() && (version == null || r.version === Number(version)),
+    );
   const tsOf = (block) => now - Number(headBlock - BigInt(block)) * secondsPerBlock;
   // A base fee that varies with height when a test wants one, so gas-history
   // samples can be told apart and a lowest one exists.
@@ -119,6 +129,7 @@ export function fakeChain({
   const io = {
     chainId,
     ephemeral: true,
+    ...(versions ? { versions: [...versions] } : {}),
     async blockNumber() {
       record('eth_blockNumber');
       return headBlock;
@@ -145,14 +156,17 @@ export function fakeChain({
         .sort((a, b) => Number(b.index - a.index))
         .map(meta);
     },
-    async latestBlock(author) {
+    async latestBlock(author, version = 1) {
       record('latestBlock', author);
-      const own = byAuthor(author);
+      const own = byAuthor(author, version);
       return own.length ? own[own.length - 1].block : 0n;
     },
-    async count(author) {
+    async count(author, version = 1) {
       record('count', author);
-      return BigInt(byAuthor(author).length);
+      return BigInt(byAuthor(author, version).length);
+    },
+    async isDeployed(version) {
+      return (versions ?? [1]).includes(Number(version));
     },
     async postsInTx(txHash) {
       record('eth_getTransactionReceipt', txHash);

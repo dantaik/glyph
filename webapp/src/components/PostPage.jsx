@@ -11,12 +11,15 @@ import {
   fmtTitle,
   fmtAbsTime,
   fmtRelTime,
+  etherscanAddrUrl,
   etherscanTxUrl,
   friendlyError,
+  shortAddr,
 } from '../lib/format';
 import { downloadText, postFileName } from '../lib/download';
 import { setPendingDraftPatch } from '../lib/drafts';
 import { formatPostRef } from '../lib/glyphRefs';
+import { hookInfo } from '../lib/hookRegistry';
 import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
 import AddressLabel, { Identicon } from './Address';
@@ -142,6 +145,15 @@ export default function PostPage({
 
   const title = fmtTitle(meta.title);
   const loaded = !loading && !error && html != null;
+
+  // --- Where the post came from, beyond the author -----------------------
+  //
+  // The event names the hook a v2 post went through; the transaction says
+  // who sent it, which for a relayed post is not the author. Both are facts
+  // on chain, and the page states them as such: it never runs a hook.
+  const hook = body?.hook ?? meta.hook ?? null;
+  const relayer = body?.relayed ? (body.sender ?? null) : null;
+  const hookName = hook ? (hookInfo(hook).name ?? shortAddr(hook)) : null;
 
   // --- What this post says about others, and they about it -------------
   //
@@ -287,6 +299,12 @@ export default function PostPage({
           <ChainChip chainId={reader.chainId} navigate={navigate} />
           <Dot />
           <span>{fmtIndex(meta.index)}</span>
+          {Number(meta.version ?? 1) !== 1 && (
+            <>
+              <Dot />
+              <span data-contract-version={meta.version}>{t('post.contractVersion', { version: meta.version })}</span>
+            </>
+          )}
           {relTime && (
             <>
               <Dot />
@@ -294,6 +312,41 @@ export default function PostPage({
             </>
           )}
         </Meta>
+        {(hook || relayer) && (
+          <Meta as="div" nums className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5" data-provenance="">
+            {hook && (
+              <span className="flex items-center gap-1">
+                <span>{t('post.viaHook')}</span>
+                <a
+                  href={etherscanAddrUrl(hook, reader.chainId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={hook}
+                  data-hook={hook}
+                  className="hover:text-accent transition-colors"
+                >
+                  {hookName}
+                </a>
+              </span>
+            )}
+            {hook && relayer && <Dot />}
+            {relayer && (
+              <span className="flex items-center gap-1">
+                <span>{t('post.relayedBy')}</span>
+                <a
+                  href={etherscanAddrUrl(relayer, reader.chainId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={relayer}
+                  data-relayer={relayer}
+                  className="inline-flex items-center hover:text-accent transition-colors"
+                >
+                  <AddressLabel address={relayer} size={14} tailClassName="text-xs" />
+                </a>
+              </span>
+            )}
+          </Meta>
+        )}
         {body?.meta && (
           <RelationsAbove
             meta={body.meta}
@@ -433,6 +486,7 @@ export default function PostPage({
           block={meta.block}
           txHash={meta.txHash}
           chainId={reader.chainId}
+          call={raw}
         />
       )}
 

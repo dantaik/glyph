@@ -64,9 +64,15 @@ export async function getMarketStates(chains) {
 /**
  * publish(bytes32 title, bytes payload) gas estimate.
  * @param {number} payloadBytes — brotli-compressed payload size in bytes
- * @param {boolean} firstPost   — true if this author has never posted (cold SSTORE)
+ * @param {boolean} firstPost   — true if this author has never posted on
+ *   that contract (cold SSTORE)
+ * @param {{ version?: number, hooked?: boolean, hookDataBytes?: number }} call
+ *   the v2 contract indexes the hook as one more topic; a post through a
+ *   hook pays the hook word, the data's offsets, one cold call and the
+ *   memory the hook is handed — and then whatever the hook itself does,
+ *   which no estimate here can know
  */
-export function estimatePublishGas(payloadBytes, firstPost) {
+export function estimatePublishGas(payloadBytes, firstPost, { version = 1, hooked = false, hookDataBytes = 0 } = {}) {
   const padded = Math.ceil(payloadBytes / 32) * 32;
   const nonzero = 4 + 32 + payloadBytes; // selector + title + payload (mostly nonzero)
   const zero = 32 + 32 + (padded - payloadBytes); // ABI offset + length slots (~zero)
@@ -74,12 +80,18 @@ export function estimatePublishGas(payloadBytes, firstPost) {
 
   const base = 21000;
   // LOG with 2 topics (signature + indexed author) and 96 bytes of data:
-  // 375 + 375 × 2 + 8 × 96 = 1,893 (EIP-2929).
-  const logCost = 1893;
+  // 375 + 375 × 2 + 8 × 96 = 1,893 (EIP-2929). v2 indexes the hook too.
+  const logCost = 1893 + (Number(version) === 2 ? 375 : 0);
   // One packed slot, read then written: warm SLOAD+SSTORE = 100+100 (EIP-2929);
   // the first post pays cold access + 0→non-zero init = 2,100+22,100.
   const sstore = firstPost ? 2100 + 22100 : 100 + 100;
-  return base + calldata + logCost + sstore;
+  // A hook: the address word (12 zero + 20 nonzero bytes), the data's offset
+  // and length words, the data itself, a cold CALL, and the copy of the
+  // payload into the hook's calldata.
+  const hookCost = hooked
+    ? 12 * 10 + 20 * 40 + 64 * 10 + hookDataBytes * 40 + 2600 + 100 + Math.ceil(payloadBytes / 32) * 3 + 700
+    : 0;
+  return base + calldata + logCost + sstore + hookCost;
 }
 
 /** Image upload = plain self-tx with the bytes as calldata. */

@@ -39,8 +39,8 @@ import {
   toHex,
 } from 'viem';
 import { mainnet } from 'viem/chains';
-import { abi } from '../../src/lib/abi.js';
-import { CHAINS } from '../../src/lib/chains.js';
+import { abi, abiV2 } from '../../src/lib/abi.js';
+import { CHAINS, DEFAULT_GLYPH_ADDRESS, DEFAULT_XUENI_ADDRESS } from '../../src/lib/chains.js';
 import {
   AUTHORS,
   ENS_NAMES,
@@ -49,15 +49,27 @@ import {
   ensAddressOf,
   ensNameOf,
   expectedMergedOrder,
+  streamKey,
 } from '../../src/lib/fixtureWorld.js';
 import { buildPayloadText } from '../../src/lib/payloadText.js';
 
 const PORT = Number(process.argv[2] || process.env.GLYPH_RPC_PORT || 8545);
-const GLYPH = '0x000000ae2f2249c497cfc5f262dd1491634c361c';
+// Both contracts, at their deterministic addresses: v1 (Blog.sol) and v2
+// (Xueni.sol, hooks and relayed posts). The worlds' v2 posts are served
+// from the second address with the second event, and their transactions
+// carry the second contract's call forms.
+const GLYPH = DEFAULT_GLYPH_ADDRESS.toLowerCase();
+const XUENI = DEFAULT_XUENI_ADDRESS.toLowerCase();
+const ZERO_ADDRESS = `0x${'00'.repeat(20)}`;
 const POST_SIG = toEventSelector('Post(address,uint256,uint256,bytes32)');
+const POST_V2_SIG = toEventSelector('Post(address,address,uint256,uint256,bytes32)');
 const CHAIN_IDS = [1, 167000];
 const NOW = Math.floor(Date.now() / 1000);
 const SCALE = 20;
+
+/** Which contract a post lives on, and the event it was announced with. */
+const contractOf = (p) => (p.version === 2 ? XUENI : GLYPH);
+const topic0Of = (p) => (p.version === 2 ? POST_V2_SIG : POST_SIG);
 
 const SCENARIOS = {
   default: {},
@@ -89,7 +101,7 @@ function scenario(name) {
   if (scenarios.has(name)) return scenarios.get(name);
   const spec = SCENARIOS[name];
   if (!spec) return null;
-  const worlds = buildWorlds(CHAIN_IDS, { now: NOW, scale: SCALE });
+  const worlds = buildWorlds(CHAIN_IDS, { now: NOW, scale: SCALE, v2: true });
   const chains = new Map();
   for (const [id, world] of worlds) {
     const offset = BigInt(CHAINS[id].deployBlock);
@@ -101,10 +113,12 @@ function scenario(name) {
           realPrev: p.prevBlock === 0n ? 0n : offset + p.prevBlock,
         }));
     const byTx = new Map(posts.map((p) => [p.txHash.toLowerCase(), p]));
-    const byAuthor = new Map();
+    // One list per stream — an author's posts on one contract — since each
+    // contract keeps its own head pointer and count for an author.
+    const byStream = new Map();
     for (const p of posts) {
-      const k = p.author.toLowerCase();
-      byAuthor.set(k, [...(byAuthor.get(k) ?? []), p]);
+      const k = streamKey(p.author, p.version);
+      byStream.set(k, [...(byStream.get(k) ?? []), p]);
     }
     chains.set(id, {
       id,
@@ -113,7 +127,7 @@ function scenario(name) {
       head: offset + world.head,
       posts,
       byTx,
-      byAuthor,
+      byStream,
       bodies: spec.empty ? new Map() : world.bodyByTx,
       txCache: new Map(),
       calls: [],
@@ -157,9 +171,11 @@ function blockOf(c, n) {
 }
 
 function logOf(c, p) {
+  const author = pad(p.author.toLowerCase(), { size: 32 });
   return {
-    address: GLYPH,
-    topics: [POST_SIG, pad(p.author.toLowerCase(), { size: 32 })],
+    address: contractOf(p),
+    // v2's event indexes the hook as well as the author.
+    topics: p.version === 2 ? [POST_V2_SIG, author, pad(p.hook ?? ZERO_ADDRESS, { size: 32 })] : [POST_SIG, author],
     data: encodeAbiParameters(
       [{ type: 'uint256' }, { type: 'uint256' }, { type: 'bytes32' }],
       [p.index, p.realPrev, titleHex(p.title)],
@@ -173,14 +189,17 @@ function logOf(c, p) {
   };
 }
 
+/** Who sent the transaction: the author, or the relayer of a relayed post. */
+const senderOf = (p) => (p.relayer ?? p.author).toLowerCase();
+
 function receiptOf(c, p) {
   return {
     transactionHash: p.txHash,
     transactionIndex: '0x0',
     blockHash: blockHash(c, p.realBlock),
     blockNumber: hex(p.realBlock),
-    from: p.author.toLowerCase(),
-    to: GLYPH,
+    from: senderOf(p),
+    to: contractOf(p),
     cumulativeGasUsed: '0x5208',
     gasUsed: '0x5208',
     contractAddress: null,
@@ -192,7 +211,11 @@ function receiptOf(c, p) {
   };
 }
 
-/** The publish() transaction: title + brotli(front matter + markdown) as calldata. */
+/**
+ * The publish transaction: title + brotli(front matter + markdown) as
+ * calldata, in whichever of the three call forms the post was sent —
+ * plain, through a hook, or relayed on the author's behalf.
+ */
 function txOf(c, p) {
   const key = p.txHash.toLowerCase();
   if (c.txCache.has(key)) return c.txCache.get(key);
@@ -201,21 +224,39 @@ function txOf(c, p) {
     markdown: body.markdown,
     meta: { ...(body.meta ?? {}), tags: body.tags },
   });
-  const payload = brotliCompressSync(Buffer.from(text, 'utf8'), {
-    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
-  });
+  const payload = toHex(
+    new Uint8Array(
+      brotliCompressSync(Buffer.from(text, 'utf8'), {
+        params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+      }),
+    ),
+  );
+  const call = body.call ?? null;
+  const title = titleHex(p.title);
+  let input;
+  if (call?.relayer) {
+    input = encodeFunctionData({
+      abi: abiV2,
+      functionName: 'publishFor',
+      args: [p.author.toLowerCase(), title, payload, call.hook ?? ZERO_ADDRESS, call.hookData ?? '0x', BigInt(call.deadline ?? 0), call.signature ?? '0x'],
+    });
+  } else if (call?.hook) {
+    input = encodeFunctionData({ abi: abiV2, functionName: 'publish', args: [title, payload, call.hook, call.hookData ?? '0x'] });
+  } else {
+    input = encodeFunctionData({ abi, functionName: 'publish', args: [title, payload] });
+  }
   const tx = {
     hash: p.txHash,
     nonce: '0x0',
     blockHash: blockHash(c, p.realBlock),
     blockNumber: hex(p.realBlock),
     transactionIndex: '0x0',
-    from: p.author.toLowerCase(),
-    to: GLYPH,
+    from: senderOf(p),
+    to: contractOf(p),
     value: '0x0',
     gas: '0x100000',
     gasPrice: '0x1',
-    input: encodeFunctionData({ abi, functionName: 'publish', args: [titleHex(p.title), toHex(new Uint8Array(payload))] }),
+    input,
     type: '0x0',
     chainId: hex(c.id),
     v: '0x1b',
@@ -253,16 +294,32 @@ function answer(c, method, params) {
       const from = tagToNumber(c, f.fromBlock ?? 'earliest');
       const to = tagToNumber(c, f.toBlock);
       if (to > c.head) throw rpcError(-32000, 'block range extends beyond current head block');
+      // A node honours the address list and the first topic: a reader of the
+      // v1 contract alone (the command-line tool) must not be handed v2 logs.
+      const lowerSet = (v) => (v == null ? null : new Set((Array.isArray(v) ? v : [v]).map((x) => String(x).toLowerCase())));
+      const wantAddress = lowerSet(f.address);
+      const wantTopic = lowerSet(f.topics?.[0]);
       return c.posts
         .filter((p) => p.realBlock >= from && p.realBlock <= to)
+        .filter((p) => !wantAddress || wantAddress.has(contractOf(p)))
+        .filter((p) => !wantTopic || wantTopic.has(topic0Of(p).toLowerCase()))
         .sort((a, b) => (a.realBlock === b.realBlock ? (a.logIndex ?? 0) - (b.logIndex ?? 0) : a.realBlock < b.realBlock ? -1 : 1))
         .map((p) => logOf(c, p));
+    }
+    case 'eth_getCode': {
+      const to = String(params[0] ?? '').toLowerCase();
+      return to === GLYPH || to === XUENI ? '0x6080604052' : '0x';
     }
     case 'eth_call': {
       const ens = ensCall(c, params[0]);
       if (ens !== undefined) return ens;
+      // Each contract answers for its own stream of the author; an address
+      // with no contract answers nothing, as a node does.
+      const to = String(params[0].to ?? '').toLowerCase();
+      const version = to === GLYPH ? 1 : to === XUENI ? 2 : null;
+      if (version == null) return '0x';
       const { functionName, args } = decodeFunctionData({ abi, data: params[0].data });
-      const list = c.byAuthor.get(String(args[0]).toLowerCase()) ?? [];
+      const list = c.byStream.get(streamKey(args[0], version)) ?? [];
       const v =
         functionName === 'latestBlock' ? (list.length ? list[list.length - 1].realBlock : 0n) : functionName === 'count' ? BigInt(list.length) : 0n;
       return encodeAbiParameters([{ type: 'uint256' }], [v]);
@@ -392,6 +449,10 @@ function oracleOf(s) {
       title: p.title,
       author: p.author,
       index: Number(p.index),
+      // Which contract, which hook, who relayed it — what the page must say.
+      version: p.version ?? 1,
+      hook: p.hook ?? null,
+      relayer: p.relayer ?? null,
       ts: p.ts,
       href: `/${CHAINS[p.chainId].slug}/tx/${p.txHash}/0`,
       probe: probeOf(c.bodies.get(p.txHash), p.title),
@@ -406,7 +467,8 @@ function oracleOf(s) {
     const byChain = {};
     let total = 0;
     for (const c of s.chains.values()) {
-      byChain[c.id] = (c.byAuthor.get(a.toLowerCase()) ?? []).length;
+      // Both contracts: the author page shows one total per chain.
+      byChain[c.id] = c.posts.filter((p) => p.author.toLowerCase() === a.toLowerCase()).length;
       total += byChain[c.id];
     }
     counts[a] = { total, byChain };

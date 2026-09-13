@@ -55,6 +55,14 @@ warnings, errors — so `xueni fetch … > letter.md` writes a file with nothing
 in it but the letter, even while the terminal shows what is happening.
 Failures exit 1.
 
+**Two contracts.** Since the second contract (hooks and `publishFor`,
+glyph-spec §4.1) an author has a list on each, and every reading command
+reads both and merges them by block, the way the web app does. A post on the
+second contract is marked `#<index>·v2` in a listing — an index is only an
+identity together with its contract — carries `version: 2` (and, where it
+applies, its `contract` and `hook`) in `--json`, and is exported as
+`….v2.md`. A chain without the second contract reads exactly as before.
+
 ## `xueni publish <file.md> --chain <chain>`
 
 Publish a Markdown file as a post.
@@ -168,6 +176,7 @@ Walk an author's list to its very end on every chain and write what it holds.
 
 ```
 <dir>/<chain>/<yyyy-mm-dd>-<index>-<title>.md    the exact stored text
+<dir>/<chain>/<yyyy-mm-dd>-<index>-<title>.v2.md a post on the second contract (index 0 exists on both)
 <dir>/<chain>/images/<txhash>.webp               the images those posts show
 <dir>/archive.xueni.json                         the bundle
 ```

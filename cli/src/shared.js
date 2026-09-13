@@ -18,13 +18,17 @@
 // so a change that makes one of them browser-only fails loudly in this
 // package instead of quietly at a user's terminal.
 
-export { abi, POST_EVENT } from '../../webapp/src/lib/abi.js';
+export { abi, abiV2, POST_EVENT, POST_EVENT_V2, POST_EVENTS, abiFor, postEventFor } from '../../webapp/src/lib/abi.js';
 export {
   CHAINS,
+  CONTRACT_VERSIONS,
   DEFAULT_GLYPH_ADDRESS,
+  DEFAULT_XUENI_ADDRESS,
+  DEFAULT_MULTI_HOOK_ADDRESS,
   SELECTABLE_CHAIN_IDS,
   chainFromSlug,
   chainSlug,
+  defaultContractAddress,
   defaultRpcs,
   getChain,
   isKnownChain,

@@ -31,8 +31,13 @@ export function bytesToBase64(bytes) {
   return Buffer.from(bytes).toString('base64');
 }
 
-/** A post as the bundle carries it: the row, plus the document itself. */
-export const archivePost = ({ chainId, row, body }) => ({
+/**
+ * A post as the bundle carries it: the row, plus the document itself. A
+ * post on the second contract also says which contract holds it and which
+ * hook it went through — the same three fields the web app writes, so a
+ * bundle from either side reads the same in the other.
+ */
+export const archivePost = ({ chainId, row, body, contract = null }) => ({
   chainId: Number(chainId),
   txHash: row.txHash,
   eventIndex: Number(row.eventIndex),
@@ -45,6 +50,13 @@ export const archivePost = ({ chainId, row, body }) => ({
   title: row.title,
   text: body.text,
   compressedBytes: Number(body.compressedBytes),
+  ...(Number(row.version ?? 1) === 1
+    ? {}
+    : {
+        version: Number(row.version),
+        contract: contract ? String(contract).toLowerCase() : null,
+        hook: row.hook ? String(row.hook).toLowerCase() : null,
+      }),
 });
 
 /** An image as the bundle carries it. */
@@ -64,11 +76,14 @@ export const archiveImage = ({ chainId, txHash, bytes }) => ({
  *
  * @param {{ contract: string, scope: object, posts: object[], images: object[], authors: object[] }} parts
  */
-export function buildArchive({ contract, scope, posts, images, authors, now = new Date() }) {
+export function buildArchive({ contract, contracts = null, scope, posts, images, authors, now = new Date() }) {
   return {
     glyph: { archive: ARCHIVE_FORMAT },
     exportedAt: now.toISOString(),
+    // `contract` names the journal (v1's address, which every reader
+    // checks); `contracts` names every contract a post here may live on.
     contract,
+    ...(contracts ? { contracts } : {}),
     scope,
     posts,
     images,

@@ -27,6 +27,25 @@ const taikoHoodi = {
  */
 export const DEFAULT_GLYPH_ADDRESS = '0x000000AE2f2249c497cfc5F262dd1491634C361C';
 
+/**
+ * The second contract — Xueni.sol: per-post hooks, and publishing on an
+ * author's behalf against their signature. Mined for the same proxy, so it
+ * too sits at one address on every chain. On a chain where it is not yet
+ * deployed, reading it finds nothing, which is exactly what an author with
+ * no v2 posts looks like; so every chain is read on both contracts always.
+ */
+export const DEFAULT_XUENI_ADDRESS = '0x0000008D02020df6bCDD56A888cFC9eD9b9053eC';
+
+/** The fan-out hook deployed beside v2 (contracts/src/hooks/MultiHook.sol). */
+export const DEFAULT_MULTI_HOOK_ADDRESS = '0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93';
+
+/** Every contract version a chain is read on, oldest first. */
+export const CONTRACT_VERSIONS = [1, 2];
+
+/** The built-in address of each version — plain Node's view of the deployment. */
+export const defaultContractAddress = (version) =>
+  Number(version) === 2 ? DEFAULT_XUENI_ADDRESS : DEFAULT_GLYPH_ADDRESS;
+
 export const CHAINS = {
   1: {
     id: 1,
