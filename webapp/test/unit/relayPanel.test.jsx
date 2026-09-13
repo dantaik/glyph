@@ -98,6 +98,36 @@ describe('RelayPanel', () => {
     expect(disabled()).toBe(false);
   });
 
+  it('a signature of another length than a wallet’s is only good for a contract account', async () => {
+    const signed = ticketFor({ signature: '0x12' });
+    // The author holds no code: a 1-byte signature can never be accepted.
+    render(<RelayPanel chainId={1} reader={{ hasCode: async () => false }} />);
+    paste(serializeTicket(signed));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('The signature is 1 byte long.'));
+    expect(disabled()).toBe(true);
+    cleanup();
+    // The author is a contract account: the contract will ask it (ERC-1271).
+    render(<RelayPanel chainId={1} reader={{ hasCode: async () => true }} />);
+    paste(serializeTicket(signed));
+    await waitFor(() => expect(document.querySelector('[data-relay-summary]').textContent).toContain('signed by a contract account'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(disabled()).toBe(false);
+    cleanup();
+    // While the chain is being asked, nothing is sent.
+    render(<RelayPanel chainId={1} reader={{ hasCode: () => new Promise(() => {}) }} />);
+    paste(serializeTicket(signed));
+    expect(document.querySelector('[data-relay-checking]')).toBeTruthy();
+    expect(disabled()).toBe(true);
+  });
+
+  it('a 64-byte compact signature is a wallet’s and needs no asking', () => {
+    render(<RelayPanel chainId={1} />);
+    paste(serializeTicket(ticketFor({ signature: `0x${'ab'.repeat(32)}${'cd'.repeat(32)}` })));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.querySelector('[data-relay-checking]')).toBeNull();
+    expect(disabled()).toBe(false);
+  });
+
   it('reads a ticket from a file', async () => {
     render(<RelayPanel chainId={1} />);
     const input = screen.getByLabelText('Choose a signed post file');

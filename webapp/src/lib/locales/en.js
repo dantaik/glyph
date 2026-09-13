@@ -574,6 +574,10 @@ Drop images into the area below or click to upload; click an image or its name t
   'relay.notTicket': 'This is not a signed post (the xueni.relay marker is missing).',
   'relay.wrongFormat': ({ format }) => `Signed post format ${format} is not supported.`,
   'relay.badField': ({ field }) => `The field ${field} is malformed.`,
+  'relay.signatureShape': ({ bytes }) =>
+    `The signature is ${bytes} byte${bytes === 1 ? '' : 's'} long. A wallet signs 64 or 65 bytes, and this author is not a contract account, so Xueni would refuse it.`,
+  'relay.contractSigned': 'signed by a contract account',
+  'relay.checkingAuthor': 'checking whether the author is a contract account…',
   'relay.unknownChain': ({ id }) => `Chain ${id} is not one this app reads.`,
   'relay.wrongContract': ({ contract }) => `This signed post is for a different contract (${contract}).`,
   'relay.send': 'Send it on-chain',

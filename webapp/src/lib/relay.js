@@ -30,6 +30,43 @@ const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 
 const lower = (s) => String(s ?? '').toLowerCase();
 
+/**
+ * A non-negative integer out of a number, a numeric string or a bigint,
+ * or null: JSON carries plain numbers, a file may carry anything, and a
+ * value past 2^53 would be read back wrong rather than refused.
+ */
+function intOf(value) {
+  if (typeof value === 'bigint') return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+  if (typeof value === 'string') {
+    if (!/^\d+$/.test(value.trim())) return null;
+  } else if (typeof value !== 'number') {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n >= 0 ? n : null;
+}
+
+/** As `intOf`, for values this module makes itself: a throw, not a null. */
+function safeInt(value, what) {
+  const n = intOf(value);
+  if (n == null) throw new RangeError(`${what} must be a non-negative safe integer, got ${String(value)}`);
+  return n;
+}
+
+/**
+ * What a signature's length says about who made it. A wallet key signs 65
+ * bytes (r, s, v) or 64 in the EIP-2098 compact form, and the contract
+ * checks those with ecrecover; any other length can only be a contract
+ * account's, which the contract asks through ERC-1271 and which is
+ * therefore only good if the author has code. `null` for what is not a
+ * signature at all: not hex, or empty.
+ */
+export function signatureKind(signature) {
+  const sig = String(signature ?? '');
+  if (!HEX_RE.test(sig) || sig.length < 4) return null;
+  return sig.length === 132 || sig.length === 130 ? 'wallet' : 'contract';
+}
+
 /** The name a ticket is offered under. */
 export const ticketFileName = (ticket) =>
   `xueni-signed-post-${lower(ticket.author).slice(2, 10)}-${Number(ticket.index)}.json`;
@@ -68,16 +105,16 @@ export const relayDigest = (fields) => hashTypedData(relayTypedData(fields));
 export function buildTicket({ chainId, contract, author, title, payload, hook, hookData, index, deadline, signature, value = 0n }) {
   return {
     xueni: { relay: TICKET_FORMAT },
-    chainId: Number(chainId),
+    chainId: safeInt(chainId, 'chainId'),
     contract: lower(contract),
     author: lower(author),
     title,
     titleText: decodeTitle(title),
     payload,
     hook: hook && lower(hook) !== ZERO_ADDRESS ? lower(hook) : null,
-    hookData: hookData && hookData !== '0x' ? hookData : '0x',
-    index: Number(index),
-    deadline: Number(deadline),
+    hookData: hookData && lower(hookData) !== '0x' ? hookData : '0x',
+    index: safeInt(index, 'index'),
+    deadline: safeInt(deadline, 'deadline'),
     signature,
     value: String(BigInt(value ?? 0)),
   };
@@ -109,24 +146,30 @@ export function parseTicket(text) {
 
   const problems = [];
   const bad = (field) => problems.push({ code: 'badField', field });
-  if (!Number.isInteger(Number(raw.chainId)) || Number(raw.chainId) <= 0) bad('chainId');
+  const chainId = intOf(raw.chainId);
+  const index = intOf(raw.index);
+  const deadline = intOf(raw.deadline);
+  if (chainId == null || chainId <= 0) bad('chainId');
   if (!ADDRESS_RE.test(String(raw.contract ?? ''))) bad('contract');
   if (!ADDRESS_RE.test(String(raw.author ?? ''))) bad('author');
   if (!BYTES32_RE.test(String(raw.title ?? ''))) bad('title');
   if (!HEX_RE.test(String(raw.payload ?? '')) || String(raw.payload).length < 4) bad('payload');
   if (raw.hook != null && !ADDRESS_RE.test(String(raw.hook))) bad('hook');
   if (raw.hookData != null && !HEX_RE.test(String(raw.hookData))) bad('hookData');
-  if (!Number.isInteger(Number(raw.index)) || Number(raw.index) < 0) bad('index');
-  if (!Number.isInteger(Number(raw.deadline)) || Number(raw.deadline) <= 0) bad('deadline');
+  if (index == null) bad('index');
+  if (deadline == null || deadline <= 0) bad('deadline');
+  // Hex and not empty is all a file can be held to: 64 and 65 bytes are a
+  // wallet's, anything else is a contract account's or nothing, and only
+  // the chain knows which (`signatureKind`, and the relay panel asks).
   const sig = String(raw.signature ?? '');
-  if (!HEX_RE.test(sig) || ![130, 132].includes(sig.length - 2) && sig.length < 4) bad('signature');
+  if (signatureKind(sig) == null) bad('signature');
   if (raw.value != null && !/^\d+$/.test(String(raw.value))) bad('value');
   if (problems.length) return { ticket: null, problems };
 
   return {
     ticket: {
       xueni: { relay: TICKET_FORMAT },
-      chainId: Number(raw.chainId),
+      chainId,
       contract: lower(raw.contract),
       author: lower(raw.author),
       title: lower(raw.title),
@@ -134,8 +177,8 @@ export function parseTicket(text) {
       payload: lower(raw.payload),
       hook: raw.hook ? lower(raw.hook) : null,
       hookData: raw.hookData ? lower(raw.hookData) : '0x',
-      index: Number(raw.index),
-      deadline: Number(raw.deadline),
+      index,
+      deadline,
       signature: lower(sig),
       value: String(raw.value ?? '0'),
     },

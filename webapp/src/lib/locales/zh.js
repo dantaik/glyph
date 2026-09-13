@@ -542,6 +542,10 @@ export default {
   'relay.notTicket': '这不是一篇已签名的文章（缺少 xueni.relay 标记）。',
   'relay.wrongFormat': ({ format }) => `不支持的已签名文章格式版本 ${format}。`,
   'relay.badField': ({ field }) => `字段 ${field} 格式有误。`,
+  'relay.signatureShape': ({ bytes }) =>
+    `签名长度为 ${bytes} 字节。钱包签名为 64 或 65 字节，而该作者并非合约账户，Xueni 会拒绝这份签名。`,
+  'relay.contractSigned': '由合约账户签名',
+  'relay.checkingAuthor': '正在确认作者是否为合约账户…',
   'relay.unknownChain': ({ id }) => `链 ${id} 不在本应用读取的链之列。`,
   'relay.wrongContract': ({ contract }) => `这篇已签名的文章属于另一份合约（${contract}）。`,
   'relay.send': '发送到链上',

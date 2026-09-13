@@ -14,6 +14,7 @@ import {
   relayDigest,
   relayTypedData,
   serializeTicket,
+  signatureKind,
   ticketExpired,
   ticketFileName,
 } from '../../src/lib/relay';
@@ -150,6 +151,44 @@ describe('the ticket', () => {
     expect(problems.map((p) => p.field)).toEqual(['author', 'title', 'deadline', 'signature']);
     expect(parseTicket(JSON.stringify({ ...ticket, hook: '0x12' })).problems).toEqual([{ code: 'badField', field: 'hook' }]);
     expect(parseTicket(JSON.stringify({ ...ticket, value: '1.5' })).problems).toEqual([{ code: 'badField', field: 'value' }]);
+  });
+
+  it('holds a signature to being hex and non-empty, and says whose shape it has', () => {
+    const withSig = (signature) => parseTicket(JSON.stringify({ ...ticket, signature }));
+    const badSig = [{ code: 'badField', field: 'signature' }];
+    expect(withSig('').problems).toEqual(badSig);
+    expect(withSig('0x').problems).toEqual(badSig);
+    expect(withSig('0xabc').problems).toEqual(badSig);
+    expect(withSig('nope').problems).toEqual(badSig);
+    // 65 bytes (r, s, v) and the 64-byte EIP-2098 form are a wallet's, and
+    // the contract checks them with ecrecover.
+    const compact = `0x${'ab'.repeat(32)}${'cd'.repeat(32)}`;
+    expect(withSig(compact).problems).toEqual([]);
+    expect(withSig(compact).ticket.signature).toBe(compact);
+    expect(signatureKind(compact)).toBe('wallet');
+    expect(signatureKind(SIG)).toBe('wallet');
+    // Any other length only a contract account can have made (ERC-1271), so
+    // it parses, and the caller is told to ask the chain who the author is.
+    expect(withSig('0x12').problems).toEqual([]);
+    expect(signatureKind('0x12')).toBe('contract');
+    expect(signatureKind(`0x${'ab'.repeat(66)}`)).toBe('contract');
+    expect(signatureKind(`0x${'ab'.repeat(96)}`)).toBe('contract');
+    expect(signatureKind('')).toBeNull();
+    expect(signatureKind('0x')).toBeNull();
+    expect(signatureKind('nope')).toBeNull();
+  });
+
+  it('refuses numbers a file cannot carry exactly, and reads the ones it can', () => {
+    const at = (over) => parseTicket({ ...ticket, ...over });
+    expect(at({ index: 2 ** 53 }).problems).toEqual([{ code: 'badField', field: 'index' }]);
+    expect(at({ index: '9007199254740993' }).problems).toEqual([{ code: 'badField', field: 'index' }]);
+    expect(at({ deadline: 1.5 }).problems).toEqual([{ code: 'badField', field: 'deadline' }]);
+    expect(at({ chainId: '' }).problems).toEqual([{ code: 'badField', field: 'chainId' }]);
+    expect(at({ index: '' }).problems).toEqual([{ code: 'badField', field: 'index' }]);
+    expect(at({ index: true }).problems).toEqual([{ code: 'badField', field: 'index' }]);
+    expect(at({ index: '7', deadline: 1_900_000_000n }).ticket).toMatchObject({ index: 7, deadline: 1_900_000_000 });
+    expect(() => buildTicket({ ...fields, signature: SIG, index: 2n ** 53n })).toThrow(RangeError);
+    expect(() => buildTicket({ ...fields, signature: SIG, deadline: -1 })).toThrow(RangeError);
   });
 
   it('knows when it has expired, and how long a fresh one lasts', () => {

@@ -199,6 +199,9 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
   const isDeployed = (version) =>
     io.isDeployed ? io.isDeployed(version) : Promise.resolve(Number(version) === 1);
 
+  /** Whether an address is a contract account (holds code) on this chain. */
+  const hasCode = (address) => (io.hasCode ? io.hasCode(address) : Promise.resolve(false));
+
   // The last day of base fees, sampled from block headers. Held for ten
   // minutes: the shape of a day does not change by the minute, and this is
   // two dozen header reads.
@@ -368,6 +371,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     countOf,
     versions,
     isDeployed,
+    hasCode,
     clock,
     blockTime,
     ensName,

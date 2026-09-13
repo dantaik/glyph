@@ -84,7 +84,9 @@ chain, so nothing moves and nothing needs migrating.
 **Relaying (`publishFor`)**: "Sign for a relayer instead" signs the post with the wallet (EIP-712, no
 transaction, no gas) and produces a **ticket** — one small JSON file naming the chain, the contract, the
 post, the hook, the deadline you chose (1, 7 or 30 days) and the signature. Anyone can paste or open
-that file in the "Relay a signed post" panel at the foot of their own Write tab and send it; it lands
+that file in the "Relay a signed post" panel at the foot of their own Write tab and send it — the panel
+checks the file's shape, its chain and contract, its deadline and, for a signature that is not the 64
+or 65 bytes a wallet key makes, that the author is a contract account, before anything goes out; it lands
 under your address, as your next post, and the post page says who sent it on your behalf. A ticket is
 for one specific post number, so publishing anything yourself in the meantime cancels it.
 **Tags and search**: a tag on a row or under a post opens `/tag/<name>`, and the magnifier in the

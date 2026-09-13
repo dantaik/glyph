@@ -117,6 +117,12 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
       return true;
     },
 
+    /** The demo world's authors are all keys; nothing but the contracts has code. */
+    async hasCode() {
+      await wait();
+      return false;
+    },
+
     async postsInTx(txHash) {
       await wait();
       const p = metaByTx.get(String(txHash).toLowerCase());

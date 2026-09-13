@@ -258,6 +258,18 @@ export function createChainIO(chainId, log) {
     return hit;
   }
 
+  /** Whether an address holds code: a contract account, as against a key. */
+  function hasCode(address) {
+    return log
+      .fromNode(
+        'eth_getCode',
+        short(address),
+        () => client().getCode({ address }),
+        (code) => (code && code !== '0x' ? 'a contract account' : 'no code'),
+      )
+      .then((code) => Boolean(code && code !== '0x'));
+  }
+
   /** One contract's view of an author, or 0 where the contract is not deployed. */
   function authorView(functionName, author, version) {
     const v = Number(version);
@@ -400,6 +412,7 @@ export function createChainIO(chainId, log) {
     },
 
     isDeployed,
+    hasCode,
 
     /**
      * Every Post event a transaction emitted, in log order, from either

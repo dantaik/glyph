@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { contractAddress, isReadChain } from '../lib/config';
 import { chainName, etherscanTxUrl, fmtAbsTime, shortAddr } from '../lib/format';
 import { hookInfo } from '../lib/hookRegistry';
 import { useT } from '../lib/i18n';
 import { fmtEth } from '../lib/price';
 import { relayTicket } from '../lib/publish';
-import { parseTicket, ticketExpired } from '../lib/relay';
+import { parseTicket, signatureKind, ticketExpired } from '../lib/relay';
 import { BTN_OUTLINE, BTN_PRIMARY } from './formStyles';
 import { AlertCircle, Check, ExternalLink } from './Icons';
 import { Meta, Note } from './Text';
@@ -14,12 +14,15 @@ import { Meta, Note } from './Text';
  * Relay a post somebody else signed: paste the ticket (or open its file),
  * see what it is, send it. The connected wallet pays; the post is recorded
  * under the author who signed it. The ticket is checked for shape, for the
- * chain and contract this build knows, and for its deadline — and nothing
- * in it can be altered here, because the signature covers all of it.
+ * chain and contract this build knows, for its deadline, and — where the
+ * signature is not the 64 or 65 bytes a wallet key makes — for the author
+ * being a contract account, since only one of those can have made it. Nothing
+ * in the ticket can be altered here, because the signature covers all of it.
  *
- * Props: { chainId (the publish target), disabled }
+ * Props: { chainId (the publish target), reader (the target chain's, for the
+ *          code check), disabled }
  */
-export default function RelayPanel({ chainId, disabled = false }) {
+export default function RelayPanel({ chainId, reader = null, disabled = false }) {
   const t = useT();
   const [text, setText] = useState('');
   const [status, setStatus] = useState('idle'); // idle | sending | done | error
@@ -30,7 +33,25 @@ export default function RelayPanel({ chainId, disabled = false }) {
   const parsed = useMemo(() => (text.trim() ? parseTicket(text) : null), [text]);
   const ticket = parsed?.ticket ?? null;
 
-  // What the parser cannot know: which chains and contracts this app reads.
+  // A signature of another length than a wallet's is a contract account's
+  // or nobody's; the chain says which. `undefined` = asking, `null` = could
+  // not ask (the contract is the judge then), boolean = the answer.
+  const contractSigned = Boolean(ticket) && signatureKind(ticket.signature) === 'contract';
+  const [authorHasCode, setAuthorHasCode] = useState(undefined);
+  useEffect(() => {
+    if (!contractSigned) return undefined;
+    let cancelled = false;
+    setAuthorHasCode(undefined);
+    Promise.resolve(reader?.hasCode ? reader.hasCode(ticket.author) : null)
+      .then((code) => !cancelled && setAuthorHasCode(code == null ? null : Boolean(code)))
+      .catch(() => !cancelled && setAuthorHasCode(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [contractSigned, reader, ticket?.author]);
+
+  // What the parser cannot know: which chains and contracts this app reads,
+  // and who the author is.
   const problems = useMemo(() => {
     if (!parsed) return [];
     const out = parsed.problems.map((p) => {
@@ -44,11 +65,15 @@ export default function RelayPanel({ chainId, disabled = false }) {
       out.push(t('relay.wrongContract', { contract: ticket.contract }));
     }
     if (ticketExpired(ticket)) out.push(t('relay.expired'));
+    if (contractSigned && authorHasCode === false) {
+      out.push(t('relay.signatureShape', { bytes: (ticket.signature.length - 2) / 2 }));
+    }
     return out;
-  }, [parsed, ticket, t]);
+  }, [parsed, ticket, t, contractSigned, authorHasCode]);
 
   const wrongChain = ticket && isReadChain(ticket.chainId) && Number(ticket.chainId) !== Number(chainId);
-  const canSend = Boolean(ticket) && problems.length === 0 && !wrongChain && status !== 'sending' && !disabled;
+  const checking = contractSigned && authorHasCode === undefined;
+  const canSend = Boolean(ticket) && problems.length === 0 && !wrongChain && !checking && status !== 'sending' && !disabled;
 
   const openFile = async (file) => {
     if (!file) return;
@@ -132,6 +157,8 @@ export default function RelayPanel({ chainId, disabled = false }) {
             )}
           </div>
           {wrongChain && <div className="text-danger">{t('relay.wrongChain', { chain: chainName(ticket.chainId) })}</div>}
+          {contractSigned && authorHasCode === true && <div>{t('relay.contractSigned')}</div>}
+          {checking && <div data-relay-checking="">{t('relay.checkingAuthor')}</div>}
         </Meta>
       )}
 

@@ -886,7 +886,7 @@ export default function Publisher() {
 
       {v2Ready === true && (
         <div className="mt-12">
-          <RelayPanel chainId={chainId} disabled={inFlight} />
+          <RelayPanel chainId={chainId} reader={reader} disabled={inFlight} />
           <Note className="mt-2">{t('relay.note')}</Note>
         </div>
       )}

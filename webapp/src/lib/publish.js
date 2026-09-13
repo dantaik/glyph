@@ -279,7 +279,7 @@ export async function publishPost({
   const { wallet, account } = await getWallet(chainId);
   const payload = await encodePayload({ tags, markdown, meta });
   const titleHex = encodeTitle(title);
-  const hooked = (hook && hook.toLowerCase() !== ZERO_ADDRESS) || (hookData && hookData !== '0x');
+  const hooked = (hook && hook.toLowerCase() !== ZERO_ADDRESS) || (hookData && String(hookData).toLowerCase() !== '0x');
   if (Number(version) !== 2) {
     if (hooked || BigInt(value ?? 0) !== 0n) throw new Error('hooks need the v2 contract');
     return wallet.writeContract({
