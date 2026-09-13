@@ -7,14 +7,21 @@
 //
 // Every call goes through the chain's client of the moment (clients.js), so
 // an edited endpoint list applies to the next request, even mid-sweep.
+//
+// One chain, two contracts. Logs are asked for from both addresses in one
+// request (eth_getLogs takes a list), and every row says which contract it
+// came from; the head pointer and the count are per contract, because an
+// author has a list on each. On a chain where v2 is not deployed yet, its
+// logs are simply absent and its two views answer no data, which reads as
+// "never published there" — so nothing has to be configured when it lands.
 
 import { decodeEventLog, decodeFunctionData, hexToBytes, zeroAddress } from 'viem';
 import { normalize } from 'viem/ens';
-import { abi, POST_EVENT } from './abi';
+import { POST_EVENTS, abiFor, abiV2 } from './abi';
 import { mapLimit } from './async';
 import { getChain } from './chains';
 import { getClient } from './clients';
-import { GLYPH_ADDRESS } from './config';
+import { CONTRACTS, contractAddress, contractVersionOf } from './config';
 import { decodeTitle } from './title';
 import { decodePayload } from './payload';
 import { shortAddr } from './format';
@@ -42,6 +49,10 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
 
 const ZERO_ADDRESS = zeroAddress;
 
+/** The addresses read on every chain, and the versions they are. */
+const ADDRESSES = CONTRACTS.map((c) => c.address);
+const VERSIONS = CONTRACTS.map((c) => c.version);
+
 /**
  * ENS names are normalised before they are hashed (UTS-46 plus ENSIP-15), so
  * "Xiaoman.ETH" and "xiaoman.eth" are the same name. A name that cannot be
@@ -63,6 +74,16 @@ const isBeyondHead = (err) =>
     errorText(err),
   );
 
+/**
+ * A view called on an address with no code at it: the node answers `0x`
+ * and viem refuses to decode nothing. That is what a contract not yet
+ * deployed on this chain looks like, and it means "no posts here".
+ */
+const isNoContract = (err) =>
+  err?.cause?.name === 'ContractFunctionZeroDataError' ||
+  err?.name === 'ContractFunctionZeroDataError' ||
+  /returned no data|"0x"/i.test(errorText(err));
+
 /** How many times to lower the window top before giving up on it. */
 const HEAD_RETRIES = 3;
 
@@ -83,7 +104,8 @@ function tagRangeError(err) {
 /**
  * One transaction can publish several posts (e.g. a multicall), so a
  * txHash is not a unique post id. Tag each Post log with its 0-based
- * ordinal among the Post events of its transaction (by logIndex order).
+ * ordinal among the Post events of its transaction (by logIndex order),
+ * whichever contract emitted them.
  */
 function assignEventIndexes(logs) {
   const byTx = new Map();
@@ -101,6 +123,15 @@ function assignEventIndexes(logs) {
   return logs;
 }
 
+/** Which contract a log came from. A log with no address (a test double) is v1's. */
+const versionOf = (log) => (log.address == null ? 1 : contractVersionOf(log.address));
+
+const hookOf = (args) => {
+  const hook = args?.hook;
+  if (!hook || String(hook).toLowerCase() === ZERO_ADDRESS) return null;
+  return String(hook).toLowerCase();
+};
+
 function logToMeta(log, block) {
   return {
     author: log.args.author,
@@ -115,6 +146,8 @@ function logToMeta(log, block) {
     // The block's timestamp (seconds) when the node put it on the log
     // (geth ≥ 1.14 and Erigon do); otherwise looked up, see withTimes().
     ts: log.blockTimestamp != null ? Number(log.blockTimestamp) : null,
+    version: versionOf(log) ?? 1,
+    hook: hookOf(log.args),
   };
 }
 
@@ -127,6 +160,28 @@ const short = (s) => `${String(s).slice(0, 10)}…`;
  * lowercase is the same address and passes, so that is what goes out.
  */
 const addrArg = (a) => String(a).toLowerCase();
+
+/**
+ * What a publish transaction's calldata says beyond the payload: which of
+ * the three calls it was, the hook and its data, and for a relayed post the
+ * author of record, the deadline and the signature.
+ */
+function describeCall(decoded) {
+  const { functionName, args } = decoded;
+  if (functionName === 'publishFor') {
+    return {
+      form: 'publishFor',
+      payload: args[2],
+      hook: hookOf({ hook: args[3] }),
+      hookData: args[4],
+      relayed: { author: String(args[0]).toLowerCase(), deadline: String(args[5]), signature: args[6] },
+    };
+  }
+  if (args.length >= 4) {
+    return { form: 'publishWithHook', payload: args[1], hook: hookOf({ hook: args[2] }), hookData: args[3], relayed: null };
+  }
+  return { form: 'publish', payload: args[1], hook: null, hookData: '0x', relayed: null };
+}
 
 /**
  * The real chain I/O for `chainId`. `log` is the chain's rpcLog.scoped().
@@ -177,10 +232,62 @@ export function createChainIO(chainId, log) {
     return rows;
   }
 
+  /** Whether a contract version has code on this chain — once per page. */
+  const deployed = new Map(); // version -> Promise<boolean>
+  function isDeployed(version) {
+    const v = Number(version);
+    let hit = deployed.get(v);
+    if (!hit) {
+      const address = contractAddress(v);
+      hit = address
+        ? log
+            .fromNode(
+              'eth_getCode',
+              `contract v${v}`,
+              () => client().getCode({ address }),
+              (code) => (code && code !== '0x' ? 'deployed' : 'not deployed'),
+            )
+            .then((code) => Boolean(code && code !== '0x'))
+            .catch((err) => {
+              deployed.delete(v); // ask again next time
+              throw err;
+            })
+        : Promise.resolve(false);
+      deployed.set(v, hit);
+    }
+    return hit;
+  }
+
+  /** One contract's view of an author, or 0 where the contract is not deployed. */
+  function authorView(functionName, author, version) {
+    const v = Number(version);
+    const address = contractAddress(v);
+    if (!address) return Promise.resolve(0n);
+    return log.fromNode(
+      `${functionName}()`,
+      `author ${shortAddr(author)} · v${v}`,
+      () =>
+        client()
+          .readContract({
+            address,
+            abi: abiFor(v),
+            functionName,
+            args: [addrArg(author)],
+          })
+          .catch((err) => {
+            if (isNoContract(err)) return 0n;
+            throw err;
+          }),
+      (n) => (functionName === 'count' ? `${n} posts` : `block ${log.b(n)}`),
+    );
+  }
+
   const io = {
     chainId: id,
     /** False: what this reads is worth keeping in IndexedDB. */
     ephemeral: false,
+    /** The contract versions every read here covers. */
+    versions: VERSIONS,
 
     /** The node's current head. */
     blockNumber() {
@@ -213,10 +320,10 @@ export function createChainIO(chainId, log) {
     },
 
     /**
-     * Every Post event in `[from, to]`, all authors. Returns the top block
-     * actually read: when the node hasn't seen `to` yet the window is
-     * retried one block shorter, up to HEAD_RETRIES times, and the caller
-     * claims coverage only up to what came back.
+     * Every Post event in `[from, to]`, all authors, both contracts. Returns
+     * the top block actually read: when the node hasn't seen `to` yet the
+     * window is retried one block shorter, up to HEAD_RETRIES times, and the
+     * caller claims coverage only up to what came back.
      */
     async postsInRange(from, to) {
       const bottom = BigInt(from);
@@ -229,8 +336,8 @@ export function createChainIO(chainId, log) {
             () =>
               withRetry(() =>
                 client().getLogs({
-                  address: GLYPH_ADDRESS,
-                  event: POST_EVENT,
+                  address: ADDRESSES,
+                  events: POST_EVENTS,
                   fromBlock: bottom,
                   toBlock: top,
                 }),
@@ -251,7 +358,7 @@ export function createChainIO(chainId, log) {
       }
     },
 
-    /** `author`'s Post events in one block. */
+    /** `author`'s Post events in one block, on every contract. */
     async authorPostsInBlock(author, block) {
       // Block heights must reach viem as bigints — it hex-encodes bigints and
       // passes anything else through verbatim, so a plain number would go out
@@ -263,8 +370,8 @@ export function createChainIO(chainId, log) {
         () =>
           withRetry(() =>
             client().getLogs({
-              address: GLYPH_ADDRESS,
-              event: POST_EVENT,
+              address: ADDRESSES,
+              events: POST_EVENTS,
               fromBlock: at,
               toBlock: at,
             }),
@@ -282,41 +389,22 @@ export function createChainIO(chainId, log) {
       );
     },
 
-    /** The block holding `author`'s newest post (0 when they have none). */
-    latestBlock(author) {
-      return log.fromNode(
-        'latestBlock()',
-        `author ${shortAddr(author)}`,
-        () =>
-          client().readContract({
-            address: GLYPH_ADDRESS,
-            abi,
-            functionName: 'latestBlock',
-            args: [addrArg(author)],
-          }),
-        (head) => `block ${log.b(head)}`,
-      );
+    /** The block holding `author`'s newest post on one contract (0 when they have none there). */
+    latestBlock(author, version = 1) {
+      return authorView('latestBlock', author, version);
     },
 
-    /** How many posts `author` has published. */
-    count(author) {
-      return log.fromNode(
-        'count()',
-        `author ${shortAddr(author)}`,
-        () =>
-          client().readContract({
-            address: GLYPH_ADDRESS,
-            abi,
-            functionName: 'count',
-            args: [addrArg(author)],
-          }),
-        (c) => `${c} posts`,
-      );
+    /** How many posts `author` has published on one contract. */
+    count(author, version = 1) {
+      return authorView('count', author, version);
     },
+
+    isDeployed,
 
     /**
-     * Every Post event a transaction emitted, in log order — one receipt
-     * read, no scanning. Empty when the transaction published nothing.
+     * Every Post event a transaction emitted, in log order, from either
+     * contract — one receipt read, no scanning. Empty when the transaction
+     * published nothing.
      */
     async postsInTx(txHash) {
       const receipt = await log.fromNode(
@@ -327,22 +415,23 @@ export function createChainIO(chainId, log) {
       );
       const posts = [];
       for (const entry of receipt.logs) {
-        if (entry.address.toLowerCase() !== GLYPH_ADDRESS.toLowerCase()) continue;
+        const version = contractVersionOf(entry.address);
+        if (version == null) continue;
         try {
           const decoded = decodeEventLog({
-            abi,
+            abi: abiFor(version),
             eventName: 'Post',
             data: entry.data,
             topics: entry.topics,
           });
-          posts.push({ log: entry, args: decoded.args });
+          posts.push({ log: entry, args: decoded.args, version });
         } catch {
           continue; // some other event from the same contract
         }
       }
       posts.sort((a, b) => a.log.logIndex - b.log.logIndex);
       const ts = posts.length ? await blockTs(receipt.blockNumber) : null;
-      return posts.map(({ log: entry, args }, i) => ({
+      return posts.map(({ log: entry, args, version }, i) => ({
         author: args.author,
         index: args.index,
         block: receipt.blockNumber,
@@ -352,14 +441,21 @@ export function createChainIO(chainId, log) {
         eventIndex: i,
         logIndex: entry.logIndex,
         ts,
+        version,
+        hook: hookOf(args),
       }));
     },
 
     /**
-     * The body of a post, decoded from its publish() transaction's calldata:
-     * `{ meta, tags, markdown, text, compressedBytes }`. `text` is the exact
-     * document the chain holds (the raw view, a `.md` download and an archive
-     * all carry it verbatim) and `compressedBytes` is what it cost to store.
+     * The body of a post, decoded from its publish transaction's calldata:
+     * `{ meta, tags, markdown, text, compressedBytes, form, hook, hookData,
+     * relayed, sender }`. `text` is the exact document the chain holds (the
+     * raw view, a `.md` download and an archive all carry it verbatim) and
+     * `compressedBytes` is what it cost to store. `form` is which of the
+     * three calls carried it; `hook` and `hookData` (hex) say which hook the
+     * post went through; `relayed` names the author of record, the deadline
+     * and the signature of a post somebody else submitted; `sender` is the
+     * account that sent the transaction.
      */
     async postBody(txHash) {
       const tx = await log.fromNode(
@@ -368,10 +464,19 @@ export function createChainIO(chainId, log) {
         () => client().getTransaction({ hash: txHash }),
         (t) => `${log.b((t.input.length - 2) / 2)} bytes calldata`,
       );
-      const decoded = decodeFunctionData({ abi, data: tx.input });
-      const bytes = hexToBytes(decoded.args[1]);
+      // v2's ABI decodes every form, v1's plain call included (same selector).
+      const call = describeCall(decodeFunctionData({ abi: abiV2, data: tx.input }));
+      const bytes = hexToBytes(call.payload);
       const body = await decodePayload(bytes);
-      return { ...body, compressedBytes: bytes.length };
+      return {
+        ...body,
+        compressedBytes: bytes.length,
+        form: call.form,
+        hook: call.hook,
+        hookData: call.hookData,
+        relayed: call.relayed,
+        sender: tx.from ? String(tx.from).toLowerCase() : null,
+      };
     },
 
     /** The raw bytes an image transaction carries as calldata. */

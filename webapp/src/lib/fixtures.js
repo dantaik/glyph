@@ -13,14 +13,15 @@
 // genuinely different chains. `?window=700` shrinks the getLogs window so a
 // sweep takes several round trips — the way to watch posts arrive one window
 // at a time; `?fixtures=1&window=700&log=1` shows it in the console.
+//
+// Both contracts are "deployed" here: an author's list on v2 is its own
+// stream with its own head, as on chain.
 
-import { ENS_RECORDS, buildWorld, ensAddressOf, ensNameOf } from './fixtureWorld';
+import { ENS_RECORDS, buildWorld, ensAddressOf, ensNameOf, streamKey } from './fixtureWorld';
 import { buildPayloadText, parsePayloadText } from './payloadText';
 
 const DELAY_MIN_MS = 350;
 const DELAY_SPAN_MS = 250;
-
-const keyOf = (author) => String(author || '').toLowerCase();
 
 /** Window size override from `?window=N`, else the chain's default. */
 function windowOverride() {
@@ -39,13 +40,14 @@ function windowOverride() {
  * Options (tests): `now` pins the head block's time; `delay` is the
  * artificial latency per call in ms (the demo's 350–600 ms by default, 0
  * in tests); `legacyRows` hands out rows without `ts`, the way rows
- * persisted before timestamps existed look; `scale` is buildWorld's.
+ * persisted before timestamps existed look; `scale` and `v2` are
+ * buildWorld's — with `v2` the second contract is read too, as on chain.
  */
-export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false, scale = 1 } = {}) {
-  const world = buildWorld(chainId, { now, scale });
+export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false, scale = 1, v2 = false } = {}) {
+  const world = buildWorld(chainId, { now, scale, v2 });
   const empty = mode === 'empty';
   const feed = empty ? [] : world.posts;
-  const postsOf = (author) => (empty ? [] : (world.byAuthor.get(keyOf(author)) ?? []));
+  const postsOf = (author, version = 1) => (empty ? [] : (world.byStream.get(streamKey(author, version)) ?? []));
   const metaByTx = empty ? new Map() : world.metaByTx;
   const bodyByTx = empty ? new Map() : world.bodyByTx;
   const wait =
@@ -55,8 +57,9 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
           new Promise((resolve) =>
             setTimeout(resolve, delay ?? DELAY_MIN_MS + Math.random() * DELAY_SPAN_MS),
           );
-  // What chainIO hands out: a copy, with the block's timestamp attached.
-  const meta = (p) => ({ ...p, ts: legacyRows ? null : p.ts });
+  // What chainIO hands out: a copy, with the block's timestamp attached and
+  // without the demo's own bookkeeping (who relayed it is the body's to say).
+  const meta = ({ relayer: _relayer, ...p }) => ({ ...p, ts: legacyRows ? null : p.ts });
 
   return {
     chainId: world.chainId,
@@ -67,6 +70,8 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
     windowSize: windowOverride(),
     /** Per-sweep budget, when the world sets one (Taiko's is small on purpose). */
     scanBlocks: world.scanBlocks,
+    /** Both contracts, as the real chain I/O reads them — or v1 alone for a v1 world. */
+    versions: v2 ? [1, 2] : [1],
     /** The world behind this I/O, for tests and the /scan page. */
     world,
 
@@ -89,23 +94,27 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
       return { rows: feed.filter((p) => p.block >= lo && p.block <= hi).map(meta), to: hi };
     },
 
+    /** `author`'s posts in one block, on every contract. */
     async authorPostsInBlock(author, block) {
       await wait();
       const at = BigInt(block);
-      return postsOf(author)
-        .filter((p) => p.block === at)
-        .map(meta);
+      return [...postsOf(author, 1), ...postsOf(author, 2)].filter((p) => p.block === at).map(meta);
     },
 
-    async latestBlock(author) {
+    async latestBlock(author, version = 1) {
       await wait();
-      const posts = postsOf(author);
+      const posts = postsOf(author, version);
       return posts.length ? posts[posts.length - 1].block : 0n;
     },
 
-    async count(author) {
+    async count(author, version = 1) {
       await wait();
-      return BigInt(postsOf(author).length);
+      return BigInt(postsOf(author, version).length);
+    },
+
+    async isDeployed() {
+      await wait();
+      return true;
     },
 
     async postsInTx(txHash) {
@@ -117,17 +126,32 @@ export function createFixtureIO(chainId, mode, { now, delay, legacyRows = false,
     async postBody(txHash) {
       await wait();
       const body = bodyByTx.get(txHash);
-      if (!body) throw new Error('no such transaction in the demo data');
+      const post = metaByTx.get(String(txHash).toLowerCase());
+      if (!body || !post) throw new Error('no such transaction in the demo data');
       // Built and re-parsed through the real text layer, so the demo body
       // carries the same `text` and front-matter the chain would.
       const text = buildPayloadText({
         markdown: body.markdown,
         meta: { ...(body.meta ?? {}), tags: body.tags },
       });
+      const call = body.call ?? null;
+      const hook = call?.hook ? String(call.hook).toLowerCase() : null;
+      const relayed = call?.relayer
+        ? {
+            author: String(post.author).toLowerCase(),
+            deadline: String(call.deadline ?? 0),
+            signature: call.signature ?? '0x',
+          }
+        : null;
       return {
         ...parsePayloadText(text),
         text,
         compressedBytes: Math.ceil(new TextEncoder().encode(text).length * 0.45),
+        form: relayed ? 'publishFor' : hook ? 'publishWithHook' : 'publish',
+        hook,
+        hookData: call?.hookData ?? '0x',
+        relayed,
+        sender: String(call?.relayer ?? post.author).toLowerCase(),
       };
     },
 

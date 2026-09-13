@@ -9,20 +9,26 @@
 //
 //     npm run vectors
 //
-// The posts themselves are kept in the file, so they are the input here.
+// The posts themselves are kept in the file, so they are the input here. A
+// vector with a `call` — `{ hook, hookData }`, or `{ relayed: { author,
+// deadline, signature } }` — is written in that call form.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { encodePost } from '../src/node.js';
+import { PUBLISH_FOR_SELECTOR, PUBLISH_SELECTOR, PUBLISH_WITH_HOOK_SELECTOR, encodePost, encodeRelayedPost } from '../src/node.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const path = join(here, '..', 'test', 'vectors.json');
 const file = JSON.parse(readFileSync(path, 'utf8'));
 
-file.vectors = file.vectors.map(({ name, post }) => {
-  const { title, text, callData, payload } = encodePost(post);
-  return { name, post, title, text, compressedBytes: payload.length, callData };
+file.selectors = { publish: PUBLISH_SELECTOR, publishWithHook: PUBLISH_WITH_HOOK_SELECTOR, publishFor: PUBLISH_FOR_SELECTOR };
+file.vectors = file.vectors.map(({ name, post, call }) => {
+  const enc = call?.relayed
+    ? encodeRelayedPost(post, { ...call.relayed, hook: call.hook ?? null, hookData: call.hookData ?? null })
+    : encodePost(post, { hook: call?.hook ?? null, hookData: call?.hookData ?? null });
+  const { title, text, callData, payload } = enc;
+  return { name, post, ...(call ? { call } : {}), title, text, compressedBytes: payload.length, callData };
 });
 file.generatedWith = { node: process.version };
 writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`);

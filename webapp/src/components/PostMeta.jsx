@@ -6,14 +6,16 @@ import { Meta } from './Text';
 /**
  * The shared meta line for article rows and the featured entry:
  *
- *   [lead] · [chain] · [prefix] · [time]
+ *   [lead] · [chain] · [prefix] · [time] · [extra…]
  *
  * `lead` is e.g. the author link, `prefix` e.g. the post's ordinal. The
  * chain chip names the network the post was read on and links to that
  * network's view — unless the list is already filtered to it
  * (`currentChain`), when it is just a label. The time is exact when the
  * row carries its block's timestamp (`ts`), an estimate from the chain
- * clock — marked approximate — until it does.
+ * clock — marked approximate — until it does. `extra` is whatever else a
+ * row wants to say after the time: a mark for a post that went through a
+ * hook, say.
  */
 export default function PostMeta({
   block,
@@ -25,6 +27,7 @@ export default function PostMeta({
   prefix,
   className = '',
   lead,
+  extra = [],
 }) {
   const exact = ts != null;
   const date = exact ? new Date(Number(ts) * 1000) : estimateBlockTime(clock, block);
@@ -36,6 +39,7 @@ export default function PostMeta({
     ),
     prefix && <span className="text-ink-ghost">{prefix}</span>,
     rel && <span title={exact ? fmtAbsTime(ts) : undefined}>{rel}</span>,
+    ...extra,
   ].filter(Boolean);
   return (
     <Meta as="span" nums className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>

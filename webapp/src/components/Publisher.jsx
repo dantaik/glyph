@@ -4,6 +4,7 @@ import {
   hashProcessedImage,
   nextImageKeys,
   publishPost,
+  signRelayTicket,
   usedImageKeys,
   measurePayload,
   MAX_CALLDATA_BYTES,
@@ -16,17 +17,21 @@ import { resolvePublishChain, savePublishChainId, usePublishChainId } from '../l
 import { useWallet } from '../lib/wallet';
 import { chainName, etherscanTxUrl, fmtRelTime } from '../lib/format';
 import { clearDraft, isEmptyDraft, loadDraft, saveDraft, takePendingDraftPatch } from '../lib/drafts';
+import { emptyHookConfig, resolveHookConfig } from '../lib/hookRegistry';
 import { t, useLang } from '../lib/i18n';
 import { Check, AlertCircle, Close, ExternalLink } from './Icons';
 import ImageUploader from './ImageUploader';
 import ImportMarkdown from './ImportMarkdown';
 import RelationsFields from './RelationsFields';
+import HookFields from './HookFields';
+import RelayPanel from './RelayPanel';
+import RelayTicketView from './RelayTicketView';
 import CostPanel from './CostPanel';
 import SectionHeader from './SectionHeader';
 import EditorSkeleton from './EditorSkeleton';
 import WalletPanel from './WalletPanel';
-import { BTN_PRIMARY, BTN_QUIET, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
-import { Body, Meta, Micro } from './Text';
+import { BTN_OUTLINE, BTN_PRIMARY, BTN_QUIET, SEGMENT_OFF, SEGMENT_ON } from './formStyles';
+import { Body, Meta, Micro, Note } from './Text';
 import {
   getMarketStates,
   estimatePublishGas,
@@ -50,6 +55,10 @@ const PLACEHOLDER_TITLE = '';
  * closed tab.
  */
 const DRAFT_SAVE_DELAY_MS = 500;
+
+/** How long a signed post stays good for, by default, and the choices offered. */
+const RELAY_DAYS_DEFAULT = 7;
+const RELAY_DAYS_CHOICES = [1, 7, 30];
 
 /**
  * The starting draft, in the language the tab was opened in. Read as a
@@ -80,6 +89,13 @@ export default function Publisher() {
   const [meta, setMeta] = useState({});
   // Set when what is on screen came back from storage: drives the notice.
   const [restoredAt, setRestoredAt] = useState(null);
+  // The hook the post goes through, if any (v2 only): none, one, or several.
+  const [hookConfig, setHookConfig] = useState(emptyHookConfig);
+  // Whether the v2 contract has code on the publish chain: null until known.
+  const [v2Ready, setV2Ready] = useState(null);
+  // A post signed for a relayer, once the author has signed one.
+  const [ticket, setTicket] = useState(null);
+  const [relayDays, setRelayDays] = useState(RELAY_DAYS_DEFAULT);
   useLang(); // the phrases below are read at render time
   const { account, chainId: walletChainId, connect } = useWallet();
   // The chain to publish on: the one picked here, else the wallet's own
@@ -93,6 +109,25 @@ export default function Publisher() {
   // comparison lines are made of.
   const market = markets[chainId] ?? { gasPriceWei: null, ethUsd: null };
   const chainMismatch = walletChainId != null && walletChainId !== chainId;
+
+  // --- Which contract the post goes to ------------------------------------
+  //
+  // v2 where it is deployed on the publish chain — hooks and relaying live
+  // there, and a plain post costs what it costs on v1 — and v1 until then.
+  useEffect(() => {
+    let cancelled = false;
+    setV2Ready(null);
+    reader
+      .isDeployed(2)
+      .then((ok) => !cancelled && setV2Ready(Boolean(ok)))
+      .catch(() => !cancelled && setV2Ready(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [reader]);
+  const targetVersion = v2Ready ? 2 : 1;
+  const hookCall = useMemo(() => resolveHookConfig(hookConfig), [hookConfig]);
+  const hooked = v2Ready === true && hookCall.active;
 
   // --- The draft, kept across the tab ------------------------------------
   //
@@ -183,7 +218,7 @@ export default function Publisher() {
    * file-key sanitizer in ImageUploader (ASCII \w plus `-` and CJK).
    */
   const uploadRefs = useMemo(
-    () => [...markdown.matchAll(/upload:([A-Za-z0-9_\u4e00-\u9fff-]+)/g)].map((m) => m[1]),
+    () => [...markdown.matchAll(/upload:([A-Za-z0-9_一-鿿-]+)/g)].map((m) => m[1]),
     [markdown],
   );
 
@@ -258,7 +293,8 @@ export default function Publisher() {
   const resolveEth = useCallback((md) => reader.resolveImages(md), [reader]);
 
   // First-post status (drives the cold-SSTORE estimate), from the shared
-  // wallet store instead of a one-off eth_accounts poll.
+  // wallet store instead of a one-off eth_accounts poll. Per contract: the
+  // first post on v2 pays the cold slot however many the author has on v1.
   useEffect(() => {
     if (!account) {
       setIsFirstPost(true);
@@ -266,13 +302,13 @@ export default function Publisher() {
     }
     let cancelled = false;
     reader
-      .count(account)
+      .countOf(account, targetVersion)
       .then((c) => !cancelled && setIsFirstPost(c === 0n))
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [account, reader]);
+  }, [account, reader, targetVersion]);
 
   // Poll gas + ETH price every 30s, for every chain at once — the price is
   // one lookup shared between them, and the comparison needs them all.
@@ -320,7 +356,8 @@ export default function Publisher() {
       new TextEncoder().encode(markdown).length;
     // brotli q11 on markdown text typically lands at 0.35–0.5
     const estCompressed = Math.max(60, Math.ceil(rawBytes * 0.45));
-    const postGas = estimatePublishGas(estCompressed, isFirstPost);
+    const hookDataBytes = hooked ? Math.max(0, (hookCall.hookData.length - 2) / 2) : 0;
+    const postGas = estimatePublishGas(estCompressed, isFirstPost, { version: targetVersion, hooked, hookDataBytes });
     // The real size depends on the source image; a third of the original is
     // a fair guess until it has actually been processed.
     const images = usedKeys.map((key) => ({
@@ -337,7 +374,7 @@ export default function Publisher() {
       images,
       totalGas: postGas + images.reduce((a, c) => a + c.gas, 0),
     };
-  }, [tags, markdown, files, usedKeys, isFirstPost, alreadyOnChain]);
+  }, [tags, markdown, files, usedKeys, isFirstPost, alreadyOnChain, targetVersion, hooked, hookCall.hookData]);
 
   const costEstimate = useMemo(() => {
     if (!market.gasPriceWei) return null;
@@ -352,8 +389,11 @@ export default function Publisher() {
       // Rough — the exact size is measured with brotli at publish time.
       limitBytes: MAX_CALLDATA_BYTES,
       nearLimit: gas.estCompressed > MAX_CALLDATA_BYTES * 0.9,
+      hooked,
+      // What the post carries to its hook, on top of the gas.
+      hookValueEth: hooked ? Number(hookCall.value) / 1e18 : 0,
     };
-  }, [market, gas]);
+  }, [market, gas, hooked, hookCall.value]);
 
   /** The same draft, priced on the chains it is NOT going to. */
   const comparisons = useMemo(
@@ -410,7 +450,8 @@ export default function Publisher() {
     !titleOver &&
     title.trim() &&
     markdown.trim() &&
-    uploadRefs.every((k) => files[k]);
+    uploadRefs.every((k) => files[k]) &&
+    (!hooked || hookCall.problems.length === 0);
 
   /** Forget the stored draft, and any save still on its way to it. */
   const forgetDraft = () => {
@@ -427,6 +468,7 @@ export default function Publisher() {
     setMarkdown(placeholderBody());
     setFiles({});
     setMeta({});
+    setHookConfig(emptyHookConfig());
     setRestoredAt(null);
   };
 
@@ -435,43 +477,55 @@ export default function Publisher() {
     setStatus('idle');
     setStatusMsg('');
     setTxHash(null);
+    setTicket(null);
   };
 
-  const handlePublish = async () => {
+  /**
+   * What publishing and signing share: the checks, the size measurement
+   * while failing is still free, and the images — paid for by the author
+   * either way, since an image is its own transaction. Returns the body
+   * with its image references rewritten, or null after reporting a problem.
+   */
+  const prepareBody = async () => {
     const missingRefs = uploadRefs.filter((k) => !files[k]);
     if (missingRefs.length > 0) {
       setStatus('error');
       setStatusMsg(t('publish.missingImages', { keys: missingRefs.join(', ') }));
-      return;
+      return null;
     }
+    await ensureWallet();
+    setStatus('processing');
+
+    // Images are uploaded one paid transaction at a time, so check the
+    // body against the transaction ceiling while failing is still free.
+    setStatusMsg(t('publish.compressing'));
+    const size = await measurePayload({ tags, markdown, files, meta });
+    if (!size.ok) {
+      const kb = (n) => `${Math.ceil(n / 1024)} KB`;
+      setStatus('error');
+      setStatusMsg(t('publish.bodyTooBig', { size: kb(size.bytes), limit: kb(size.limit) }));
+      return null;
+    }
+
+    let finalMd = markdown;
+    if (usedKeys.length > 0) {
+      setStatusMsg(t('publish.uploadingToChain'));
+      finalMd = await embedImages(markdown, files, {
+        chainId,
+        onProgress: (key, i, total, { reused } = {}) =>
+          setStatusMsg(
+            t(reused ? 'publish.reusingImage' : 'publish.uploadProgress', { index: i, total, key }),
+          ),
+      });
+      setMarkdown(finalMd);
+    }
+    return finalMd;
+  };
+
+  const handlePublish = async () => {
     try {
-      await ensureWallet();
-      setStatus('processing');
-
-      // Images are uploaded one paid transaction at a time, so check the
-      // body against the transaction ceiling while failing is still free.
-      setStatusMsg(t('publish.compressing'));
-      const size = await measurePayload({ tags, markdown, files, meta });
-      if (!size.ok) {
-        const kb = (n) => `${Math.ceil(n / 1024)} KB`;
-        setStatus('error');
-        setStatusMsg(t('publish.bodyTooBig', { size: kb(size.bytes), limit: kb(size.limit) }));
-        return;
-      }
-
-      let finalMd = markdown;
-      if (usedKeys.length > 0) {
-        setStatusMsg(t('publish.uploadingToChain'));
-        finalMd = await embedImages(markdown, files, {
-          chainId,
-          onProgress: (key, i, total, { reused } = {}) =>
-            setStatusMsg(
-              t(reused ? 'publish.reusingImage' : 'publish.uploadProgress', { index: i, total, key }),
-            ),
-        });
-        setMarkdown(finalMd);
-      }
-
+      const finalMd = await prepareBody();
+      if (finalMd == null) return;
       setStatus('signing');
       setStatusMsg(t('publish.confirmInWallet'));
       const hash = await publishPost({
@@ -480,12 +534,49 @@ export default function Publisher() {
         tags,
         markdown: finalMd,
         meta,
+        version: targetVersion,
+        hook: hooked ? hookCall.hook : null,
+        hookData: hooked ? hookCall.hookData : '0x',
+        value: hooked ? hookCall.value : 0n,
       });
       setTxHash(hash);
       setStatus('done');
       setStatusMsg(t('publish.done'));
       // It is on chain now; keeping a copy of it here would only offer to
       // restore something already published.
+      forgetDraft();
+      setRestoredAt(null);
+    } catch (err) {
+      setStatus('error');
+      setStatusMsg(err.message || t('publish.failed'));
+    }
+  };
+
+  /**
+   * Sign the post for a relayer instead of sending it: the same letter,
+   * the same hook, but what leaves here is a signature and a file, and
+   * whoever sends the file pays the gas.
+   */
+  const handleSign = async () => {
+    try {
+      const finalMd = await prepareBody();
+      if (finalMd == null) return;
+      setStatus('signing');
+      setStatusMsg(t('relay.signing'));
+      const signed = await signRelayTicket({
+        chainId,
+        title: title.trim(),
+        tags,
+        markdown: finalMd,
+        meta,
+        hook: hooked ? hookCall.hook : null,
+        hookData: hooked ? hookCall.hookData : '0x',
+        value: hooked ? hookCall.value : 0n,
+        days: relayDays,
+      });
+      setTicket(signed);
+      setStatus('signed');
+      setStatusMsg('');
       forgetDraft();
       setRestoredAt(null);
     } catch (err) {
@@ -596,6 +687,22 @@ export default function Publisher() {
         />
       </div>
 
+      {/* The hook: only where the v2 contract is; otherwise a line saying
+          why the section is not there, so its absence is not a mystery. */}
+      <div className="mb-10" data-publish-target={v2Ready == null ? '' : targetVersion}>
+        {v2Ready === true && (
+          <>
+            <HookFields
+              config={hookConfig}
+              onChange={setHookConfig}
+              disabled={status === 'processing' || status === 'signing'}
+            />
+            <Meta className="mt-2">{t('hooks.target', { chain: chainName(chainId) })}</Meta>
+          </>
+        )}
+        {v2Ready === false && <Meta>{t('hooks.notDeployed', { chain: chainName(chainId) })}</Meta>}
+      </div>
+
       <SectionHeader
         label={t('publish.bodyHeading')}
         right={
@@ -684,28 +791,58 @@ export default function Publisher() {
               {statusMsg}
             </Body>
           )}
-          <button
-            onClick={handlePublish}
-            disabled={
-              !canPublish ||
-              status === 'processing' ||
-              status === 'signing' ||
-              chainMismatch
-            }
-            className={BTN_PRIMARY}
-          >
-            {(status === 'processing' || status === 'signing') && (
-              <span
-                className="h-4 w-4 rounded-full border-2 border-edge-strong border-t-accent animate-spin"
-                aria-hidden="true"
-              />
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            {v2Ready === true && (
+              <>
+                <label className="inline-flex items-center gap-2 text-xs text-ink-faint">
+                  <span>{t('relay.validity')}</span>
+                  <select
+                    value={relayDays}
+                    onChange={(e) => setRelayDays(Number(e.target.value))}
+                    disabled={inFlight}
+                    aria-label={t('relay.validity')}
+                    className="rounded-lg border border-edge-strong bg-paper px-2 py-1 text-xs"
+                  >
+                    {RELAY_DAYS_CHOICES.map((days) => (
+                      <option key={days} value={days}>
+                        {t('relay.days', { days })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSign}
+                  disabled={!canPublish || inFlight || chainMismatch}
+                  className={BTN_OUTLINE}
+                >
+                  {t('relay.signButton')}
+                </button>
+              </>
             )}
-            {status === 'processing'
-              ? t('publish.uploadingImages')
-              : status === 'signing'
-                ? t('publish.confirmInWallet')
-                : t('publish.button')}
-          </button>
+            <button
+              onClick={handlePublish}
+              disabled={
+                !canPublish ||
+                status === 'processing' ||
+                status === 'signing' ||
+                chainMismatch
+              }
+              className={BTN_PRIMARY}
+            >
+              {(status === 'processing' || status === 'signing') && (
+                <span
+                  className="h-4 w-4 rounded-full border-2 border-edge-strong border-t-accent animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              {status === 'processing'
+                ? t('publish.uploadingImages')
+                : status === 'signing'
+                  ? statusMsg || t('publish.confirmInWallet')
+                  : t('publish.button')}
+            </button>
+          </div>
         </div>
 
         {status === 'error' && (
@@ -743,7 +880,16 @@ export default function Publisher() {
             </button>
           </div>
         )}
+
+        {status === 'signed' && ticket && <RelayTicketView ticket={ticket} chainId={chainId} onDone={resetDraft} />}
       </div>
+
+      {v2Ready === true && (
+        <div className="mt-12">
+          <RelayPanel chainId={chainId} disabled={inFlight} />
+          <Note className="mt-2">{t('relay.note')}</Note>
+        </div>
+      )}
     </div>
   );
 }

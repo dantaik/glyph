@@ -1,8 +1,9 @@
 # `xueni-codec` — the post codec
 
 The conversion between a [Xueni](../README.md) post as a person sees it — a title, some tags, a
-Markdown body, a little front-matter — and the call data of the `publish(bytes32,bytes)` call that
-stores it on chain, in both directions, as **pure functions**: no wallet, no node, no I/O, no
+Markdown body, a little front-matter — and the call data of the `publish()` call that stores it on
+chain (the plain call both contracts take, or the second contract's two others: through a hook, and
+on an author's behalf), in both directions, as **pure functions**: no wallet, no node, no I/O, no
 dependencies. A post in, `0x…` out; `0x…` in, the post out. Given the same compressor, the same
 input always gives the same bytes.
 
@@ -24,7 +25,7 @@ system — why a post is shaped like this — is [`../glyph-spec.md`](../glyph-s
 | **Post** | `{ title, tags, markdown, meta }` | the write tab, a `.md` import, a reader's view |
 | **Document** | front-matter + Markdown, one UTF-8 text | "Raw" on a post page, `Download .md`, an archive bundle, `xueni verify` |
 | **Payload** | the document, brotli-compressed (format version 1) | the second argument of `publish()`; its size is what the post cost |
-| **Call data** | selector + ABI(`bytes32`, `bytes`) | `tx.input`, what a wallet signs |
+| **Call data** | selector + ABI arguments: `(bytes32, bytes)` plain, or with a hook and its data, or with the author, a deadline and their signature besides (SPEC §6) | `tx.input`, what a wallet signs |
 
 Each hop is its own pair of functions, and `postToCallData` / `callDataToPost` are the composition.
 
@@ -39,7 +40,7 @@ cd codec && npm install      # dev dependencies only — the library itself has 
 **In Node**, `xueni-codec/node` has Node's built-in brotli already bound:
 
 ```js
-import { postToCallData, callDataToPost, encodePost, validatePost } from 'xueni-codec/node';
+import { postToCallData, callDataToPost, encodePost, encodeRelayedPost, validatePost } from 'xueni-codec/node';
 
 const post = {
   title: '关于外婆的香樟木箱',
@@ -50,9 +51,16 @@ const post = {
 
 const { ok, problems } = validatePost(post);   // errors the writer refuses on, warnings it does not
 const callData = postToCallData(post);         // '0x70a74532…' — hand it to writeContract / sendTransaction
-const back = callDataToPost(tx.input);         // { version: 1, title, tags, markdown, meta, text, compressedBytes }
+const back = callDataToPost(tx.input);         // { version: 1, title, tags, markdown, meta, text, compressedBytes, call }
+back.call;                                     // { form: 'publish', hook: null, hookData, relayed: null } — or the
+                                               // hook and, for a relayed post, { author, deadline, signature }
 
 const { text, payload, title, callData: same } = encodePost(post);   // every layer at once: a dry run
+
+// The second contract's two other calls: the same post, through a hook …
+const hooked = postToCallData(post, { hook, hookData });                       // '0xcf5f0bff…'
+// … or submitted by someone else against the author's EIP-712 signature.
+const relayed = encodeRelayedPost(post, { author, deadline, signature }).callData;   // '0x80e41e43…'
 ```
 
 **In a browser**, the compressor is injected. brotli-wasm is what the web app uses; wrap the
@@ -85,9 +93,10 @@ Everything below is exported from `xueni-codec`; `xueni-codec/node` re-exports i
 
 | Function | |
 | --- | --- |
-| `postToCallData(post, { brotli, version?, maxDocumentBytes? })` | `0x…` call data. Throws `InvalidPostError` with every problem, `UnsupportedFormatVersionError`, or `DocumentTooLargeError`. |
-| `callDataToPost(callData, { brotli, maxDocumentBytes? })` | `{ version, title, tags, markdown, meta, text, compressedBytes }`. Throws `MalformedCallDataError`, `MalformedPayloadError`, `UnsupportedFormatVersionError`, `DocumentTooLargeError`. |
-| `encodePost(post, { brotli, version?, maxDocumentBytes? })` | `{ version, title, text, payload, callData }` — every intermediate form, for a dry run or a cost estimate. |
+| `postToCallData(post, { brotli, version?, maxDocumentBytes?, hook?, hookData? })` | `0x…` call data: the plain call, or with a hook (other than the zero address) or hook data given, the second contract's four-argument call. Throws `InvalidPostError` with every problem, `UnsupportedFormatVersionError`, or `DocumentTooLargeError`. |
+| `callDataToPost(callData, { brotli, maxDocumentBytes? })` | `{ version, title, tags, markdown, meta, text, compressedBytes, call }`, any of the three forms; `call` is `{ form, title, payload, hook, hookData, relayed }`, with `relayed` = `{ author, deadline, signature }` for a `publishFor` call and `null` otherwise. Throws `MalformedCallDataError`, `MalformedPayloadError`, `UnsupportedFormatVersionError`, `DocumentTooLargeError`. |
+| `encodePost(post, { brotli, version?, maxDocumentBytes?, hook?, hookData? })` | `{ version, title, text, payload, callData }` — every intermediate form, for a dry run or a cost estimate. |
+| `encodeRelayedPost(post, { brotli, author, deadline, signature, hook?, hookData?, version?, maxDocumentBytes? })` | the same, with `callData` a `publishFor()` call and `author` echoed. The signature is the author's over the contract's EIP-712 digest (`GlyphV2.publishDigest`); making it is a wallet's job, this takes the bytes. |
 
 **The post** — `validatePost(post)` → `{ ok, problems }`, every problem at once, each
 `{ level: 'error' | 'warning', path, code, message }`; `postProblems(post)` the list alone;
@@ -108,9 +117,14 @@ as every existing reader behaves); `parseTags`; `FRONT_MATTER_KEYS`, `RESERVED_K
 `FORMAT_VERSION` (written by default), `SUPPORTED_FORMAT_VERSIONS` (read), `VERSION_ENVELOPE_BYTE`,
 `REFERENCE_BROTLI`, `MAX_DOCUMENT_BYTES` (4 MiB, the default bound on both sides).
 
-**The call data** — `encodePublishCallData({ title, payload })` → hex; `decodePublishCallData(hex | bytes)`
-→ `{ title, payload }`; `isPublishCallData`; `PUBLISH_SELECTOR` (`0x70a74532`), `PUBLISH_SIGNATURE`,
-`POST_EVENT_TOPIC`, `POST_EVENT_SIGNATURE`.
+**The call data** — `encodePublishCallData({ title, payload, hook?, hookData? })` → hex (the plain
+call, or the hooked one); `encodePublishForCallData({ author, title, payload, hook?, hookData?, deadline, signature })`
+→ hex; `decodePublishCallData(hex | bytes)` → `{ form, title, payload, hook, hookData, relayed }` for
+any of the three; `callDataForm(hex | bytes)` → `'publish' | 'publishWithHook' | 'publishFor' | null`;
+`isPublishCallData`; `CALL_FORMS`; `PUBLISH_SELECTOR` (`0x70a74532`), `PUBLISH_WITH_HOOK_SELECTOR`
+(`0xcf5f0bff`), `PUBLISH_FOR_SELECTOR` (`0x80e41e43`) and their `…_SIGNATURE`s; `POST_EVENT_TOPIC`
+(the first contract's event), `POST_V2_EVENT_TOPIC` (the second's, with the hook indexed) and their
+signatures; `ZERO_ADDRESS`.
 
 **Errors** — all `CodecError`s with a stable `.code`: `InvalidPostError` (`.problems`),
 `UnsupportedFormatVersionError` (`.version`, `.supported`), `MalformedPayloadError`,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fmtTitle, fmtIndex, excerpt } from '../lib/format';
+import { hookInfo } from '../lib/hookRegistry';
 import { t } from '../lib/i18n';
 import { ArticleTitle, Body } from './Text';
 import { hrefFor } from '../lib/router';
@@ -88,6 +89,17 @@ export default function ArticleListItem({ post, clock, navigate, currentChain = 
           navigate={navigate}
           prefix={showIndex ? fmtIndex(post.index) : undefined}
           lead={<AuthorLink author={post.author} navigate={navigate} />}
+          extra={
+            post.hook
+              ? [
+                  // A post that went through a hook says so, quietly; the
+                  // post page names the hook.
+                  <span key="hook" title={hookInfo(post.hook).name ?? post.hook} data-hook-mark={post.hook}>
+                    {t('post.hookMark')}
+                  </span>,
+                ]
+              : []
+          }
         />
       </div>
     </li>

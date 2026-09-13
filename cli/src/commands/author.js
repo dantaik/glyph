@@ -71,6 +71,9 @@ export async function run(argv) {
         eventIndex: row.eventIndex,
         author: row.author,
         index: row.index,
+        // Which contract the post is on: an index is only an identity
+        // together with it, since the author has a list on each.
+        version: Number(row.version ?? 1),
         block: row.block,
         prevBlock: row.prevBlock,
         logIndex: row.logIndex,
@@ -78,6 +81,7 @@ export async function run(argv) {
         date: dayOf(row.ts),
         title: row.title,
         url: `${SITE}/${row.slug}/tx/${row.txHash}/${row.eventIndex}`,
+        ...(Number(row.version ?? 1) === 1 ? {} : { hook: row.hook ?? null }),
       })),
     );
   }
@@ -89,8 +93,11 @@ export async function run(argv) {
   for (const row of shown) {
     // Two lines a post: the title on its own so it is readable at any width,
     // and the provenance under it with the FULL transaction hash — the thing
-    // the next command will be given, so it has to be copyable.
-    print(`#${row.index}  ${row.title}`);
+    // the next command will be given, so it has to be copyable. A post on
+    // the second contract says so next to its index, which is only an
+    // identity within that contract's list.
+    const where = Number(row.version ?? 1) === 1 ? '' : `·v${row.version}`;
+    print(`#${row.index}${where}  ${row.title}`);
     print(`    ${row.slug} · block ${row.block} · ${dayOf(row.ts)} · ${row.txHash}`);
   }
 }

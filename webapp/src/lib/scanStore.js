@@ -2,11 +2,12 @@
 // two lifetimes.
 //
 // SESSION layer (module state, never expires). Every post this tab has seen,
-// indexed by (author, index) and by (txHash, eventIndex), plus the block
-// ranges the tab has genuinely fetched. Posts are immutable once mined, so a
-// second fetch could only ever return the same bytes: once ANY surface — the
-// home feed, an author list, a /tx deep link, prev/next navigation — has read
-// a post, no other surface fetches it again for the life of the page.
+// indexed by (author, index, contract version) and by (txHash, eventIndex),
+// plus the block ranges the tab has genuinely fetched. Posts are immutable
+// once mined, so a second fetch could only ever return the same bytes: once
+// ANY surface — the home feed, an author list, a /tx deep link, prev/next
+// navigation — has read a post, no other surface fetches it again for the
+// life of the page.
 //
 // PERSISTED layer (localStorage). A bounded snapshot of the same thing, so a
 // fresh session starts warm. The session layer is seeded from it when the
@@ -19,6 +20,17 @@
 // getScanStore(chainId) hands out a chain's store and keeps it for the life
 // of the page. A scan on one chain keeps writing to its own store no matter
 // which chain the reader is showing.
+//
+// TWO CONTRACTS PER CHAIN. A chain is read on every contract version at
+// once (v1 and v2, chains.js), and an author has an independent list —
+// their own index sequence, their own reverse-linked walk — on each. So a
+// post is identified by (author, index, version), and an author's walk head
+// is kept per version. Coverage, on the other hand, is per chain: every
+// fetch asks for every contract, so a block or range read once is read for
+// all of them. Coverage recorded by an older build that read fewer contracts
+// is not trusted: the persisted snapshot names the versions it was read
+// under, and one read under a different set keeps its rows but drops its
+// ranges and heads, so the blocks are read again for what was missed.
 //
 // Coverage is a SET of ranges, not one `[frontier, head]` window: blocks
 // 1–100 read once and 200–300 read later are two segments, and a read that
@@ -33,9 +45,26 @@ export const FEED_ROW_CAP = 300;
 export const AUTHOR_ROW_CAP = 200;
 
 export const addrKey = (a) => String(a || '').toLowerCase();
-export const postId = (author, index) => `${addrKey(author)}:${index}`;
+
+/**
+ * A post's identity within a chain. Version 1 keeps the key it always had,
+ * so nothing that held one — a meta cache, a test — reads differently.
+ */
+export const postId = (author, index, version = 1) =>
+  Number(version ?? 1) === 1 ? `${addrKey(author)}:${index}` : `${addrKey(author)}:${index}@${Number(version)}`;
+
 export const txId = (txHash, eventIndex = 0) =>
   `${String(txHash || '').toLowerCase()}:${Number(eventIndex ?? 0)}`;
+
+/** An author's walk head, per contract version. */
+const headKey = (author, version = 1) =>
+  Number(version ?? 1) === 1 ? addrKey(author) : `${addrKey(author)}@${Number(version)}`;
+
+const sameVersions = (a, b) => {
+  const x = [...new Set((a ?? []).map(Number))].sort((p, q) => p - q);
+  const y = [...new Set((b ?? []).map(Number))].sort((p, q) => p - q);
+  return x.length === y.length && x.every((v, i) => v === y[i]);
+};
 
 /**
  * One canonical in-memory row shape. Chain reads hand us BigInt heights,
@@ -56,6 +85,10 @@ function normalizeRow(row) {
     // The block's timestamp in seconds. Absent on rows persisted before it
     // was read; filled in later by rememberBlockTs().
     ts: row.ts == null ? null : Number(row.ts),
+    // Which contract the post is on. Rows persisted before v2 are v1's.
+    version: row.version == null ? 1 : Number(row.version),
+    // The hook a v2 post went through (lowercase), or null.
+    hook: row.hook ? String(row.hook).toLowerCase() : null,
   };
 }
 
@@ -70,6 +103,8 @@ const plainRow = (r) => ({
   eventIndex: r.eventIndex ?? 0,
   logIndex: r.logIndex ?? null,
   ts: r.ts ?? null,
+  version: r.version ?? 1,
+  hook: r.hook ?? null,
 });
 
 /** Feed order: newest first — higher block, then higher log index. */
@@ -78,7 +113,7 @@ export function feedCompare(a, b) {
   return (b.logIndex ?? 0) - (a.logIndex ?? 0);
 }
 
-/** Author order: newest (highest index) first. */
+/** Author order within one contract: newest (highest index) first. */
 export const indexCompare = (a, b) => (a.index < b.index ? 1 : a.index > b.index ? -1 : 0);
 
 /**
@@ -119,9 +154,14 @@ function lsRead(key) {
   }
 }
 
-/** Build the store for one chain. Prefer getScanStore(), which memoizes. */
-export function createScanStore(chainId) {
+/**
+ * Build the store for one chain. Prefer getScanStore(), which memoizes.
+ * `versions` names the contracts this build reads the chain on; coverage
+ * persisted under a different set is not trusted (see the header).
+ */
+export function createScanStore(chainId, { versions = [1] } = {}) {
   const id = Number(chainId);
+  const contracts = [...new Set(versions.map(Number))].sort((a, b) => a - b);
   // Block heights and post indexes mean nothing across chains, so every
   // persisted key is scoped to the chain. The v1 keys were mainnet-only.
   const FEED_KEY = `glyph.feedScan.v2.${id}`;
@@ -140,7 +180,7 @@ export function createScanStore(chainId) {
   const authorSegments = new Map();
   /** Chain head at the last completed feed scan, as a decimal string. */
   let feedHead = null;
-  /** addrKey -> the author's `latestBlock` at their last completed walk. */
+  /** headKey -> the author's `latestBlock` on that contract at their last completed walk. */
   const authorHeads = new Map();
 
   // --- Change notification ------------------------------------------
@@ -166,12 +206,13 @@ export function createScanStore(chainId) {
    * fresh object, so anything holding the old one sees a change.
    */
   function indexRow(row) {
-    const key = postId(row.author, row.index);
+    const key = postId(row.author, row.index, row.version);
     const prev = posts.get(key);
     if (prev) {
       const fills = {};
       if (prev.logIndex == null && row.logIndex != null) fills.logIndex = row.logIndex;
       if (prev.ts == null && row.ts != null) fills.ts = row.ts;
+      if (prev.hook == null && row.hook != null) fills.hook = row.hook;
       if (Object.keys(fills).length === 0) return { row: prev, changed: false };
       const merged = { ...prev, ...fills };
       posts.set(key, merged);
@@ -243,7 +284,7 @@ export function createScanStore(chainId) {
   }
 
   /** A post already read this session, or null — no RPC needed either way. */
-  const knownPost = (author, index) => posts.get(postId(author, index)) ?? null;
+  const knownPost = (author, index, version = 1) => posts.get(postId(author, index, version)) ?? null;
 
   /** Same, addressed by publish transaction + event ordinal. */
   function knownPostByTx(txHash, eventIndex = 0) {
@@ -277,27 +318,33 @@ export function createScanStore(chainId) {
     return out.sort(feedCompare);
   }
 
-  /** One author's posts inside a block, newest (highest index) first. */
-  function authorPostsInBlock(author, block) {
+  /**
+   * One author's posts inside a block: on one contract (newest index
+   * first), or on every contract (newest in the block first) when `version`
+   * is null.
+   */
+  function authorPostsInBlock(author, block, version = null) {
     const ids = idsByBlock.get(String(block));
     if (!ids) return [];
     const key = addrKey(author);
+    const wanted = version == null ? null : Number(version);
     const out = [];
     for (const pid of ids) {
       const row = posts.get(pid);
-      if (row && addrKey(row.author) === key) out.push(row);
+      if (row && addrKey(row.author) === key && (wanted == null || row.version === wanted)) out.push(row);
     }
-    return out.sort(indexCompare);
+    return out.sort(wanted == null ? feedCompare : indexCompare);
   }
 
-  /** One author's posts, newest (highest index) first. */
-  function authorPosts(author) {
+  /** One author's posts, on one contract or all, newest first. */
+  function authorPosts(author, version = null) {
     const key = addrKey(author);
+    const wanted = version == null ? null : Number(version);
     const out = [];
     for (const row of posts.values()) {
-      if (addrKey(row.author) === key) out.push(row);
+      if (addrKey(row.author) === key && (wanted == null || row.version === wanted)) out.push(row);
     }
-    return out.sort(indexCompare);
+    return out.sort(wanted == null ? feedCompare : indexCompare);
   }
 
   /** Ranges proven complete for every author. */
@@ -311,16 +358,16 @@ export function createScanStore(chainId) {
     seg.normalize([...(authorSegments.get(addrKey(author)) ?? []), ...feedSegments]);
 
   /**
-   * The author's chain from `fromBlock` down, as far as covered blocks
-   * reach — the rows a completed walk left behind, without any I/O. Stops
-   * at the first block that would have to be fetched.
+   * The author's chain on one contract from `fromBlock` down, as far as
+   * covered blocks reach — the rows a completed walk left behind, without
+   * any I/O. Stops at the first block that would have to be fetched.
    */
-  function knownChain(author, fromBlock) {
+  function knownChain(author, fromBlock, version = 1) {
     const out = [];
     const coverage = authorCoverage(author);
     let block = BigInt(fromBlock);
     while (block > 0n && seg.segmentAt(coverage, block)) {
-      const rows = authorPostsInBlock(author, block);
+      const rows = authorPostsInBlock(author, block, version);
       if (rows.length === 0) break;
       out.push(...rows);
       const next = rows[rows.length - 1].prevBlock;
@@ -331,13 +378,13 @@ export function createScanStore(chainId) {
   }
 
   const feedScanHead = () => feedHead;
-  const authorScanHead = (author) => authorHeads.get(addrKey(author)) ?? null;
+  const authorScanHead = (author, version = 1) => authorHeads.get(headKey(author, version)) ?? null;
   function setFeedScanHead(head) {
     feedHead = String(head);
     notify();
   }
-  function setAuthorScanHead(author, head) {
-    authorHeads.set(addrKey(author), String(head));
+  function setAuthorScanHead(author, head, version = 1) {
+    authorHeads.set(headKey(author, version), String(head));
     notify();
   }
 
@@ -351,6 +398,7 @@ export function createScanStore(chainId) {
       localStorage.setItem(
         FEED_KEY,
         JSON.stringify({
+          contracts,
           head: feedHead,
           segments: seg.toPlain(segments),
           rows: kept.map(plainRow),
@@ -368,10 +416,18 @@ export function createScanStore(chainId) {
     const { kept, floor } = trimRows(authorPosts(author), AUTHOR_ROW_CAP);
     const own = authorSegments.get(key) ?? [];
     const segments = floor == null ? own : seg.clipBelow(own, floor);
+    const heads = {};
+    for (const v of contracts) {
+      const head = authorHeads.get(headKey(author, v));
+      if (head != null) heads[v] = head;
+    }
     try {
       const all = lsRead(AUTHOR_KEY) ?? {};
       all[key] = {
-        head: authorHeads.get(key) ?? null,
+        contracts,
+        // `head` is v1's, the field older builds read; `heads` has every contract's.
+        head: heads[1] ?? null,
+        heads,
         segments: seg.toPlain(segments),
         rows: kept.map(plainRow),
       };
@@ -385,22 +441,27 @@ export function createScanStore(chainId) {
 
   /**
    * Fold the persisted snapshot into the session layer. v1 stored a single
-   * `[frontier, head]` window; that is simply the first segment.
+   * `[frontier, head]` window; that is simply the first segment. A snapshot
+   * read under another set of contracts keeps its rows and nothing else.
    */
   function seedFromStorage() {
     const feed = lsRead(FEED_KEY);
     if (feed && Array.isArray(feed.rows)) {
       rememberPosts(feed.rows);
-      feedSegments = seg.normalize([...feedSegments, ...seg.fromPlain(feed.segments)]);
-      if (typeof feed.head === 'string') feedHead = feed.head;
+      if (sameVersions(feed.contracts ?? [1], contracts)) {
+        feedSegments = seg.normalize([...feedSegments, ...seg.fromPlain(feed.segments)]);
+        if (typeof feed.head === 'string') feedHead = feed.head;
+      }
     } else {
       const legacy = lsRead(FEED_KEY_LEGACY);
       if (legacy && Array.isArray(legacy.rows)) {
         rememberPosts(legacy.rows);
-        if (legacy.frontier != null && legacy.head != null) {
-          feedSegments = seg.add(feedSegments, legacy.frontier, legacy.head);
+        if (sameVersions([1], contracts)) {
+          if (legacy.frontier != null && legacy.head != null) {
+            feedSegments = seg.add(feedSegments, legacy.frontier, legacy.head);
+          }
+          if (typeof legacy.head === 'string') feedHead = legacy.head;
         }
-        if (typeof legacy.head === 'string') feedHead = legacy.head;
       }
     }
 
@@ -408,8 +469,13 @@ export function createScanStore(chainId) {
     for (const [address, scan] of Object.entries(authors)) {
       if (!scan || typeof scan !== 'object') continue;
       rememberPosts(Array.isArray(scan.rows) ? scan.rows : []);
+      if (!sameVersions(scan.contracts ?? [1], contracts)) continue;
       authorSegments.set(addrKey(address), seg.fromPlain(scan.segments));
-      if (typeof scan.head === 'string') authorHeads.set(addrKey(address), scan.head);
+      const heads = scan.heads && typeof scan.heads === 'object' ? scan.heads : {};
+      if (typeof scan.head === 'string' && heads[1] == null) heads[1] = scan.head;
+      for (const [v, head] of Object.entries(heads)) {
+        if (typeof head === 'string') authorHeads.set(headKey(address, v), head);
+      }
     }
 
     // v1 per-author state has rows but no ranges: the rows are still worth
@@ -419,7 +485,9 @@ export function createScanStore(chainId) {
       for (const [address, scan] of Object.entries(legacyAuthors)) {
         if (!scan || typeof scan !== 'object') continue;
         rememberPosts(Array.isArray(scan.rows) ? scan.rows : []);
-        if (typeof scan.head === 'string') authorHeads.set(addrKey(address), scan.head);
+        if (typeof scan.head === 'string' && sameVersions([1], contracts)) {
+          authorHeads.set(headKey(address, 1), scan.head);
+        }
       }
     }
     notify();
@@ -430,17 +498,26 @@ export function createScanStore(chainId) {
   /** Per-author coverage: `{ address, head, segments, count }`, newest head first. */
   function readAuthorScanEntries() {
     const out = [];
+    const seen = new Set();
+    const headOf = (address) => {
+      // The newest head on any contract, so the entry says how far the
+      // author has been read whichever contract they wrote on last.
+      let best = null;
+      for (const v of contracts) {
+        const h = authorHeads.get(headKey(address, v));
+        if (h != null && (best == null || BigInt(h) > BigInt(best))) best = h;
+      }
+      return best;
+    };
     for (const [address, segments] of authorSegments.entries()) {
-      out.push({
-        address,
-        head: authorHeads.get(address) ?? null,
-        segments,
-        count: authorPosts(address).length,
-      });
+      seen.add(address);
+      out.push({ address, head: headOf(address), segments, count: authorPosts(address).length });
     }
-    for (const [address, head] of authorHeads.entries()) {
-      if (authorSegments.has(address)) continue;
-      out.push({ address, head, segments: [], count: authorPosts(address).length });
+    for (const key of authorHeads.keys()) {
+      const address = key.split('@')[0];
+      if (seen.has(address)) continue;
+      seen.add(address);
+      out.push({ address, head: headOf(address), segments: [], count: authorPosts(address).length });
     }
     out.sort((a, b) => {
       if (a.head == null || b.head == null) return a.head == null ? 1 : -1;
@@ -489,6 +566,8 @@ export function createScanStore(chainId) {
 
   return {
     chainId: id,
+    /** The contract versions this store's coverage is read under. */
+    versions: contracts,
     subscribe,
     getVersion: () => version,
     rememberPosts,
@@ -520,12 +599,16 @@ export function createScanStore(chainId) {
 
 const stores = new Map(); // chainId -> store
 
-/** The store for `chainId`, created (and seeded from localStorage) on first use. */
-export function getScanStore(chainId) {
+/**
+ * The store for `chainId`, created (and seeded from localStorage) on first
+ * use. `versions` is honoured on that first use — the reader passes the
+ * contracts its I/O reads.
+ */
+export function getScanStore(chainId, versions = undefined) {
   const id = Number(chainId);
   let store = stores.get(id);
   if (!store) {
-    store = createScanStore(id);
+    store = createScanStore(id, versions ? { versions } : {});
     stores.set(id, store);
   }
   return store;

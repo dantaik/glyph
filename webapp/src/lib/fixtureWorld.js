@@ -9,6 +9,14 @@
 // No Vite, no browser APIs: fixtures.js wraps this into the reader's I/O
 // surface for the DEV demo, the unit tests build merged feeds over it, and
 // expectedMergedOrder() is the oracle those tests check against.
+//
+// A few posts are on the second contract (v2): one through a hook, one
+// relayed on its author's behalf, one plain. They have their own index
+// sequence and their own prevBlock chain per author, exactly as on chain,
+// so the demo exercises the two-stream walk and the provenance the reader
+// shows for them.
+
+import { DEFAULT_MULTI_HOOK_ADDRESS } from './chains.js';
 
 export const AUTHORS = [
   '0x8a1f3b52C9e44E1a9b1f0d2C7a44E0b1D2e3F4a5',
@@ -247,6 +255,26 @@ const BODY_T3_0 = `First day at the crossing. The house is rented, right on the 
 
 My luggage is one box of books and one pen. I came here to write this river down. No idea how long that will take, so I will start with today's level: up one finger.`;
 
+// --- Posts on the second contract: a hook, a relayer, a plain one. --------
+
+const BODY_V2_A0_0 = `A short letter through the new door. The words are the same as ever; only the way they arrived has changed: this one passed through a hook on its way into the block, and the hook filed it under a key, so a reader can walk to it without scanning a single range.
+
+Nothing about the letter itself is different. Read it as you read the others.`;
+
+const BODY_V2_A1_0 = `Written up here, carried down by somebody else. I signed this letter by the stove and handed the signature to a relayer on their way to market; they paid the gas and sent it in my name.
+
+The chain records it as mine, because it is: the signature is the proof, and the relayer could change nothing about it but the hour it landed.`;
+
+const BODY_V2_T3_0 = `The water is up two fingers. This note went in through a hook that keeps a list of everything written from the crossing, so the river's own page can be walked like an author's.`;
+
+/** A relayer who submits other people's signed letters, in the demo. */
+export const DEMO_RELAYER = '0x9999999999999999999999999999999999999999';
+
+/** A hook the demo does not know by name, so the reader shows its address. */
+export const DEMO_UNKNOWN_HOOK = '0x00000000000000000000000000000000000000ab';
+
+const DEMO_SIGNATURE = `0x${'ab'.repeat(32)}${'cd'.repeat(32)}1b`;
+
 /**
  * Per-chain seeds: [authorIdx, index, block, title, tags, body] with the
  * chain's pace, head and per-sweep budget.
@@ -284,6 +312,12 @@ export const WORLDS = {
         { series: 'Kitchen notes', part: '1' }],
       [1, 0n, 1100n, 'When the osmanthus opens', ['autumn'], BODY_A1_0],
       [0, 0n, 900n, '', [], BODY_A0_0],
+      // The second contract: its own index sequence per author (both are #1
+      // there), a hook on one, a relayer on the other.
+      [1, 0n, 2790n, 'Relayed from the hills', ['living up here', 'hooks'], BODY_V2_A1_0, {},
+        { version: 2, relayer: DEMO_RELAYER, deadline: 1_900_000_000, signature: DEMO_SIGNATURE }],
+      [0, 0n, 2560n, 'Through the fan-out', ['letters home', 'hooks'], BODY_V2_A0_0, {},
+        { version: 2, hook: DEFAULT_MULTI_HOOK_ADDRESS, hookData: '0xc0ffee' }],
     ],
   },
   167000: {
@@ -301,6 +335,8 @@ export const WORLDS = {
       [1, 0n, 12_300n, 'The day we moved', ['the old days'], BODY_T1_0],
       [3, 0n, 6_200n, 'First day at the crossing', ['the crossing'], BODY_T3_0],
       [0, 0n, 2_100n, 'Trying Taiko', [], BODY_T0_0],
+      [3, 0n, 29_600n, 'The crossing, indexed', ['the crossing', 'hooks'], BODY_V2_T3_0, {},
+        { version: 2, hook: DEMO_UNKNOWN_HOOK, hookData: '0x' }],
     ],
   },
 };
@@ -310,14 +346,24 @@ export const WORLD_CHAIN_IDS = Object.keys(WORLDS).map(Number);
 const keyOf = (author) => String(author || '').toLowerCase();
 
 /**
- * A publish transaction hash that is unique per (chain, author, index) — the
- * chain id sits in the top bits so the same author's same index on two
- * chains never collides.
+ * A publish transaction hash that is unique per (chain, author, index,
+ * contract) — the chain id sits in the top bits so the same author's same
+ * index on two chains never collides, and the contract version a little
+ * lower so the same index on the two contracts does not either.
  */
-export const txOf = (chainId, author, index) =>
-  `0x${((BigInt(chainId) << 224n) + (BigInt(author) << 64n) + 0xfab1e0n + BigInt(index))
+export const txOf = (chainId, author, index, version = 1) =>
+  `0x${(
+    (BigInt(chainId) << 224n) +
+    (BigInt(author) << 64n) +
+    (BigInt(Number(version) - 1) << 40n) +
+    0xfab1e0n +
+    BigInt(index)
+  )
     .toString(16)
     .padStart(64, '0')}`;
+
+/** The stream a post is in: one author's list on one contract. */
+export const streamKey = (author, version = 1) => `${String(author || '').toLowerCase()}@${Number(version)}`;
 
 /**
  * Build one chain's world.
@@ -325,9 +371,11 @@ export const txOf = (chainId, author, index) =>
  * `now` (seconds) is the head block's time; every block is `secondsPerBlock`
  * earlier. `scale` multiplies block heights and divides the pace, so the
  * same afternoon spans `scale`× more blocks — the way to put a chain's
- * posts beyond a production-sized sweep budget in a test.
+ * posts beyond a production-sized sweep budget in a test. `v2` adds the
+ * posts on the second contract; without it the world is the v1 journal
+ * alone, which is what the merge and frontier tests were written against.
  */
-export function buildWorld(chainId, { now = Math.floor(Date.now() / 1000), scale = 1 } = {}) {
+export function buildWorld(chainId, { now = Math.floor(Date.now() / 1000), scale = 1, v2 = false } = {}) {
   const id = Number(chainId);
   const spec = WORLDS[id];
   if (!spec) throw new Error(`no fixture world for chain ${id}`);
@@ -336,18 +384,31 @@ export function buildWorld(chainId, { now = Math.floor(Date.now() / 1000), scale
   const secondsPerBlock = spec.secondsPerBlock / scale;
   const floor = spec.floor * scaleN;
   const scanBlocks = spec.scanBlocks == null ? undefined : spec.scanBlocks * scaleN;
-  const tx = (author, index) => txOf(id, author, index);
+  const tx = (author, index, version = 1) => txOf(id, author, index, version);
   const tsOf = (block) => Math.floor(now - Number(head - BigInt(block)) * secondsPerBlock);
 
-  const byAuthor = new Map(AUTHORS.map((a) => [keyOf(a), []]));
+  // One list per stream — an author's posts on one contract — because that
+  // is what a prevBlock chain links. `byAuthor` is the v1 streams alone, the
+  // lists every earlier test and the demo's QA hooks were written against.
+  const byStream = new Map();
+  const listFor = (author, version) => {
+    const key = streamKey(author, version);
+    if (!byStream.has(key)) byStream.set(key, []);
+    return byStream.get(key);
+  };
+  for (const a of AUTHORS) listFor(a, 1);
   const bodyByTx = new Map();
-  // A seed is [author, index, block, title, tags, markdown, meta?] — the
-  // last being the rest of the front-matter: a language, a relation to
-  // another post, a place in a series.
-  for (const [ai, index, block, title, tags, markdown, meta = {}] of spec.seeds(tx)) {
+  // A seed is [author, index, block, title, tags, markdown, meta?, call?] —
+  // `meta` the rest of the front-matter (a language, a relation to another
+  // post, a place in a series), `call` how the post reached the chain when
+  // it was not a plain v1 publish: `{ version: 2, hook?, hookData?,
+  // relayer?, deadline?, signature? }`.
+  const seeds = spec.seeds(tx).filter((seed) => v2 || Number(seed[7]?.version ?? 1) === 1);
+  for (const [ai, index, block, title, tags, markdown, meta = {}, call = null] of seeds) {
     const author = AUTHORS[ai];
-    const txHash = tx(author, index);
-    byAuthor.get(keyOf(author)).push({
+    const version = Number(call?.version ?? 1);
+    const txHash = tx(author, index, version);
+    listFor(author, version).push({
       author,
       index,
       block: block * scaleN,
@@ -357,19 +418,24 @@ export function buildWorld(chainId, { now = Math.floor(Date.now() / 1000), scale
       eventIndex: 0,
       logIndex: 0,
       ts: tsOf(block * scaleN),
+      version,
+      hook: call?.hook ? String(call.hook).toLowerCase() : null,
+      // Who sent the transaction, when it was not the author.
+      relayer: call?.relayer ? String(call.relayer).toLowerCase() : null,
     });
-    bodyByTx.set(txHash, { tags, markdown, meta });
+    bodyByTx.set(txHash, { tags, markdown, meta, call });
   }
-  for (const list of byAuthor.values()) {
+  for (const list of byStream.values()) {
     list.sort((a, b) => Number(a.index - b.index));
     list.forEach((p, i) => {
       p.prevBlock = i === 0 ? 0n : list[i - 1].block;
     });
   }
-  const posts = [...byAuthor.values()].flat().sort((a, b) => Number(a.block - b.block));
+  const byAuthor = new Map(AUTHORS.map((a) => [keyOf(a), listFor(a, 1)]));
+  const posts = [...byStream.values()].flat().sort((a, b) => Number(a.block - b.block));
   const metaByTx = new Map(posts.map((p) => [p.txHash.toLowerCase(), p]));
 
-  return { chainId: id, head, secondsPerBlock, floor, scanBlocks, posts, byAuthor, bodyByTx, metaByTx, tsOf, txOf: tx };
+  return { chainId: id, head, secondsPerBlock, floor, scanBlocks, posts, byAuthor, byStream, bodyByTx, metaByTx, tsOf, txOf: tx };
 }
 
 /** Every world at once, sharing one `now`. */
@@ -388,7 +454,19 @@ export function expectedMergedOrder(worlds, { limit = Infinity } = {}) {
   const all = [];
   for (const world of worlds.values()) {
     for (const p of world.posts) {
-      all.push({ chainId: world.chainId, txHash: p.txHash, title: p.title, ts: p.ts, block: p.block, logIndex: p.logIndex, author: p.author, index: p.index });
+      all.push({
+        chainId: world.chainId,
+        txHash: p.txHash,
+        title: p.title,
+        ts: p.ts,
+        block: p.block,
+        logIndex: p.logIndex,
+        author: p.author,
+        index: p.index,
+        version: p.version,
+        hook: p.hook,
+        relayer: p.relayer,
+      });
     }
   }
   all.sort((a, b) => {

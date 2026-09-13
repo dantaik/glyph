@@ -1,10 +1,11 @@
 # Xueni post codec — specification
 
-**Format version 1 · specification revision 1.1 · 2026-09**
+**Format version 1 · specification revision 1.2 · 2026-09**
 
 This document states, normatively, how a **post** as a person sees it — a title, some tags, a
-Markdown body, a little metadata — becomes the **call data** of the `publish(bytes32,bytes)` call
-that stores it on chain, and how that call data becomes the post again. The library beside this
+Markdown body, a little metadata — becomes the **call data** of the `publish()` call that stores it
+on chain (in its plain form, and in the two forms the second contract added: through a hook, and on
+an author's behalf, §6), and how that call data becomes the post again. The library beside this
 file (`xueni-codec`, see [`README.md`](./README.md)) is the reference implementation, and its test
 suite, with the vectors in [`test/vectors.json`](./test/vectors.json), is the conformance suite.
 
@@ -51,6 +52,7 @@ Two numbers, kept apart on purpose:
 | --- | --- | --- | --- |
 | 1.0 | 1 | 2026-09 | First normative statement of the format in use since deployment. |
 | 1.1 | 1 | 2026-09 | Security considerations (§10). A writer refuses control characters in the title, the tags and the values (§3) and a document over the size bound; a reader bounds decompression (§5.4). Bidirectional controls are reported (§10.3). The wire format is unchanged. |
+| 1.2 | 1 | 2026-09 | The second contract's two further calls (§6): `publish(bytes32,bytes,address,bytes)`, a post through a hook, and `publishFor(…)`, a post submitted on the author's behalf against their signature. A reader tells the three forms apart by selector (§6.3); the second contract's event (§6.4); two vectors (Appendix A). The title, the document and the payload are unchanged, and so is the plain call, which both contracts accept. |
 
 ## 1. Scope and terms
 
@@ -69,7 +71,9 @@ A post exists in four forms. This specification defines each and the conversion 
   It is what the raw view shows, what a `.md` download holds and what an archive bundle carries.
 - **Payload** — bytes: the document, compressed (§5). The second argument of `publish()`.
 - **Call data** — bytes: the transaction's `input`: the function selector followed by the ABI
-  encoding of `(bytes32 title, bytes payload)` (§6).
+  encoding of the call's arguments — `(bytes32 title, bytes payload)` in the plain call, and in the
+  two forms the second contract added, a hook and its data, and an author and a signature besides
+  (§6). The title and the payload are the same bytes in all three.
 
 A **writer** turns a post into call data; a **reader** turns call data into a post. An
 implementation MAY provide one direction only. Both directions are pure: they depend on nothing but
@@ -97,6 +101,10 @@ document   =  [ "---" LF  ( key ": " value LF )*  "---" LF LF ]  body
 ```
 
 A post with no metadata is stored as its bare Markdown, with no front-matter block at all.
+
+The second contract accepts this same call and two more — `0xcf5f0bff`, the post plus a hook and
+data for it, and `0x80e41e43`, the post plus the author it is submitted for, a deadline and their
+signature (§6.1). The title word and the payload tail inside them are these same bytes.
 
 ## 3. The post
 
@@ -371,24 +379,50 @@ store, and the raw view, archives and the command-line tool all carry it as `com
 
 ## 6. The call data
 
-### 6.1 The function
+### 6.1 The functions
+
+The first contract (Glyph, deployed 2026-09-02) has one function:
 
 ```solidity
 function publish(bytes32 title, bytes calldata payload) external;
 ```
 
-The contract reads `title` and never reads `payload`: the payload rides in the transaction's calldata
-only, is never copied to storage or to the event, and is read back with `eth_getTransactionByHash`.
+The second contract (Glyph v2, glyph-spec §4.1) keeps that function — the same call, byte for byte —
+and adds two:
 
-The selector is the first four bytes of `keccak256("publish(bytes32,bytes)")`:
+```solidity
+function publish(bytes32 title, bytes calldata payload, address hook, bytes calldata hookData)
+    external payable;
+function publishFor(address author, bytes32 title, bytes calldata payload, address hook,
+    bytes calldata hookData, uint256 deadline, bytes calldata signature) external payable;
+```
+
+In every form the contract reads `title` and never reads `payload`: the payload rides in the
+transaction's calldata only, is never copied to storage or to the event, and is read back with
+`eth_getTransactionByHash`. The other arguments are the contract's business, not the post's: `hook`
+names a contract the core calls once the post is recorded, with `hookData` for it (the zero address
+is "no hook"); `author` is whose list the post joins when someone else submits it, `deadline` is
+when the author's signature stops being valid, and `signature` is the author's, over an EIP-712
+digest of everything else (glyph-spec §4.1). This specification carries them through and does not
+interpret them.
+
+The selectors are the first four bytes of the keccak256 of each signature:
 
 ```
-PUBLISH_SELECTOR = 0x70a74532
+PUBLISH_SELECTOR           = 0x70a74532    publish(bytes32,bytes)
+PUBLISH_WITH_HOOK_SELECTOR = 0xcf5f0bff    publish(bytes32,bytes,address,bytes)
+PUBLISH_FOR_SELECTOR       = 0x80e41e43    publishFor(address,bytes32,bytes,address,bytes,uint256,bytes)
 ```
 
 ### 6.2 Layout
 
-Standard ABI encoding of `(bytes32, bytes)`, which for these two types is fixed:
+Standard ABI encoding: the selector; then a **head** of one 32-byte word per argument — a static
+argument (`bytes32`, `address`, `uint256`) in place, a dynamic one (`bytes`) as the offset of its
+tail, counted from the first byte after the selector; then the **tails** in argument order, each a
+length word, the bytes, and zero-padding to a whole word. An `address` sits right-aligned in its
+word behind twelve zero bytes; a `uint256` is big-endian.
+
+For the plain call, `(bytes32, bytes)`, this is fixed:
 
 | Offset (bytes) | Size | Content |
 | --- | --- | --- |
@@ -402,44 +436,79 @@ Standard ABI encoding of `(bytes32, bytes)`, which for these two types is fixed:
 A writer MUST produce exactly this layout (offset `0x40`, full padding). Call data is written as
 lowercase hex with a `0x` prefix wherever it is text.
 
+The two other forms follow the same rule with heads of four and seven words:
+
+| Form | Head (one word each, in order) | Tails (in order) | Payload tail begins at |
+| --- | --- | --- | --- |
+| `publish(bytes32,bytes,address,bytes)` | title · payload offset · hook · hookData offset | payload · hookData | byte 4 + 4·32 = 132 |
+| `publishFor(…)` | author · title · payload offset · hook · hookData offset · deadline · signature offset | payload · hookData · signature | byte 4 + 7·32 = 228 |
+
+A writer MUST produce the canonical encoding in every form: tails in argument order with no gaps,
+each fully padded, offsets pointing at them. A writer given no hook (the zero address) and no hook
+data SHOULD write the plain call, which both contracts accept — the four-argument form with a zero
+hook and empty data is the same post, only longer. The reference does.
+
 ### 6.3 Reading
 
 A reader:
 
-1. MUST refuse call data whose first four bytes are not the selector, saying what they were: it is
-   some other call, not a post.
-2. MUST read the offset from bytes 36–67 rather than assuming `0x40`, and MUST refuse an offset that
-   does not leave room for a length word inside the data.
+1. MUST refuse call data whose first four bytes are none of the three selectors, saying what they
+   were: it is some other call, not a post. A reader MAY implement the plain form alone — every post
+   on the first contract is one — and MUST then still refuse the other two selectors by name rather
+   than misread them as the plain call.
+2. MUST read each offset from its head word rather than assuming it (`0x40` in the plain call), and
+   MUST refuse an offset that does not leave room for a length word inside the data.
 3. MUST read the length at that offset and MUST refuse call data that does not hold *length* bytes
-   of payload after it: a payload cut short is not a post.
-4. MUST accept call data with **bytes after the payload's padding**, and with **padding shorter than
-   canonical**, as every ABI decoder does — such data is not what a conforming writer produces, but
-   a node hands back whatever was signed, and the post inside it is intact.
+   of payload after it: a payload cut short is not a post. The same holds for the `hookData` and
+   `signature` tails.
+4. MUST accept call data with **bytes after the last tail's padding**, and with **padding shorter
+   than canonical**, as every ABI decoder does — such data is not what a conforming writer produces,
+   but a node hands back whatever was signed, and the post inside it is intact.
 5. MUST refuse an offset or a length too large to be a size (the reference refuses anything above
    2⁵³ − 1; every real payload is under 2¹⁷).
+6. MUST refuse an `address` word whose upper twelve bytes are not zero — the contract's own decoder
+   does, so no such call was ever accepted — and SHOULD report a zero `hook` as "no hook" rather than
+   as an address.
 
-The title is bytes 4–35 as a bytes32 (§3.1); the payload is a copy of the *length* bytes at
-offset + 36 (that is, counted from byte 4, offset + 32).
+The title is the bytes32 word of the head — the first word in the two `publish` forms, the second
+in `publishFor` — read per §3.1; the payload is a copy of the *length* bytes after its length word
+(in the plain call: at offset + 36, that is, counted from byte 4, offset + 32). What else the call
+carries — which form it is, the hook and its data, and for `publishFor` the author, the deadline
+and the signature — a reader SHOULD hand on as data, and the reference does (the `call` of a decoded
+post, Appendix C).
 
-### 6.4 Informative: the event, and the limits
+### 6.4 Informative: the events, and the limits
 
-`publish()` emits `Post(address indexed author, uint256 index, uint256 prevBlock, bytes32 title)`,
-whose topic 0 is
+The first contract's `publish()` emits
+`Post(address indexed author, uint256 index, uint256 prevBlock, bytes32 title)`, whose topic 0 is
 
 ```
 POST_EVENT_TOPIC = keccak256("Post(address,uint256,uint256,bytes32)")
                  = 0x5cd0759ab74dbe8f489ac7602146c443e7d2eedf00377e0c113b0466b4ffde5f
 ```
 
-and whose `title` is the same bytes32 as the call's — §3.1 decoding applies to it unchanged. One
-transaction MAY emit several `Post` events (a multicall); the pair (transaction hash, 0-based event
-ordinal) identifies a post, which is what a post reference (§3.4) names. Decoding events is a
-client's job and outside this specification.
+The second contract's three functions all emit
+`Post(address indexed author, address indexed hook, uint256 index, uint256 prevBlock, bytes32 title)`,
+whose topic 0 is
+
+```
+POST_V2_EVENT_TOPIC = keccak256("Post(address,address,uint256,uint256,bytes32)")
+                    = 0xb9b1202ea7165d7724de1f5fd6ae97b9a1b4376c87e1fdbcceb4907f60a78a9d
+```
+
+In both, `title` is the same bytes32 as the call's — §3.1 decoding applies to it unchanged — and
+`author` is the author of record: the caller, or for `publishFor` the signer whose list the post
+joins. A relayed post's transaction is sent by someone other than its author, so a reader that
+names the author from the transaction's sender names the wrong one; the event, or the call's
+`author` word, is right. One transaction MAY emit several `Post` events (a multicall); the pair
+(transaction hash, 0-based event ordinal) identifies a post, which is what a post reference (§3.4)
+names. Decoding events is a client's job and outside this specification.
 
 There is no size ceiling in the format. In practice a transaction is bounded by the transaction
 pool's size limit (128 KiB on geth's default, see glyph-spec §11 and `webapp/src/lib/limits.js`),
 which binds long before the per-transaction gas cap; a writer that wants to refuse an oversize post
-before signing measures the payload (§5) against that ceiling.
+before signing measures the payload (§5) against that ceiling — and, in the two longer forms, the
+hook data and the signature that ride beside it.
 
 ## 7. Errors
 
@@ -453,7 +522,7 @@ problem it finds in a post rather than the first:
 | A payload that would decompress past the reader's bound, or a document a writer is asked to write past it (§5.4) | both | `DOCUMENT_TOO_LARGE`, carrying the bound |
 | A format version the implementation does not have (§5.2) | both | `UNSUPPORTED_FORMAT_VERSION`, carrying the version |
 | An empty payload, a malformed envelope, or bytes that are not a brotli stream (§5.2, §5.4) | read | `MALFORMED_PAYLOAD` |
-| Call data that is not a `publish()` call, or is cut short (§6.3) | read | `MALFORMED_CALLDATA` |
+| Call data that is none of the three publishing calls, is cut short, or holds an address word that is not an address (§6.3) | read | `MALFORMED_CALLDATA` |
 
 Invalid UTF-8 in a title or a payload is **not** an error (§3.1, §5.4). An unknown front-matter key
 is **not** an error (§3.4).
@@ -467,7 +536,10 @@ written in it begins with the envelope `0x91 n` (§5.2). Version 1 payloads are 
 never enveloped.
 
 **What does not.** A new defined key, a new advisory rule, a stricter writer, an editorial change:
-a new specification revision. Older readers keep working, because unknown keys survive (§3.4).
+a new specification revision. Older readers keep working, because unknown keys survive (§3.4). So
+is a new *call* around the same post (revision 1.2, §6): the title and the payload inside it are the
+bytes of this format, and a reader of the older calls refuses the new selector by name rather than
+misreading it.
 
 **A later version SHOULD keep §3 and §4.** The presentation and the document are the part a person
 reads and the part an editor opens; a new version is expected to change how the document is carried
@@ -483,7 +555,8 @@ a version outside the versions it implements MUST refuse. The reference library 
 
 A **conforming reader**:
 
-- reads call data per §6.3, the payload per §5.2 and §5.4, and the document per §4.2, exactly;
+- reads call data per §6.3 — all three forms, or the plain one alone with the other two refused by
+  name — the payload per §5.2 and §5.4, and the document per §4.2, exactly;
 - bounds decompression while decompressing, as §5.4 requires;
 - never fails on invalid UTF-8, on an unknown key, on a value that does not fit its grammar;
 - refuses, with the reason, what §6.3, §5.2 and §5.4 say to refuse, and an unknown version by name;
@@ -495,7 +568,7 @@ A **conforming writer**:
 - accepts a post only within §3 — control characters included — and reports every problem it finds;
 - refuses a document over the size bound of §5.4;
 - produces the document of §4.1, the payload of §5.1 (quality 11, no dictionary), the call data of
-  §6.2, and the bytes32 of §3.1;
+  §6.2 in whichever form is asked for, and the bytes32 of §3.1;
 - satisfies the round-trip identities of §3.5 for every post it accepts;
 - produces, for every vector in Appendix A, the vector's document and title exactly, and a payload
   that decompresses to that document.
@@ -628,8 +701,11 @@ it is not the codec's to guarantee: that the strings it returns are shown safely
 
 The full set is [`test/vectors.json`](./test/vectors.json): for each vector the post, the document
 (`text`), the title (`title`, the bytes32), the reference payload size (`compressedBytes`) and the
-call data the reference implementation produces (`callData`). The document and the title are
-normative; the call data pins the reference encoder (§5.3). Two of them, in full:
+call data the reference implementation produces (`callData`) — and, for a vector in one of the
+second contract's forms, the call around the post (`call`: the hook and its data, and for a relayed
+post the author, the deadline and the signature; the file's `selectors` names the three). The
+document and the title are normative; the call data pins the reference encoder (§5.3). Two of them,
+in full:
 
 **Bare Markdown, no metadata.**
 
@@ -662,8 +738,10 @@ call data 0x70a74532
 
 The others cover: the specification's own tags example; every defined key plus one unknown key with a
 27-byte Chinese title; a title that fills the word exactly (eight emoji) over a CRLF body; a body that
-would itself read as front-matter (the empty-block rule); and a reply carrying a multi-byte tag, a
-regional language tag and a byte-order mark.
+would itself read as front-matter (the empty-block rule); a reply carrying a multi-byte tag, a
+regional language tag and a byte-order mark; and two posts in the second contract's forms — one
+through a hook with data for it (`0xcf5f0bff`), one relayed on the author's behalf through a hook
+(`0x80e41e43`) — whose title and payload are the same bytes the plain call would carry.
 
 ## Appendix B — grammar summary
 
@@ -686,10 +764,21 @@ payload       = brotli-stream                               ; version 1
               / %x91 version *OCTET                          ; versions 2–255 (reserved)
 version       = %x02-FF
 
-call-data     = %x70.A7.45.32 title offset length payload padding
+call-data     = plain-call / hook-call / for-call
+plain-call    = %x70.A7.45.32 title offset length payload padding     ; offset = 31%x00 %x40
+hook-call     = %xCF.5F.0B.FF title offset address offset             ; head: title, payload offset,
+                bytes-tail bytes-tail                                 ;   hook, hookData offset;
+                                                                      ; tails: payload, hookData
+for-call      = %x80.E4.1E.43 address title offset address offset     ; head: author, title, payload
+                uint offset bytes-tail bytes-tail bytes-tail          ;   offset, hook, hookData offset,
+                                                                      ;   deadline, signature offset;
+                                                                      ; tails: payload, hookData, signature
 title         = 32OCTET                                      ; UTF-8, right-padded with %x00
-offset        = 31%x00 %x40
-length        = 32OCTET                                      ; big-endian byte length of payload
+offset        = 32OCTET                                      ; big-endian, from the byte after the selector
+address       = 12%x00 20OCTET
+uint          = 32OCTET                                      ; big-endian
+bytes-tail    = length *OCTET padding
+length        = 32OCTET                                      ; big-endian byte length of what follows
 padding       = *31%x00                                      ; to a multiple of 32 after the selector
 ```
 
@@ -712,8 +801,8 @@ result as well, so a codec that ignores the option still cannot hand a bomb thro
 | Title (§3.1) | `encodeTitle`, `decodeTitle`, `titleByteLength`, `fitTitle`, `TITLE_MAX_BYTES` |
 | Document (§4) | `buildDocument`, `parseDocument`, `splitFrontMatter`, `parseTags`, `FRONT_MATTER_KEYS`, `RESERVED_KEYS` |
 | Payload (§5) | `encodePayload`, `decodePayload` (both taking `{ maxDocumentBytes }`), `detectFormatVersion`, `FORMAT_VERSION`, `SUPPORTED_FORMAT_VERSIONS`, `VERSION_ENVELOPE_BYTE`, `REFERENCE_BROTLI`, `MAX_DOCUMENT_BYTES` |
-| Call data (§6) | `encodePublishCallData`, `decodePublishCallData`, `isPublishCallData`, `PUBLISH_SELECTOR`, `POST_EVENT_TOPIC` |
-| The whole trip | `postToCallData`, `callDataToPost`, `encodePost` |
+| Call data (§6) | `encodePublishCallData` (plain, or through a hook), `encodePublishForCallData`, `decodePublishCallData` (all three forms), `callDataForm`, `isPublishCallData`, `CALL_FORMS`, `PUBLISH_SELECTOR`, `PUBLISH_WITH_HOOK_SELECTOR`, `PUBLISH_FOR_SELECTOR`, `POST_EVENT_TOPIC`, `POST_V2_EVENT_TOPIC`, `ZERO_ADDRESS` |
+| The whole trip | `postToCallData`, `callDataToPost`, `encodePost`, `encodeRelayedPost` |
 | Errors (§7) | `CodecError`, `InvalidPostError`, `UnsupportedFormatVersionError`, `MalformedPayloadError`, `MalformedCallDataError`, `DocumentTooLargeError` |
 
 See [`README.md`](./README.md) for usage.

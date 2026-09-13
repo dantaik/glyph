@@ -40,19 +40,29 @@ export {
   encodePayload,
 } from './payload.js';
 
-// The calldata.
+// The calldata: the plain post, the post through a hook, the relayed post.
 export {
+  CALL_FORMS,
   POST_EVENT_SIGNATURE,
   POST_EVENT_TOPIC,
+  POST_V2_EVENT_SIGNATURE,
+  POST_V2_EVENT_TOPIC,
+  PUBLISH_FOR_SELECTOR,
+  PUBLISH_FOR_SIGNATURE,
   PUBLISH_SELECTOR,
   PUBLISH_SIGNATURE,
+  PUBLISH_WITH_HOOK_SELECTOR,
+  PUBLISH_WITH_HOOK_SIGNATURE,
+  ZERO_ADDRESS,
+  callDataForm,
   decodePublishCallData,
   encodePublishCallData,
+  encodePublishForCallData,
   isPublishCallData,
 } from './calldata.js';
 
 // The whole trip.
-export { callDataToPost, encodePost, postToCallData } from './convert.js';
+export { callDataToPost, encodePost, encodeRelayedPost, postToCallData } from './convert.js';
 
 // Bytes and hex, for callers that have one and need the other.
 export { bytesToHex, hexToBytes, isHex } from './hex.js';

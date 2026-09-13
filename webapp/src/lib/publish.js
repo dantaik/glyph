@@ -12,11 +12,13 @@
 // announced extension, or WalletConnect where a build carries a project id.
 
 import { createWalletClient, custom, toHex } from 'viem';
-import { GLYPH_ADDRESS } from './config';
+import { GLYPH_ADDRESS, GLYPH_V2_ADDRESS, contractAddress } from './config';
 import { getChain } from './chains';
-import { abi } from './abi';
+import { abi, abiV2 } from './abi';
+import { getClient } from './clients';
 import { encodeTitle } from './title';
 import { encodePayload } from './payload';
+import { ZERO_ADDRESS, buildTicket, deadlineInDays, publishForArgs, relayTypedData } from './relay';
 import { nextImageKeys } from './imageKeys';
 import { knownImage, rememberImage, sha256Hex } from './imageLedger';
 import { MAX_CALLDATA_BYTES, MAX_TX_BYTES } from './limits';
@@ -256,19 +258,116 @@ export async function measurePayload({ tags = [], markdown, files = {}, meta = {
 /**
  * Publish a post on `chainId`.
  * `meta` is the rest of the front-matter — the language, the relations —
- * which rides in the same payload as the tags (spec §5.1).
- * @param {{ chainId: number, title: string, tags?: string[], markdown: string, meta?: object }} draft
+ * which rides in the same payload as the tags (spec §5.1). `version` picks
+ * the contract: v1 (the default) or v2; on v2, `hook`, `hookData` and
+ * `value` put the post through a hook (the four-argument call) — with none
+ * of them, the plain call, byte-identical to v1's.
+ * @param {{ chainId: number, title: string, tags?: string[], markdown: string, meta?: object, version?: number, hook?: string | null, hookData?: string, value?: bigint }} draft
  * @returns {Promise<`0x${string}`>} tx hash of the publish call
  */
-export async function publishPost({ chainId, title, tags = [], markdown, meta = {} }) {
+export async function publishPost({
+  chainId,
+  title,
+  tags = [],
+  markdown,
+  meta = {},
+  version = 1,
+  hook = null,
+  hookData = '0x',
+  value = 0n,
+}) {
   const { wallet, account } = await getWallet(chainId);
   const payload = await encodePayload({ tags, markdown, meta });
   const titleHex = encodeTitle(title);
+  const hooked = (hook && hook.toLowerCase() !== ZERO_ADDRESS) || (hookData && hookData !== '0x');
+  if (Number(version) !== 2) {
+    if (hooked || BigInt(value ?? 0) !== 0n) throw new Error('hooks need the v2 contract');
+    return wallet.writeContract({
+      account,
+      address: GLYPH_ADDRESS,
+      abi,
+      functionName: 'publish',
+      args: [titleHex, toHex(payload)],
+    });
+  }
+  if (!hooked) {
+    return wallet.writeContract({
+      account,
+      address: GLYPH_V2_ADDRESS,
+      abi: abiV2,
+      functionName: 'publish',
+      args: [titleHex, toHex(payload)],
+    });
+  }
   return wallet.writeContract({
     account,
-    address: GLYPH_ADDRESS,
-    abi,
+    address: GLYPH_V2_ADDRESS,
+    abi: abiV2,
     functionName: 'publish',
-    args: [titleHex, toHex(payload)],
+    args: [titleHex, toHex(payload), hook ?? ZERO_ADDRESS, hookData ?? '0x'],
+    value: BigInt(value ?? 0),
+  });
+}
+
+/**
+ * Sign a post for somebody else to send (GlyphV2.publishFor), and hand
+ * back the ticket that carries it. The author's next index on the v2
+ * contract is read fresh from the node — it is the nonce, so a stale count
+ * would sign a post that can never land. The wallet is asked for an
+ * EIP-712 signature, never a transaction; nothing is sent.
+ * @returns {Promise<object>} the ticket (see relay.js)
+ */
+export async function signRelayTicket({
+  chainId,
+  title,
+  tags = [],
+  markdown,
+  meta = {},
+  hook = null,
+  hookData = '0x',
+  value = 0n,
+  days = 7,
+}) {
+  const { wallet, account } = await getWallet(chainId);
+  const contract = contractAddress(2);
+  const payload = toHex(await encodePayload({ tags, markdown, meta }));
+  const titleHex = encodeTitle(title);
+  const index = await getClient(chainId).readContract({
+    address: contract,
+    abi: abiV2,
+    functionName: 'count',
+    args: [account],
+  });
+  const deadline = deadlineInDays(days);
+  const fields = {
+    chainId,
+    contract,
+    author: account,
+    title: titleHex,
+    payload,
+    hook: hook && hook.toLowerCase() !== ZERO_ADDRESS ? hook : null,
+    hookData: hookData ?? '0x',
+    index,
+    deadline,
+  };
+  const signature = await wallet.signTypedData({ account, ...relayTypedData(fields) });
+  return buildTicket({ ...fields, signature, value });
+}
+
+/**
+ * Send a signed post on its author's behalf: the connected wallet pays the
+ * gas (and the ETH the ticket asks for, if any); the post is recorded under
+ * the author who signed it.
+ * @returns {Promise<`0x${string}`>} tx hash of the publishFor call
+ */
+export async function relayTicket(ticket, { chainId }) {
+  const { wallet, account } = await getWallet(chainId);
+  return wallet.writeContract({
+    account,
+    address: ticket.contract,
+    abi: abiV2,
+    functionName: 'publishFor',
+    args: publishForArgs(ticket),
+    value: BigInt(ticket.value ?? 0),
   });
 }

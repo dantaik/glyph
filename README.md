@@ -42,11 +42,15 @@ is ready, so import the repository as it is. `npm run build` puts the output in 
 cd contracts && forge install foundry-rs/forge-std
 forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
   --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY comes from the environment (the script reads it with vm.envUint)
+forge script script/Create2DeployV2.s.sol:Create2DeployGlyphV2 \
+  --rpc-url $ETH_RPC --broadcast   # the second contract (hooks, publishFor) and the fan-out hook beside it
 
 # Point the front end at your own copy. Vite inlines these at build time, so a
 # change here means rebuilding.
 cat > webapp/.env.local <<EOF
 VITE_GLYPH_ADDRESS=0xYourDeployedAddress
+VITE_GLYPH_V2_ADDRESS=0xYourV2Address
+VITE_MULTI_HOOK_ADDRESS=0xYourFanOutAddress
 VITE_RPC_URL=https://eth.drpc.org
 VITE_CHAIN_ID=1
 EOF
@@ -68,6 +72,21 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
+**Hooks (the second contract)**: where Glyph v2 is deployed on the publish chain, the Write tab says so
+and a post can go through a **hook** — a contract of anyone's, named per post, that the journal calls once
+after the post is recorded, with the call's ETH and whatever data you attach: a publication with members,
+a fee, an index by topic, a collectible (spec §4.1). "None" is a plain post and costs what it costs on v1;
+"One hook" takes an address, hex data and an amount of ETH; "Several hooks" packs a list of them into the
+fan-out hook deployed beside the contract. The estimate shows the ETH going to the hook. A post page
+shows the contract it lives on, the hook it went through (named where this build knows the address) and
+its data in "Raw"; the reader never runs anything for a hook. Both contracts are read together on every
+chain, so nothing moves and nothing needs migrating.
+**Relaying (`publishFor`)**: "Sign for a relayer instead" signs the post with the wallet (EIP-712, no
+transaction, no gas) and produces a **ticket** — one small JSON file naming the chain, the contract, the
+post, the hook, the deadline you chose (1, 7 or 30 days) and the signature. Anyone can paste or open
+that file in the "Relay a signed post" panel at the foot of their own Write tab and send it; it lands
+under your address, as your next post, and the post page says who sent it on your behalf. A ticket is
+for one specific post number, so publishing anything yourself in the meantime cancels it.
 **Tags and search**: a tag on a row or under a post opens `/tag/<name>`, and the magnifier in the
 masthead (⋯ menu on a phone) opens `/search`, which finds a word in any title, tag or body — matched as
 a substring, so Chinese works without word splitting. Both cover the posts this browser has read, say
@@ -204,8 +223,14 @@ an older reader fails loudly on a newer post rather than showing garbage.
 ```js
 import { postToCallData, callDataToPost } from 'xueni-codec/node';   // ../codec/src/node.js from inside this repo
 const callData = postToCallData({ title, tags, markdown, meta });   // what a wallet signs
-const post = callDataToPost(tx.input);                              // { title, tags, markdown, meta, text, compressedBytes }
+const post = callDataToPost(tx.input);                              // { title, tags, markdown, meta, text, compressedBytes, call }
 ```
+
+Revision 1.2 of the spec covers the second contract's two other calls — a post through a hook
+(`publish(bytes32,bytes,address,bytes)`) and a post relayed on the author's behalf (`publishFor`) —
+which the codec tells apart by selector and reports in `call` (the hook, its data, and for a relayed
+post the author, deadline and signature); `postToCallData(post, { hook, hookData })` and
+`encodeRelayedPost` write them. The title and the payload inside all three are the same bytes.
 
 The web app and the CLI still encode through `webapp/src/lib/payloadText.js` and `title.js`; the
 codec's test suite holds itself to those modules byte for byte, on fuzzed input, so the three cannot
@@ -221,7 +246,14 @@ npm test            # vitest: the data layer (scanning, caching, merged feeds, r
 npm run build       # build the site into dist/
 npm run test:e2e    # Playwright (Chromium): the built output + a local JSON-RPC mock node (both chains)
 npm run check       # all three
+
+cd contracts && forge install foundry-rs/forge-std && forge test   # the second contract and its hooks (Foundry)
 ```
+
+The contract tests (`contracts/test/`) cover `GlyphV2` — the plain call's parity with v1, hooks that
+gate, charge, record, reject and re-enter, ETH forwarding, `publishFor` with EOA (65- and 64-byte),
+ERC-1271 and malleated signatures, deadlines and the index-as-nonce — and the three shipped hooks.
+`Blog.sol` itself is unchanged and stays deployed as it is.
 
 The e2e mock node (`webapp/test/e2e/rpcServer.mjs`) serves the demo world (`src/lib/fixtureWorld.js`) over
 JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-encoded Post events whose
@@ -230,7 +262,7 @@ During development, `npm run dev` and then `/?fixtures=1` shows the same demo da
 Actions (`.github/workflows/ci.yml`) runs all three steps on every PR, and the `cli` job runs the
 command-line tool's tests against that same mock node (`cd cli && npm test`). The `codec` job runs the
 post codec's conformance suite (`cd codec && npm test`), which includes its test vectors and the
-byte-for-byte checks against the web app's payload modules. The macOS application has
+byte-for-byte checks against the web app's payload modules. The `contracts` job runs `forge test`. The macOS application has
 its own workflow (`.github/workflows/desktop.yml`), which builds on a `v*` tag and on a pull request
 that touches `desktop/`; its image-encoding crate is tested with `cd desktop/src-tauri/transcode &&
 cargo test`.
@@ -264,6 +296,25 @@ init code hash:   0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402
 The Solidity contract itself is still named `Glyph`: the name is part of the compiled metadata, so the
 init code hash — and with it the address the contract already lives at on every chain — depends on it.
 
+The second contract (`src/GlyphV2.sol`, hooks and `publishFor`, spec §4.1) and the fan-out hook beside
+it (`src/hooks/MultiHook.sol`) are deployed the same way, by `script/Create2DeployV2.s.sol`, each to an
+address of its own that is likewise the same on every chain:
+
+```
+GlyphV2 address:  0x0000009857c02e4BC9E55b4fC2F6681a8FE23Ce1   (6 leading zeros)
+salt:             0xbb0377c8a476ed536b5cb07973d948304b3a07dd83aa15bd8871abfa0cee4de1
+init code hash:   0x6b1cd4f393c6502ac2d5703ca10e0530ccf4a678d11fe072a2704c777223b665
+
+MultiHook address: 0x000009C923d41260e61F5bBaDBAFf7e083920993  (5 leading zeros; constructed with the GlyphV2 address)
+salt:              0x033c5c3e1849290787f459e4773aed8ef13eae4beb84f506eec2679ea11639f4
+init code hash:    0x6f57e6af6bc7596c60ac3c88bd1f5363084556fa8cdab82b6951ab572807183f
+```
+
+Both are built into the front end (`DEFAULT_GLYPH_V2_ADDRESS`, `DEFAULT_MULTI_HOOK_ADDRESS`), which reads
+them on every chain whether or not they are deployed there yet — a chain without them reads as empty, and
+the Write tab offers hooks and relaying only where `eth_getCode` finds the contract. `forge inspect
+src/GlyphV2.sol:GlyphV2 bytecode` gives the init code to mine a new salt with if the source changes.
+
 - **The deploy script**: `script/Create2Deploy.s.sol`, idempotent (if the address already holds code it
   verifies and exits). Anyone may run it, and the deployer holds no privilege.
 - **Chains where the proxy is missing**: first send ≥ 0.01 ETH (100,000 gas × 100 gwei) to the one-time
@@ -296,6 +347,16 @@ Contract address (identical on every chain): `0x000000AE2f2249c497cfc5F262dd1491
 
 The deployer address `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` holds no privilege over the contract,
 which has no owner and cannot be upgraded.
+
+**Glyph v2** (`0x0000009857c02e4BC9E55b4fC2F6681a8FE23Ce1`) and the fan-out hook
+(`0x000009C923d41260e61F5bBaDBAFf7e083920993`) are **not deployed yet** on either chain. Their addresses
+are fixed by the salts above and pinned in `script/Create2DeployV2.s.sol`, which verifies the address it
+gets before it stops; the front end already reads both addresses and lights up the hook and relay
+features on a chain the moment code appears there. Add a row here per chain when that happens.
+
+| Chain | Chain ID | Deployment tx | Deployer | Date | Verified |
+|---|---|---|---|---|---|
+| — | — | not yet deployed | — | — | — |
 
 ## License
 

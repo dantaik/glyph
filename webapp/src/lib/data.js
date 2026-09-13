@@ -28,7 +28,8 @@ export const FIXTURES_MODE = import.meta.env.DEV ? detectFixturesMode() : null;
 let makeIO = null;
 if (import.meta.env.DEV && FIXTURES_MODE) {
   const { createFixtureIO } = await import('./fixtures.js');
-  makeIO = (chainId) => createFixtureIO(chainId, FIXTURES_MODE);
+  // The demo reads both contracts, the way the real chain I/O does.
+  makeIO = (chainId) => createFixtureIO(chainId, FIXTURES_MODE, { v2: true });
 }
 
 const readers = new Map(); // chainId -> reader

@@ -3,7 +3,10 @@ import { toFunctionSelector } from 'viem';
 import { prepare } from './app.mjs';
 
 const PUBLISH = toFunctionSelector('publish(bytes32,bytes)');
-const GLYPH = '0x000000ae2f2249c497cfc5f262dd1491634c361c';
+// The mock node has the second contract deployed on both chains, so a post
+// goes there — through the same two-argument call v1 takes, since no hook
+// was chosen. hooks.spec.js covers the other calls.
+const GLYPH = '0x0000009857c02e4bc9e55b4fc2f6681a8fe23ce1';
 
 test.describe('the write tab', () => {
   test('publishes to the chosen chain through the wallet, after it is switched there', async ({ page }) => {

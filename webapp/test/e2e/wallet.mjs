@@ -50,6 +50,10 @@ function installWallets(opts) {
             return null;
           case 'eth_sendTransaction':
             return `0x${(calls.length + 0x1000 + i * 0x100).toString(16).padStart(64, '0')}`;
+          case 'eth_signTypedData_v4':
+            // A signature-shaped answer; the call is recorded so a test can
+            // read the typed data the app asked the wallet to sign.
+            return `0x${'ab'.repeat(32)}${'cd'.repeat(32)}1b`;
           case 'eth_estimateGas':
             return '0x5208';
           case 'eth_gasPrice':

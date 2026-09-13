@@ -98,6 +98,19 @@ export default function CostPanel({ estimate, market, chainId, history = [], com
         </p>
       )}
 
+      {/* ETH the post carries to its hook: not gas, but money all the same. */}
+      {estimate.hookValueEth > 0 && (
+        <Body as="div" className="mt-1.5 flex items-baseline justify-between gap-4" data-hook-value="">
+          <span>{t('cost.hookValue')}</span>
+          <span className="tabular-nums text-right">
+            {fmtEth(estimate.hookValueEth)}
+            {usdAvailable && market.ethUsd != null && (
+              <span className="ml-2 text-ink-faint">{fmtUsd(estimate.hookValueEth * market.ethUsd)}</span>
+            )}
+          </span>
+        </Body>
+      )}
+
       <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-edge pt-2.5 text-sm font-medium text-ink">
         <span>{t('cost.total')}</span>
         <span className="tabular-nums text-right">
@@ -105,6 +118,7 @@ export default function CostPanel({ estimate, market, chainId, history = [], com
           {usdAvailable && <span className="ml-2 font-normal text-ink-soft">{fmtUsd(totalCost.usd)}</span>}
         </span>
       </div>
+      {estimate.hooked && <Note className="mt-1.5">{t('cost.hookNote')}</Note>}
 
       {/* When: the last day of block space, from the chain's own headers. */}
       {history.length >= 2 && (
