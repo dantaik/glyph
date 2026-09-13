@@ -18,14 +18,103 @@ contract NoopHook is IPublishHook {
     }
 }
 
+/// @dev Measures from inside a contract of its own, in one call per
+///      measurement, so that the numbers are the core's own work and nothing
+///      else — whether or not the test runner wraps each top-level call in a
+///      transaction of its own (Foundry does by default since 1.8 and did
+///      not before; the difference is 21,000 gas plus the calldata, which
+///      says nothing about the contract). The probe is the author of the
+///      plain and hooked posts; a relayed post is signed by an account whose
+///      key the test holds.
+contract GasProbe {
+    Glyph internal immutable v1;
+    GlyphV2 internal immutable v2;
+    address internal immutable hook;
+
+    constructor(Glyph v1_, GlyphV2 v2_, address hook_) {
+        v1 = v1_;
+        v2 = v2_;
+        hook = hook_;
+    }
+
+    /// One post on each contract first, so that the author's slot, both
+    /// contracts and the memory are warm on both sides alike; then the
+    /// author's second post on each, measured.
+    function plain(bytes32 title, bytes calldata payload) external returns (uint256 one, uint256 two) {
+        v1.publish(title, payload);
+        v2.publish(title, payload);
+        uint256 g = gasleft();
+        v1.publish(title, payload);
+        one = g - gasleft();
+        g = gasleft();
+        v2.publish(title, payload);
+        two = g - gasleft();
+    }
+
+    /// A plain post and a post through the hook, the hook still cold — as it
+    /// is in a real transaction.
+    function hooked(bytes32 title, bytes calldata payload) external returns (uint256 plainUsed, uint256 hookedUsed) {
+        v2.publish(title, payload);
+        uint256 g = gasleft();
+        v2.publish(title, payload);
+        plainUsed = g - gasleft();
+        g = gasleft();
+        v2.publish(title, payload, hook, "");
+        hookedUsed = g - gasleft();
+    }
+
+    /// The hook call's overhead at two payload sizes, everything warm —
+    /// the hook included — so that what is left is the copy of the payload.
+    function hookedSizes(bytes32 title, bytes calldata small, bytes calldata large)
+        external
+        returns (uint256 plainSmall, uint256 hookedSmall, uint256 plainLarge, uint256 hookedLarge)
+    {
+        v2.publish(title, large);
+        v2.publish(title, small, hook, "");
+        uint256 g = gasleft();
+        v2.publish(title, small);
+        plainSmall = g - gasleft();
+        g = gasleft();
+        v2.publish(title, small, hook, "");
+        hookedSmall = g - gasleft();
+        g = gasleft();
+        v2.publish(title, large);
+        plainLarge = g - gasleft();
+        g = gasleft();
+        v2.publish(title, large, hook, "");
+        hookedLarge = g - gasleft();
+    }
+
+    /// The probe's second plain post against the signer's second relayed
+    /// post: `first` lands the signer's post #0 so that their slot is as
+    /// warm and as non-zero as the probe's own when `second` (#1) is timed.
+    function relayed(
+        address author,
+        bytes32 title,
+        bytes calldata payload,
+        uint256 deadline,
+        bytes calldata first,
+        bytes calldata second
+    ) external returns (uint256 plainUsed, uint256 relayedUsed) {
+        v2.publish(title, payload);
+        v2.publishFor(author, title, payload, address(0), "", deadline, first);
+        uint256 g = gasleft();
+        v2.publish(title, payload);
+        plainUsed = g - gasleft();
+        g = gasleft();
+        v2.publishFor(author, title, payload, address(0), "", deadline, second);
+        relayedUsed = g - gasleft();
+    }
+}
+
 /// @title What the second contract costs, next to the first.
-/// @notice These are steady-state numbers: the author's second post, with
-///         the author's slot and both contracts already touched in this
-///         transaction, so what is measured is the contract's own work.
-///         A real transaction adds the same 21,000 base, the same calldata
-///         and the same cold-access charges to every one of these, and
-///         under EIP-7623 the calldata floor (10 gas per token) usually
-///         swallows the whole execution anyway — see glyph-spec §4.1.
+/// @notice Steady-state numbers: an author's second post, with the slot and
+///         both contracts already touched, so what is measured is the
+///         contract's own work. A real transaction adds the same 21,000
+///         base, the same calldata and the same cold-access charges to every
+///         one of these, and under EIP-7623 the calldata floor (10 gas per
+///         token) usually swallows the whole execution anyway — see
+///         glyph-spec §4.1.
 ///
 ///         The bounds are regression guards, not targets: a change that
 ///         makes the plain post cost more than one extra topic over v1, or
@@ -35,6 +124,7 @@ contract GasTest is Test {
     Glyph internal v1;
     GlyphV2 internal v2;
     NoopHook internal hook;
+    GasProbe internal probe;
 
     uint256 internal constant PK = 0xA11CE;
     address internal author;
@@ -44,6 +134,7 @@ contract GasTest is Test {
         v1 = new Glyph();
         v2 = new GlyphV2();
         hook = new NoopHook();
+        probe = new GasProbe(v1, v2, address(hook));
         author = vm.addr(PK);
     }
 
@@ -55,91 +146,40 @@ contract GasTest is Test {
         }
     }
 
-    /// One post on each contract, so that the slot, the addresses and the
-    /// memory are warm on both sides alike before anything is measured.
-    function _warm(bytes memory payload) internal {
-        vm.startPrank(author);
-        v1.publish(TITLE, payload);
-        v2.publish(TITLE, payload);
-        vm.stopPrank();
-        vm.roll(block.number + 1);
-    }
-
-    function _v1(bytes memory payload) internal returns (uint256 used) {
-        vm.prank(author);
-        uint256 before = gasleft();
-        v1.publish(TITLE, payload);
-        used = before - gasleft();
-    }
-
-    function _v2Plain(bytes memory payload) internal returns (uint256 used) {
-        vm.prank(author);
-        uint256 before = gasleft();
-        v2.publish(TITLE, payload);
-        used = before - gasleft();
-    }
-
-    function _v2Hooked(bytes memory payload) internal returns (uint256 used) {
-        vm.prank(author);
-        uint256 before = gasleft();
-        v2.publish(TITLE, payload, address(hook), "");
-        used = before - gasleft();
-    }
-
-    function _v2Relayed(bytes memory payload) internal returns (uint256 used) {
-        uint256 deadline = block.timestamp + 1 days;
-        bytes32 digest = v2.publishDigest(author, TITLE, keccak256(payload), address(0), keccak256(""), v2.count(author), deadline);
+    /// The author's signature for their post `index`, plain, with `payload`.
+    function _signed(bytes memory payload, uint256 index, uint256 deadline) internal view returns (bytes memory) {
+        bytes32 digest = v2.publishDigest(author, TITLE, keccak256(payload), address(0), keccak256(""), index, deadline);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PK, digest);
-        bytes memory signature = abi.encodePacked(r, s, v);
-        address relayer = address(0xBEEF);
-        vm.prank(relayer);
-        uint256 before = gasleft();
-        v2.publishFor(author, TITLE, payload, address(0), "", deadline, signature);
-        used = before - gasleft();
+        return abi.encodePacked(r, s, v);
     }
 
     function test_gas_aPlainPostOnV2CostsOneTopicMoreThanV1() public {
-        bytes memory payload = _payload(2048);
-        _warm(payload);
-        uint256 one = _v1(payload);
-        uint256 two = _v2Plain(payload);
+        (uint256 one, uint256 two) = probe.plain(TITLE, _payload(2048));
         console2.log("v1 publish, 2 KiB payload, warm:          ", one);
         console2.log("v2 publish (plain), 2 KiB payload, warm:  ", two);
         console2.log("v2 over v1:                               ", two - one);
         // The hook is an indexed topic of the v2 event: 375 gas. The rest is
         // the dispatch over ten functions instead of three, the zero-hook and
         // no-value checks, and the plumbing into the shared `_publish`:
-        // measured at 749 in all. Anything past 900 is new.
+        // measured at 760 in all. Anything past 900 is new.
         assertGe(two, one + 375);
         assertLe(two - one, 900);
     }
 
     function test_gas_aHookCallIsABoundedOverheadOnThePost() public {
-        bytes memory payload = _payload(2048);
-        _warm(payload);
-        uint256 plain = _v2Plain(payload);
-        uint256 hooked = _v2Hooked(payload);
-        console2.log("v2 publish (plain), 2 KiB:                ", plain);
-        console2.log("v2 publish through a no-op hook, 2 KiB:   ", hooked);
-        console2.log("the hook call itself:                     ", hooked - plain);
+        (uint256 plainUsed, uint256 hookedUsed) = probe.hooked(TITLE, _payload(2048));
+        console2.log("v2 publish (plain), 2 KiB:                ", plainUsed);
+        console2.log("v2 publish through a no-op hook, 2 KiB:   ", hookedUsed);
+        console2.log("the hook call itself:                     ", hookedUsed - plainUsed);
         // A cold contract (2,600), the call, the payload copied into memory
         // for it, the selector checked on the way back. The hook's own work
         // comes on top and is the hook's to account for.
-        assertLe(hooked - plain, 12_000);
+        assertLe(hookedUsed - plainUsed, 12_000);
     }
 
     function test_gas_theHookCallGrowsWithThePayloadItIsHanded() public {
-        bytes memory small = _payload(2048);
-        bytes memory large = _payload(16_384);
-        // Warm with the large payload, and call the hook once, so that this
-        // contract's own memory and the hook's address are paid for before
-        // anything is measured: what is left is the core's work per call.
-        _warm(large);
-        _v2Hooked(small);
-        uint256 plainSmall = _v2Plain(small);
-        uint256 hookedSmall = _v2Hooked(small);
-        uint256 plainLarge = _v2Plain(large);
-        uint256 hookedLarge = _v2Hooked(large);
+        (uint256 plainSmall, uint256 hookedSmall, uint256 plainLarge, uint256 hookedLarge) =
+            probe.hookedSizes(TITLE, _payload(2048), _payload(16_384));
         console2.log("hook call overhead, warm hook, 2 KiB:     ", hookedSmall - plainSmall);
         console2.log("hook call overhead, warm hook, 16 KiB:    ", hookedLarge - plainLarge);
         // The payload is copied once more for the hook: 3 gas a word plus
@@ -152,14 +192,14 @@ contract GasTest is Test {
 
     function test_gas_aRelayedPostCostsASignatureCheck() public {
         bytes memory payload = _payload(2048);
-        _warm(payload);
-        uint256 plain = _v2Plain(payload);
-        uint256 relayed = _v2Relayed(payload);
-        console2.log("v2 publish (plain), 2 KiB:                ", plain);
-        console2.log("v2 publishFor (EOA signature), 2 KiB:     ", relayed);
-        console2.log("the signature check and the digest:       ", relayed - plain);
+        uint256 deadline = block.timestamp + 1 days;
+        (uint256 plainUsed, uint256 relayedUsed) =
+            probe.relayed(author, TITLE, payload, deadline, _signed(payload, 0, deadline), _signed(payload, 1, deadline));
+        console2.log("v2 publish (plain), 2 KiB:                ", plainUsed);
+        console2.log("v2 publishFor (EOA signature), 2 KiB:     ", relayedUsed);
+        console2.log("the signature check and the digest:       ", relayedUsed - plainUsed);
         // ecrecover is 3,000; hashing the payload, the struct and the domain
         // and reading the count for the nonce are the rest.
-        assertLe(relayed - plain, 12_000);
+        assertLe(relayedUsed - plainUsed, 12_000);
     }
 }

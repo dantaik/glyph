@@ -268,15 +268,16 @@ protocol and to be read against. A paid post, a tip, an attestation, a collectib
 shape — a contract that implements `onPublish` and trusts the core.
 
 **What it costs.** Measured by `contracts/test/Gas.t.sol` (steady state: the author's second post,
-a 2 KiB payload, everything but the hook already warm; a real transaction adds the same 21,000 base,
-the same calldata and the same cold-access charges to each line):
+a 2 KiB payload, everything but the hook already warm, measured from inside a contract so that the
+test runner's own transaction wrapping does not enter into it; a real transaction adds the same
+21,000 base, the same calldata and the same cold-access charges to each line):
 
 | Call | Gas | Over the plain v1 call |
 |---|---|---|
-| `Glyph.publish` (v1) | 4,156 | — |
-| `GlyphV2.publish(title, payload)` | 4,905 | +749: the hook topic (375), the dispatch and the checks |
-| `GlyphV2.publish(…, hook, data)`, a hook that only accepts | 12,408 | +7,503 for the call itself: the cold hook (2,600), the call, the payload copied for it, the selector checked; the hook's own work comes on top |
-| `GlyphV2.publishFor` (EOA signature) | 11,881 | +6,976: `ecrecover` (3,000), the digest, the count read for the nonce |
+| `Glyph.publish` (v1) | 4,016 | — |
+| `GlyphV2.publish(title, payload)` | 4,776 | +760: the hook topic (375), the dispatch and the checks |
+| `GlyphV2.publish(…, hook, data)`, a hook that only accepts | 10,163 | +5,387 for the call itself: the cold hook (2,600), the call, the payload copied for it, the selector checked; the hook's own work comes on top |
+| `GlyphV2.publishFor` (EOA signature) | 11,583 | +6,807: `ecrecover` (3,000), the digest, the count read for the nonce |
 
 Two things put those numbers in proportion. First, a post's gas is its calldata: a 2 KiB letter
 is ~33,000 gas of calldata at 16 a byte, so even the relayed call adds about a fifth to the cheapest
