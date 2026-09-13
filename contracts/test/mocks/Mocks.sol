@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IPublishHook} from "../../src/IPublishHook.sol";
-import {GlyphV2} from "../../src/GlyphV2.sol";
+import {Xueni} from "../../src/Xueni.sol";
 
 /// A hook that records exactly what it was called with, and can be told to
 /// misbehave in each of the ways the core has to catch.
@@ -17,8 +17,8 @@ contract RecordingHook is IPublishHook {
         bytes payload;
         bytes hookData;
         uint256 value;
-        uint256 countSeen; // glyph.count(author) at the time of the call
-        uint256 latestSeen; // glyph.latestBlock(author) at the time of the call
+        uint256 countSeen; // xueni.count(author) at the time of the call
+        uint256 latestSeen; // xueni.latestBlock(author) at the time of the call
     }
 
     enum Mode {
@@ -30,12 +30,12 @@ contract RecordingHook is IPublishHook {
 
     error Nope(string why);
 
-    GlyphV2 public immutable glyph;
+    Xueni public immutable xueni;
     Mode public mode;
     Call[] internal _calls;
 
-    constructor(GlyphV2 glyph_) {
-        glyph = glyph_;
+    constructor(Xueni xueni_) {
+        xueni = xueni_;
     }
 
     function setMode(Mode m) external {
@@ -72,8 +72,8 @@ contract RecordingHook is IPublishHook {
                 payload: payload,
                 hookData: hookData,
                 value: msg.value,
-                countSeen: glyph.count(author),
-                latestSeen: glyph.latestBlock(author)
+                countSeen: xueni.count(author),
+                latestSeen: xueni.latestBlock(author)
             })
         );
         if (mode == Mode.WrongSelector) return bytes4(0xdeadbeef);
@@ -83,10 +83,10 @@ contract RecordingHook is IPublishHook {
 
 /// A hook that re-enters the core and publishes a post of its own.
 contract ReenteringHook is IPublishHook {
-    GlyphV2 public immutable glyph;
+    Xueni public immutable xueni;
 
-    constructor(GlyphV2 glyph_) {
-        glyph = glyph_;
+    constructor(Xueni xueni_) {
+        xueni = xueni_;
     }
 
     function onPublish(address, address, uint256, uint256, bytes32, bytes calldata, bytes calldata)
@@ -95,7 +95,7 @@ contract ReenteringHook is IPublishHook {
         override
         returns (bytes4)
     {
-        glyph.publish(bytes32("from the hook"), hex"3b");
+        xueni.publish(bytes32("from the hook"), hex"3b");
         return IPublishHook.onPublish.selector;
     }
 }

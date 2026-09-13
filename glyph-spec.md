@@ -6,8 +6,9 @@
 > Ethereum L1 calldata. No off-chain dependencies, designed to outlive its
 > authors and still be readable by their children decades from now.
 > Product name: **雪泥**, written **Xueni** in English (from the idiom 雪泥鸿爪 —
-> the prints a wild goose leaves in the snow). The Solidity contract keeps its
-> original name, `Glyph` — renaming it would move its deterministic address.
+> the prints a wild goose leaves in the snow). The first Solidity contract keeps
+> its original name, `Glyph` — renaming it would move its deterministic address;
+> the second contract (§4.1), deployed later, carries the product's name, `Xueni`.
 
 ---
 
@@ -17,7 +18,7 @@
 2. [Architecture](#2-architecture)
 3. [Cost](#3-cost)
 4. [The contract, `Blog.sol`](#4-the-contract-blogsol) (contract name `Glyph`)
-   · [4.1 The second contract, `GlyphV2.sol`: hooks and `publishFor`](#41-the-second-contract-glyphv2sol-hooks-and-publishfor)
+   · [4.1 The second contract, `Xueni.sol`: hooks and `publishFor`](#41-the-second-contract-xuenisol-hooks-and-publishfor)
 5. [Payload encoding (`payload.js`)](#5-payload-encoding-payloadjs)
    · [5.1 Front-matter keys](#51-front-matter-keys)
 6. [The publish pipeline, `publish.js`](#6-the-publish-pipeline-publishjs)
@@ -189,12 +190,12 @@ contract Blog {
 - **`author` is indexed**, so the reader can use `eth_getLogs({ args: { author } })` to pick that author's logs precisely out of a single block. It costs +375 gas per post.
 - **A packed slot**: `uint96 + uint48 = 144 bits < 256`, so the whole `AuthorState` occupies one slot and each publish is one warm SSTORE. The first post pays the cold-slot fee once (~22k gas).
 
-### 4.1 The second contract, `GlyphV2.sol`: hooks and `publishFor`
+### 4.1 The second contract, `Xueni.sol`: hooks and `publishFor`
 
 The contract above is immutable and stays where it is; every post on it stays readable forever. But
 it has one door, `publish()`, and everything a community might want around a post — a publication
 with members, a fee, an index by topic, a collectible, a post submitted for someone who cannot pay
-gas — would have to be built beside it with no way to run inside the post. `GlyphV2.sol` is the
+gas — would have to be built beside it with no way to run inside the post. `Xueni.sol` is the
 same journal with two more doors, deployed as a second contract at its own CREATE2 address (§11),
 and read by every surface alongside the first (§7). Its design borrows the one idea of Uniswap v4's
 hooks that fits an ownerless journal: **the core stays minimal and immutable, and third-party code
@@ -240,7 +241,7 @@ is the whole protocol, and the constraints are the design:
 
 **Publishing on someone's behalf.** A hook cannot decide authorship, so relaying is in the core.
 `publishFor` records a post under `author` when the caller presents the author's EIP-712 signature
-(domain `Glyph` / `2` / the chain / the contract) over
+(domain `Xueni` / `1` / the chain / the contract) over
 `Publish(author, title, keccak256(payload), hook, keccak256(hookData), index, deadline)`, and the
 `Post` event names the author, not the sender. The **nonce is the author's next post index**
 (`count(author)`), which does three things at once: signatures land in the order they were made,
@@ -275,9 +276,9 @@ test runner's own transaction wrapping does not enter into it; a real transactio
 | Call | Gas | Over the plain v1 call |
 |---|---|---|
 | `Glyph.publish` (v1) | 4,016 | — |
-| `GlyphV2.publish(title, payload)` | 4,776 | +760: the hook topic (375), the dispatch and the checks |
-| `GlyphV2.publish(…, hook, data)`, a hook that only accepts | 10,163 | +5,387 for the call itself: the cold hook (2,600), the call, the payload copied for it, the selector checked; the hook's own work comes on top |
-| `GlyphV2.publishFor` (EOA signature) | 11,583 | +6,807: `ecrecover` (3,000), the digest, the count read for the nonce |
+| `Xueni.publish(title, payload)` | 4,776 | +760: the hook topic (375), the dispatch and the checks |
+| `Xueni.publish(…, hook, data)`, a hook that only accepts | 10,163 | +5,387 for the call itself: the cold hook (2,600), the call, the payload copied for it, the selector checked; the hook's own work comes on top |
+| `Xueni.publishFor` (EOA signature) | 11,583 | +6,807: `ecrecover` (3,000), the digest, the count read for the nonce |
 
 Two things put those numbers in proportion. First, a post's gas is its calldata: a 2 KiB letter
 is ~33,000 gas of calldata at 16 a byte, so even the relayed call adds about a fifth to the cheapest
@@ -655,7 +656,7 @@ code, and any tool that reads JSON can read it decades from now.
   "glyph": { "archive": 1 },
   "exportedAt": "2026-09-04T12:00:00.000Z",
   "contract": "0x000000AE2f2249c497cfc5F262dd1491634C361C",
-  "contracts": { "1": "0x000000AE2f2249c497cfc5F262dd1491634C361C", "2": "0x0000009857c02e4BC9E55b4fC2F6681a8FE23Ce1" },
+  "contracts": { "1": "0x000000AE2f2249c497cfc5F262dd1491634C361C", "2": "0x0000008D02020df6bCDD56A888cFC9eD9b9053eC" },
   "scope": { "kind": "author", "address": "0x…" },
   "posts": [
     { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 5,
@@ -665,8 +666,8 @@ code, and any tool that reads JSON can read it decades from now.
     { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 0,
       "block": 25990000, "prevBlock": 0, "logIndex": 3, "ts": 1757900000,
       "title": "Through the fan-out", "text": "…", "compressedBytes": 610,
-      "version": 2, "contract": "0x0000009857c02e4bc9e55b4fc2f6681a8fe23ce1",
-      "hook": "0x000009c923d41260e61f5bbadbaff7e083920993" }
+      "version": 2, "contract": "0x0000008d02020df6bcdd56a888cfc9ed9b9053ec",
+      "hook": "0x00000e2b71d66e5feda58a70e6d5ae3762a18d93" }
   ],
   "images": [{ "chainId": 1, "txHash": "0x…", "mime": "image/webp", "base64": "UklGR…" }],
   "authors": [{ "chainId": 1, "address": "0x…", "head": 25990000, "heads": { "1": 25945650, "2": 25990000 }, "complete": true }]
@@ -745,7 +746,7 @@ code, and any tool that reads JSON can read it decades from now.
 | Scan coverage | localStorage records **a set of ranges** already scanned, rather than one frontier | Paging back only fills unread gaps; a range already scanned is never scanned again |
 | Request de-duplication | indexed within a session by (author, index) / (txHash, event index) | One post is requested from the node at most once per session, whichever page it is reached from |
 | Interface language | English by default, switchable to Chinese; the choice is stored in `localStorage` (`glyph.lang.v1`) and applied without a reload | The interface is a presentation layer over on-chain content; a post stays in the language it was written in |
-| Extending the protocol | A second contract (`GlyphV2.sol`) with **one optional hook per post**, named by the author in the call, called once after the post is recorded, with the call's ETH forwarded; no registry, no permission flags, the hook an indexed event topic | Uniswap v4's lesson, trimmed to a journal: an immutable core plus third-party code at one fixed point inside the transaction lets publications, fees, indexes and collectibles be built by anyone without touching the core; effects-before-call means no hook can change who wrote what |
+| Extending the protocol | A second contract (`Xueni.sol`) with **one optional hook per post**, named by the author in the call, called once after the post is recorded, with the call's ETH forwarded; no registry, no permission flags, the hook an indexed event topic | Uniswap v4's lesson, trimmed to a journal: an immutable core plus third-party code at one fixed point inside the transaction lets publications, fees, indexes and collectibles be built by anyone without touching the core; effects-before-call means no hook can change who wrote what |
 | Publishing for someone else | `publishFor` in the core, against the author's EIP-712 signature, with the author's next post index as the nonce | A hook runs after authorship is decided, so relaying cannot be a hook; the index as nonce keeps signatures in order, unreplayable, and cancellable by the author's own next post |
 | Composing hooks | One hook in the core; `MultiHook` fans a post out to several, each with its own data and share of the ETH | The core stays one call and one check; composition is a hook's business, and a fan-out that trusts the core is all it takes |
 | Two contracts per chain | Every surface reads v1 and v2 together, a post carries a `version`, and the write tab targets v2 where it is deployed | v1 is immutable and its posts are forever; the reader treats the pair as one journal rather than asking authors to move |
@@ -792,14 +793,14 @@ useful when pointing the app at your own deployment:
 ```bash
 # webapp/.env.local (optional)
 VITE_GLYPH_ADDRESS=0x...          # override the built-in contract address
-VITE_GLYPH_V2_ADDRESS=0x...       # override the second contract's address (§4.1)
+VITE_XUENI_ADDRESS=0x...       # override the second contract's address (§4.1)
 VITE_MULTI_HOOK_ADDRESS=0x...     # override the fan-out hook's address
 VITE_RPC_URL=https://...          # the default RPC (overridable in the UI settings)
 VITE_CHAIN_ID=1                   # 1=mainnet, 11155111=sepolia
 ```
 
-The second contract and the fan-out hook have CREATE2 addresses of their own (`DEFAULT_GLYPH_V2_ADDRESS`,
-`DEFAULT_MULTI_HOOK_ADDRESS` in `chains.js`; the salts are pinned in `script/Create2DeployV2.s.sol`),
+The second contract and the fan-out hook have CREATE2 addresses of their own (`DEFAULT_XUENI_ADDRESS`,
+`DEFAULT_MULTI_HOOK_ADDRESS` in `chains.js`; the salts are pinned in `script/Create2DeployXueni.s.sol`),
 and the app reads them on every chain whether or not they are deployed there yet: a chain without
 them reads as empty.
 

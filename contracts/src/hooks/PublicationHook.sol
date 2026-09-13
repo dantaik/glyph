@@ -52,7 +52,7 @@ contract PublicationHook is BasePublishHook {
     error NotOwner(bytes32 id, address caller);
     error NotMember(bytes32 id, address author);
 
-    constructor(address glyph_, address composer_) BasePublishHook(glyph_, composer_) {}
+    constructor(address xueni_, address composer_) BasePublishHook(xueni_, composer_) {}
 
     /// @notice The id a name gets.
     function idOf(string calldata name) public pure returns (bytes32) {

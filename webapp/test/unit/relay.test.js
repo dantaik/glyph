@@ -19,13 +19,13 @@ import {
 } from '../../src/lib/relay';
 import { encodeTitle } from '../../src/lib/title';
 
-const CONTRACT = '0x0000009857c02e4bc9e55b4fc2f6681a8fe23ce1';
+const CONTRACT = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
 const AUTHOR = '0x8a1f3b52c9e44e1a9b1f0d2c7a44e0b1d2e3f4a5';
-const HOOK = '0x000009c923d41260e61f5bbadbaff7e083920993';
+const HOOK = '0x00000e2b71d66e5feda58a70e6d5ae3762a18d93';
 const SIG = `0x${'ab'.repeat(32)}${'cd'.repeat(32)}1b`;
 const PAYLOAD = toHex(new TextEncoder().encode('# The drums\n\nThey beat all afternoon.\n'));
 
-/** GlyphV2.PUBLISH_TYPEHASH, as `cast keccak` computes it from the contract's string. */
+/** Xueni.PUBLISH_TYPEHASH, as `cast keccak` computes it from the contract's string. */
 const PUBLISH_TYPEHASH = '0x7021345f7fad316ba3ea48618e456fc23fef7604f5e11d420be886ec86075d85';
 const DOMAIN_TYPEHASH = keccak256(stringToHex('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'));
 
@@ -42,9 +42,9 @@ const fields = {
 };
 
 describe('what the author signs', () => {
-  it('is the Publish struct under the Glyph/2 domain, with the hashes of the bytes', () => {
+  it('is the Publish struct under the Xueni/1 domain, with the hashes of the bytes', () => {
     const typed = relayTypedData(fields);
-    expect(typed.domain).toEqual({ name: 'Glyph', version: '2', chainId: 1, verifyingContract: CONTRACT });
+    expect(typed.domain).toEqual({ name: 'Xueni', version: '1', chainId: 1, verifyingContract: CONTRACT });
     expect(typed.domain).toEqual(publishDomain(1, CONTRACT));
     expect(typed.primaryType).toBe('Publish');
     expect(typed.types).toBe(PUBLISH_TYPES);
@@ -63,7 +63,7 @@ describe('what the author signs', () => {
     expect(plain.hookDataHash).toBe(keccak256('0x'));
   });
 
-  it('hashes to exactly what GlyphV2.publishDigest computes', () => {
+  it('hashes to exactly what Xueni.publishDigest computes', () => {
     // The contract's own arithmetic, spelled out: keccak256("\x19\x01" ‖
     // domainSeparator ‖ structHash), with the typehash the Solidity source
     // declares. If viem's typed-data encoding of PUBLISH_TYPES ever drifted
@@ -71,7 +71,7 @@ describe('what the author signs', () => {
     const domainSeparator = keccak256(
       encodeAbiParameters(
         [{ type: 'bytes32' }, { type: 'bytes32' }, { type: 'bytes32' }, { type: 'uint256' }, { type: 'address' }],
-        [DOMAIN_TYPEHASH, keccak256(stringToHex('Glyph')), keccak256(stringToHex('2')), 1n, CONTRACT],
+        [DOMAIN_TYPEHASH, keccak256(stringToHex('Xueni')), keccak256(stringToHex('1')), 1n, CONTRACT],
       ),
     );
     const structHash = keccak256(

@@ -12,7 +12,7 @@
 // announced extension, or WalletConnect where a build carries a project id.
 
 import { createWalletClient, custom, toHex } from 'viem';
-import { GLYPH_ADDRESS, GLYPH_V2_ADDRESS, contractAddress } from './config';
+import { GLYPH_ADDRESS, XUENI_ADDRESS, contractAddress } from './config';
 import { getChain } from './chains';
 import { abi, abiV2 } from './abi';
 import { getClient } from './clients';
@@ -293,7 +293,7 @@ export async function publishPost({
   if (!hooked) {
     return wallet.writeContract({
       account,
-      address: GLYPH_V2_ADDRESS,
+      address: XUENI_ADDRESS,
       abi: abiV2,
       functionName: 'publish',
       args: [titleHex, toHex(payload)],
@@ -301,7 +301,7 @@ export async function publishPost({
   }
   return wallet.writeContract({
     account,
-    address: GLYPH_V2_ADDRESS,
+    address: XUENI_ADDRESS,
     abi: abiV2,
     functionName: 'publish',
     args: [titleHex, toHex(payload), hook ?? ZERO_ADDRESS, hookData ?? '0x'],
@@ -310,7 +310,7 @@ export async function publishPost({
 }
 
 /**
- * Sign a post for somebody else to send (GlyphV2.publishFor), and hand
+ * Sign a post for somebody else to send (Xueni.publishFor), and hand
  * back the ticket that carries it. The author's next index on the v2
  * contract is read fresh from the node — it is the nonce, so a stale count
  * would sign a post that can never land. The wallet is asked for an

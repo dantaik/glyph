@@ -227,7 +227,7 @@ export function encodePublishCallData({ title, payload, hook = null, hookData = 
 
 /**
  * Encode a `publishFor()` call: a post submitted on `author`'s behalf,
- * against their EIP-712 signature (see GlyphV2.sol `publishDigest`).
+ * against their EIP-712 signature (see Xueni.sol `publishDigest`).
  * @param {{ author: string, title: string | Uint8Array, payload: Uint8Array | string, hook?: string | null, hookData?: Uint8Array | string | null, deadline: number | bigint | string, signature: Uint8Array | string }} args
  * @returns {string} the calldata, `0x`-prefixed lowercase hex
  */

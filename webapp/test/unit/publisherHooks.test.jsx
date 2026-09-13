@@ -33,7 +33,7 @@ vi.mock('../../src/lib/publish', async () => {
       return {
         xueni: { relay: 1 },
         chainId: args.chainId,
-        contract: '0x0000009857c02e4bc9e55b4fc2f6681a8fe23ce1',
+        contract: '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec',
         author: '0x327fa3369b1d1d42120d84bc407e5865eca7c458',
         title: `0x${'00'.repeat(32)}`,
         titleText: args.title,
@@ -104,7 +104,7 @@ describe('the write tab with the v2 contract', () => {
   it('offers a hook and publishes through it to v2', async () => {
     render(<Publisher />);
     await waitFor(() => expect(document.querySelector('[data-publish-target="2"]')).toBeTruthy());
-    expect(screen.getByText('This post goes to Glyph v2 on Ethereum.')).toBeTruthy();
+    expect(screen.getByText('This post goes to Xueni on Ethereum.')).toBeTruthy();
     fireEvent.change(titleBox(), { target: { value: 'Through a hook' } });
     fireEvent.click(screen.getByRole('button', { name: 'One hook' }));
     fireEvent.change(screen.getByLabelText('Hook address'), { target: { value: '0x00000000000000000000000000000000000000ab' } });
@@ -143,7 +143,7 @@ describe('the write tab with the v2 contract', () => {
     expect(signed).toHaveLength(1);
     expect(signed[0]).toMatchObject({ chainId: 1, title: 'Signed, not sent', days: 30, hook: null });
     expect(published).toHaveLength(0);
-    expect(document.querySelector('[data-relay-ticket]').textContent).toContain('as your post #5 on Glyph v2 on Ethereum');
+    expect(document.querySelector('[data-relay-ticket]').textContent).toContain('as your post #5 on Xueni on Ethereum');
     expect(document.querySelector('[data-relay-ticket] textarea').value).toContain('"xueni"');
   });
 
@@ -151,7 +151,7 @@ describe('the write tab with the v2 contract', () => {
     v2 = false;
     render(<Publisher />);
     await waitFor(() => expect(document.querySelector('[data-publish-target="1"]')).toBeTruthy());
-    expect(screen.getByText(/Hooks need Glyph v2, which is not deployed on Ethereum yet/)).toBeTruthy();
+    expect(screen.getByText(/Hooks need Xueni, which is not deployed on Ethereum yet/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Sign for a relayer instead' })).toBeNull();
     expect(document.querySelector('[data-relay-panel]')).toBeNull();
     fireEvent.change(titleBox(), { target: { value: 'Plain' } });

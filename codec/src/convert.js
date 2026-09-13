@@ -56,7 +56,7 @@ export const postToCallData = (post, options) => encodePost(post, options).callD
 /**
  * The calldata of a `publishFor()` call that would publish `post` on
  * `author`'s behalf. The signature is the author's, over the digest
- * `GlyphV2.publishDigest(author, title, keccak256(payload), hook,
+ * `Xueni.publishDigest(author, title, keccak256(payload), hook,
  * keccak256(hookData), index, deadline)`; making it is a wallet's business,
  * so this takes the finished bytes.
  * @param {import('./post.js').Post} post

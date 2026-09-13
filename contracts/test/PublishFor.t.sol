@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {GlyphV2} from "../src/GlyphV2.sol";
+import {Xueni} from "../src/Xueni.sol";
 import {RecordingHook, SmartWallet} from "./mocks/Mocks.sol";
 
 /// Publishing on someone's behalf: the signature, what it covers, how it
@@ -21,7 +21,7 @@ contract PublishForTest is Test {
     bytes32 constant TITLE = bytes32("Rain at midnight");
     bytes constant PAYLOAD = hex"0b0e804a7573742070726f73652e0a0a54776f20706172616772617068732e0a03";
 
-    GlyphV2 glyph;
+    Xueni xueni;
     RecordingHook hook;
     uint256 authorKey = 0xA11CE;
     address author;
@@ -29,8 +29,8 @@ contract PublishForTest is Test {
     uint256 deadline;
 
     function setUp() public {
-        glyph = new GlyphV2();
-        hook = new RecordingHook(glyph);
+        xueni = new Xueni();
+        hook = new RecordingHook(xueni);
         author = vm.addr(authorKey);
         vm.roll(100);
         vm.warp(1_000_000);
@@ -41,7 +41,7 @@ contract PublishForTest is Test {
 
     function domain() internal view returns (bytes32) {
         return keccak256(
-            abi.encode(DOMAIN_TYPEHASH, keccak256("Glyph"), keccak256("2"), block.chainid, address(glyph))
+            abi.encode(DOMAIN_TYPEHASH, keccak256("Xueni"), keccak256("1"), block.chainid, address(xueni))
         );
     }
 
@@ -75,65 +75,65 @@ contract PublishForTest is Test {
 
     function relay(bytes memory sig) internal {
         vm.prank(relayer);
-        glyph.publishFor(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
     }
 
     // --- The digest ----------------------------------------------------------
 
     function test_theDomainAndDigestAreTheSpecifiedOnes() public view {
-        assertEq(glyph.DOMAIN_SEPARATOR(), domain());
-        assertEq(glyph.PUBLISH_TYPEHASH(), TYPEHASH);
+        assertEq(xueni.DOMAIN_SEPARATOR(), domain());
+        assertEq(xueni.PUBLISH_TYPEHASH(), TYPEHASH);
         assertEq(
-            glyph.publishDigest(author, TITLE, keccak256(PAYLOAD), address(hook), keccak256(hex"c0ffee"), 7, deadline),
+            xueni.publishDigest(author, TITLE, keccak256(PAYLOAD), address(hook), keccak256(hex"c0ffee"), 7, deadline),
             digestOf(author, TITLE, PAYLOAD, address(hook), hex"c0ffee", 7, deadline)
         );
         (bytes1 fields, string memory name, string memory version, uint256 chainId, address verifying,,) =
-            glyph.eip712Domain();
+            xueni.eip712Domain();
         assertEq(fields, hex"0f");
-        assertEq(name, "Glyph");
-        assertEq(version, "2");
+        assertEq(name, "Xueni");
+        assertEq(version, "1");
         assertEq(chainId, block.chainid);
-        assertEq(verifying, address(glyph));
+        assertEq(verifying, address(xueni));
     }
 
     // --- The happy path -------------------------------------------------------
 
     function test_aRelayedPostIsRecordedUnderTheSigner() public {
-        vm.expectEmit(true, true, true, true, address(glyph));
+        vm.expectEmit(true, true, true, true, address(xueni));
         emit Post(author, address(0), 0, 0, TITLE);
         relay(plainSig(0));
-        assertEq(glyph.count(author), 1);
-        assertEq(glyph.latestBlock(author), 100);
-        assertEq(glyph.count(relayer), 0);
+        assertEq(xueni.count(author), 1);
+        assertEq(xueni.latestBlock(author), 100);
+        assertEq(xueni.count(relayer), 0);
     }
 
     function test_relayedPostsChainLikeAnyOther() public {
         relay(plainSig(0));
         vm.roll(140);
-        vm.expectEmit(true, true, true, true, address(glyph));
+        vm.expectEmit(true, true, true, true, address(xueni));
         emit Post(author, address(0), 1, 100, TITLE);
         relay(plainSig(1));
         // ...and mix with the author's own posts.
         vm.roll(180);
-        vm.expectEmit(true, true, true, true, address(glyph));
+        vm.expectEmit(true, true, true, true, address(xueni));
         emit Post(author, address(0), 2, 140, TITLE);
         vm.prank(author);
-        glyph.publish(TITLE, PAYLOAD);
-        assertEq(glyph.count(author), 3);
+        xueni.publish(TITLE, PAYLOAD);
+        assertEq(xueni.count(author), 3);
     }
 
     function test_theAuthorMayRelayTheirOwnPost() public {
         bytes memory sig = plainSig(0);
         vm.prank(author);
-        glyph.publishFor(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
-        assertEq(glyph.count(author), 1);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        assertEq(xueni.count(author), 1);
     }
 
     function test_anyoneMayRelay() public {
         bytes memory sig = plainSig(0);
         vm.prank(makeAddr("someone else entirely"));
-        glyph.publishFor(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
-        assertEq(glyph.count(author), 1);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        assertEq(xueni.count(author), 1);
     }
 
     // --- The nonce is the author's next index --------------------------------
@@ -141,28 +141,28 @@ contract PublishForTest is Test {
     function test_aSignatureIsSpentByThePostItLands() public {
         bytes memory sig = plainSig(0);
         relay(sig);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(sig);
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     function test_signaturesLandInOrder() public {
         bytes memory first = plainSig(0);
         bytes memory second = plainSig(1);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(second);
         relay(first);
         relay(second);
-        assertEq(glyph.count(author), 2);
+        assertEq(xueni.count(author), 2);
     }
 
     function test_theAuthorCancelsAnUnsentSignatureByPublishingAnything() public {
         bytes memory sig = plainSig(0);
         vm.prank(author);
-        glyph.publish(bytes32("something else"), hex"3b");
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        xueni.publish(bytes32("something else"), hex"3b");
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(sig);
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     // --- What the signature covers -------------------------------------------
@@ -171,47 +171,47 @@ contract PublishForTest is Test {
         bytes memory sig = sign(authorKey, digestOf(author, TITLE, PAYLOAD, address(hook), hex"c0ffee", 0, deadline));
 
         vm.startPrank(relayer);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(author, bytes32("another title"), PAYLOAD, address(hook), hex"c0ffee", deadline, sig);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(author, TITLE, hex"3b", address(hook), hex"c0ffee", deadline, sig);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(author, TITLE, PAYLOAD, address(0), hex"c0ffee", deadline, sig);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(author, TITLE, PAYLOAD, address(hook), hex"c0ffef", deadline, sig);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(author, TITLE, PAYLOAD, address(hook), hex"c0ffee", deadline + 1, sig);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(relayer, TITLE, PAYLOAD, address(hook), hex"c0ffee", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(author, bytes32("another title"), PAYLOAD, address(hook), hex"c0ffee", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(author, TITLE, hex"3b", address(hook), hex"c0ffee", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(0), hex"c0ffee", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(hook), hex"c0ffef", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(hook), hex"c0ffee", deadline + 1, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(relayer, TITLE, PAYLOAD, address(hook), hex"c0ffee", deadline, sig);
         // Exactly what was signed lands.
-        glyph.publishFor(author, TITLE, PAYLOAD, address(hook), hex"c0ffee", deadline, sig);
+        xueni.publishFor(author, TITLE, PAYLOAD, address(hook), hex"c0ffee", deadline, sig);
         vm.stopPrank();
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
         assertEq(hook.last().hookData, hex"c0ffee");
     }
 
     function test_anExpiredSignatureIsRefused() public {
         bytes memory sig = plainSig(0);
         vm.warp(deadline + 1);
-        vm.expectRevert(abi.encodeWithSelector(GlyphV2.SignatureExpired.selector, deadline));
+        vm.expectRevert(abi.encodeWithSelector(Xueni.SignatureExpired.selector, deadline));
         relay(sig);
         // The deadline itself is still good.
         vm.warp(deadline);
         relay(sig);
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     function test_aSignatureDoesNotCrossChains() public {
         bytes memory sig = plainSig(0);
-        bytes32 before = glyph.DOMAIN_SEPARATOR();
+        bytes32 before = xueni.DOMAIN_SEPARATOR();
         vm.chainId(167000);
-        assertTrue(glyph.DOMAIN_SEPARATOR() != before);
-        assertEq(glyph.DOMAIN_SEPARATOR(), domain());
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        assertTrue(xueni.DOMAIN_SEPARATOR() != before);
+        assertEq(xueni.DOMAIN_SEPARATOR(), domain());
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(sig);
         // Signed under the new domain, it lands.
         relay(plainSig(0));
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     // --- The hook and the relayer ----------------------------------------------
@@ -220,24 +220,24 @@ contract PublishForTest is Test {
         bytes memory sig = sign(authorKey, digestOf(author, TITLE, PAYLOAD, address(hook), hex"01", 0, deadline));
         vm.deal(relayer, 1 ether);
         vm.prank(relayer);
-        glyph.publishFor{value: 0.1 ether}(author, TITLE, PAYLOAD, address(hook), hex"01", deadline, sig);
+        xueni.publishFor{value: 0.1 ether}(author, TITLE, PAYLOAD, address(hook), hex"01", deadline, sig);
         RecordingHook.Call memory c = hook.last();
-        assertEq(c.caller, address(glyph));
+        assertEq(c.caller, address(xueni));
         assertEq(c.sender, relayer);
         assertEq(c.author, author);
         assertEq(c.index, 0);
         assertEq(c.value, 0.1 ether);
         assertEq(c.countSeen, 1);
         assertEq(address(hook).balance, 0.1 ether);
-        assertEq(address(glyph).balance, 0);
+        assertEq(address(xueni).balance, 0);
     }
 
     function test_valueWithNoHookRevertsForARelayedPostToo() public {
         bytes memory sig = plainSig(0);
         vm.deal(relayer, 1 ether);
         vm.prank(relayer);
-        vm.expectRevert(GlyphV2.ValueWithoutHook.selector);
-        glyph.publishFor{value: 1}(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        vm.expectRevert(Xueni.ValueWithoutHook.selector);
+        xueni.publishFor{value: 1}(author, TITLE, PAYLOAD, address(0), hex"", deadline, sig);
     }
 
     // --- Signature forms and forgeries -----------------------------------------
@@ -249,7 +249,7 @@ contract PublishForTest is Test {
         bytes memory compact = abi.encodePacked(r, vs);
         assertEq(compact.length, 64);
         relay(compact);
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     function test_theMalleatedTwinOfASignatureIsRefused() public {
@@ -260,31 +260,31 @@ contract PublishForTest is Test {
         (bytes32 lowS, uint8 lowV, bytes32 highS, uint8 highV) = uint256(s) <= HALF
             ? (s, v, bytes32(N - uint256(s)), v == 27 ? 28 : 27)
             : (bytes32(N - uint256(s)), v == 27 ? 28 : 27, s, v);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(abi.encodePacked(r, highS, highV));
         relay(abi.encodePacked(r, lowS, lowV));
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     function test_somebodyElsesSignatureIsRefused() public {
         bytes memory sig = sign(0xB0B, digestOf(author, TITLE, PAYLOAD, address(0), hex"", 0, deadline));
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(sig);
     }
 
     function test_garbageIsRefused() public {
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(hex"");
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(hex"0102030405060708090a");
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(new bytes(65)); // ecrecover answers the zero address
         (, bytes32 r, bytes32 s) = vm.sign(authorKey, digestOf(author, TITLE, PAYLOAD, address(0), hex"", 0, deadline));
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(abi.encodePacked(r, s, uint8(5))); // a v that is neither 27 nor 28
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
         relay(abi.encodePacked(r, s, uint8(27), uint8(0))); // 66 bytes
-        assertEq(glyph.count(author), 0);
+        assertEq(xueni.count(author), 0);
     }
 
     function test_anAddressWithCodeStillSignsWithItsKey() public {
@@ -292,7 +292,7 @@ contract PublishForTest is Test {
         // a key that signs. ecrecover is tried first, so ERC-1271 never runs.
         vm.etch(author, hex"00");
         relay(plainSig(0));
-        assertEq(glyph.count(author), 1);
+        assertEq(xueni.count(author), 1);
     }
 
     // --- Contract accounts ------------------------------------------------------
@@ -302,16 +302,16 @@ contract PublishForTest is Test {
         SmartWallet wallet = new SmartWallet(vm.addr(ownerKey));
         bytes memory sig = sign(ownerKey, digestOf(address(wallet), TITLE, PAYLOAD, address(0), hex"", 0, deadline));
 
-        vm.expectEmit(true, true, true, true, address(glyph));
+        vm.expectEmit(true, true, true, true, address(xueni));
         emit Post(address(wallet), address(0), 0, 0, TITLE);
         vm.prank(relayer);
-        glyph.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
-        assertEq(glyph.count(address(wallet)), 1);
+        xueni.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        assertEq(xueni.count(address(wallet)), 1);
 
         // Spent, like any other signature: the index moved on.
         vm.prank(relayer);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
     }
 
     function test_aContractAccountThatDoesNotSayYesIsRefused() public {
@@ -322,25 +322,25 @@ contract PublishForTest is Test {
 
         vm.startPrank(relayer);
         // Not the wallet's owner.
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, wrong);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, wrong);
         // The wrong magic value.
         wallet.setWrongMagic(true);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
         wallet.setWrongMagic(false);
         // A wallet that reverts.
         wallet.setBroken(true);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
         wallet.setBroken(false);
         // A contract with no isValidSignature at all.
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(address(hook), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(address(hook), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
         // Fixed, it signs.
-        glyph.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
+        xueni.publishFor(address(wallet), TITLE, PAYLOAD, address(0), hex"", deadline, sig);
         vm.stopPrank();
-        assertEq(glyph.count(address(wallet)), 1);
+        assertEq(xueni.count(address(wallet)), 1);
     }
 
     // --- Under fuzzing -----------------------------------------------------------
@@ -351,7 +351,7 @@ contract PublishForTest is Test {
         uint256 dl = block.timestamp + bound(ttl, 0, 365 days);
         bytes memory sig = sign(authorKey, digestOf(author, title, payload, address(hook), data, 0, dl));
         vm.prank(relayer);
-        glyph.publishFor(author, title, payload, address(hook), data, dl, sig);
+        xueni.publishFor(author, title, payload, address(hook), data, dl, sig);
         RecordingHook.Call memory c = hook.last();
         assertEq(c.author, author);
         assertEq(c.sender, relayer);
@@ -360,8 +360,8 @@ contract PublishForTest is Test {
         assertEq(c.hookData, data);
         // And not again.
         vm.prank(relayer);
-        vm.expectRevert(GlyphV2.InvalidSignature.selector);
-        glyph.publishFor(author, title, payload, address(hook), data, dl, sig);
+        vm.expectRevert(Xueni.InvalidSignature.selector);
+        xueni.publishFor(author, title, payload, address(hook), data, dl, sig);
     }
 
     function testFuzz_aSignatureForAnotherIndexNeverLands(uint8 signedIndex, uint8 posted) public {
@@ -369,16 +369,16 @@ contract PublishForTest is Test {
         uint256 signedFor = bound(signedIndex, 0, 24);
         for (uint256 i; i < have; ++i) {
             vm.prank(author);
-            glyph.publish(TITLE, PAYLOAD);
+            xueni.publish(TITLE, PAYLOAD);
         }
         bytes memory sig = plainSig(signedFor);
         if (signedFor == have) {
             relay(sig);
-            assertEq(glyph.count(author), have + 1);
+            assertEq(xueni.count(author), have + 1);
         } else {
-            vm.expectRevert(GlyphV2.InvalidSignature.selector);
+            vm.expectRevert(Xueni.InvalidSignature.selector);
             relay(sig);
-            assertEq(glyph.count(author), have);
+            assertEq(xueni.count(author), have);
         }
     }
 }

@@ -40,7 +40,7 @@ import {
 } from 'viem';
 import { mainnet } from 'viem/chains';
 import { abi, abiV2 } from '../../src/lib/abi.js';
-import { CHAINS, DEFAULT_GLYPH_ADDRESS, DEFAULT_GLYPH_V2_ADDRESS } from '../../src/lib/chains.js';
+import { CHAINS, DEFAULT_GLYPH_ADDRESS, DEFAULT_XUENI_ADDRESS } from '../../src/lib/chains.js';
 import {
   AUTHORS,
   ENS_NAMES,
@@ -55,11 +55,11 @@ import { buildPayloadText } from '../../src/lib/payloadText.js';
 
 const PORT = Number(process.argv[2] || process.env.GLYPH_RPC_PORT || 8545);
 // Both contracts, at their deterministic addresses: v1 (Blog.sol) and v2
-// (GlyphV2.sol, hooks and relayed posts). The worlds' v2 posts are served
+// (Xueni.sol, hooks and relayed posts). The worlds' v2 posts are served
 // from the second address with the second event, and their transactions
 // carry the second contract's call forms.
 const GLYPH = DEFAULT_GLYPH_ADDRESS.toLowerCase();
-const GLYPH_V2 = DEFAULT_GLYPH_V2_ADDRESS.toLowerCase();
+const XUENI = DEFAULT_XUENI_ADDRESS.toLowerCase();
 const ZERO_ADDRESS = `0x${'00'.repeat(20)}`;
 const POST_SIG = toEventSelector('Post(address,uint256,uint256,bytes32)');
 const POST_V2_SIG = toEventSelector('Post(address,address,uint256,uint256,bytes32)');
@@ -68,7 +68,7 @@ const NOW = Math.floor(Date.now() / 1000);
 const SCALE = 20;
 
 /** Which contract a post lives on, and the event it was announced with. */
-const contractOf = (p) => (p.version === 2 ? GLYPH_V2 : GLYPH);
+const contractOf = (p) => (p.version === 2 ? XUENI : GLYPH);
 const topic0Of = (p) => (p.version === 2 ? POST_V2_SIG : POST_SIG);
 
 const SCENARIOS = {
@@ -308,7 +308,7 @@ function answer(c, method, params) {
     }
     case 'eth_getCode': {
       const to = String(params[0] ?? '').toLowerCase();
-      return to === GLYPH || to === GLYPH_V2 ? '0x6080604052' : '0x';
+      return to === GLYPH || to === XUENI ? '0x6080604052' : '0x';
     }
     case 'eth_call': {
       const ens = ensCall(c, params[0]);
@@ -316,7 +316,7 @@ function answer(c, method, params) {
       // Each contract answers for its own stream of the author; an address
       // with no contract answers nothing, as a node does.
       const to = String(params[0].to ?? '').toLowerCase();
-      const version = to === GLYPH ? 1 : to === GLYPH_V2 ? 2 : null;
+      const version = to === GLYPH ? 1 : to === XUENI ? 2 : null;
       if (version == null) return '0x';
       const { functionName, args } = decodeFunctionData({ abi, data: params[0].data });
       const list = c.byStream.get(streamKey(args[0], version)) ?? [];

@@ -3,43 +3,43 @@ pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
-import {GlyphV2} from "../src/GlyphV2.sol";
+import {Xueni} from "../src/Xueni.sol";
 import {MultiHook} from "../src/hooks/MultiHook.sol";
 
-/// @title CREATE2 deterministic deployment of GlyphV2 and its fan-out hook.
+/// @title CREATE2 deterministic deployment of Xueni and its fan-out hook.
 ///
 /// @notice The same procedure as Create2Deploy.s.sol: both contracts go
 ///         through the canonical deterministic deployment proxy (Arachnid,
 ///         0x4e59b44847b379578588920ca78fbf26c0b4956c) with fixed salts, so
 ///         each lands at ONE address on every EVM chain. The MultiHook's init
-///         code embeds the GlyphV2 address, which is itself deterministic, so
+///         code embeds the Xueni address, which is itself deterministic, so
 ///         its address is deterministic too.
 ///
 ///         The salts and init-code hashes below are pinned to the compiled
-///         bytecode. If GlyphV2.sol or MultiHook.sol changes, re-mine:
+///         bytecode. If Xueni.sol or MultiHook.sol changes, re-mine:
 ///
-///           cast create2 --starts-with 000000 --init-code $(forge inspect src/GlyphV2.sol:GlyphV2 bytecode)
-///           cast create2 --starts-with 0000   --init-code $(cast concat-hex $(forge inspect src/hooks/MultiHook.sol:MultiHook bytecode) $(cast abi-encode 'f(address)' <GLYPH_V2_ADDRESS>))
+///           cast create2 --starts-with 000000 --init-code $(forge inspect src/Xueni.sol:Xueni bytecode)
+///           cast create2 --starts-with 00000  --init-code $(cast concat-hex $(forge inspect src/hooks/MultiHook.sol:MultiHook bytecode) $(cast abi-encode 'f(address)' <XUENI_ADDRESS>))
 ///
 ///         Anyone can run this — the deployer gains no privilege. Usage:
-///           forge script script/Create2DeployV2.s.sol:Create2DeployGlyphV2 \
+///           forge script script/Create2DeployXueni.s.sol:Create2DeployXueni \
 ///             --rpc-url $ETH_RPC --broadcast
 ///         (PRIVATE_KEY is read from the environment by vm.envUint.)
 ///
 ///         Idempotent: whatever already has code at its address is verified
 ///         and skipped.
-contract Create2DeployGlyphV2 is Script {
+contract Create2DeployXueni is Script {
     address internal constant PROXY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
-    // --- GlyphV2 (6 leading zeros) ---
-    bytes32 internal constant SALT = 0xbb0377c8a476ed536b5cb07973d948304b3a07dd83aa15bd8871abfa0cee4de1;
-    bytes32 internal constant INIT_CODE_HASH = 0x6b1cd4f393c6502ac2d5703ca10e0530ccf4a678d11fe072a2704c777223b665;
-    address internal constant EXPECTED_ADDRESS = 0x0000009857c02e4BC9E55b4fC2F6681a8FE23Ce1;
+    // --- Xueni (6 leading zeros) ---
+    bytes32 internal constant SALT = 0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56;
+    bytes32 internal constant INIT_CODE_HASH = 0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6;
+    address internal constant EXPECTED_ADDRESS = 0x0000008D02020df6bCDD56A888cFC9eD9b9053eC;
 
-    // --- MultiHook(GlyphV2) (4 leading zeros) ---
-    bytes32 internal constant MULTI_SALT = 0x033c5c3e1849290787f459e4773aed8ef13eae4beb84f506eec2679ea11639f4;
-    bytes32 internal constant MULTI_INIT_CODE_HASH = 0x6f57e6af6bc7596c60ac3c88bd1f5363084556fa8cdab82b6951ab572807183f;
-    address internal constant MULTI_EXPECTED_ADDRESS = 0x000009C923d41260e61F5bBaDBAFf7e083920993;
+    // --- MultiHook(Xueni) (5 leading zeros) ---
+    bytes32 internal constant MULTI_SALT = 0xdc284105e2f18cd3db78e88dcd75b3596e2b64c85d8da994e018d23941ac49eb;
+    bytes32 internal constant MULTI_INIT_CODE_HASH = 0x0e015a32a032e837072b30a8f87083159a0e4d9b633910264fd871821289d1de;
+    address internal constant MULTI_EXPECTED_ADDRESS = 0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93;
 
     function run() external {
         if (PROXY.code.length == 0) {
@@ -48,11 +48,11 @@ contract Create2DeployGlyphV2 is Script {
         }
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
-        bytes memory initCode = type(GlyphV2).creationCode;
-        require(keccak256(initCode) == INIT_CODE_HASH, "GlyphV2 bytecode changed - re-mine the salt (see above)");
-        address glyph = _deploy("GlyphV2", SALT, INIT_CODE_HASH, initCode, EXPECTED_ADDRESS, deployerPrivateKey);
+        bytes memory initCode = type(Xueni).creationCode;
+        require(keccak256(initCode) == INIT_CODE_HASH, "Xueni bytecode changed - re-mine the salt (see above)");
+        address xueni = _deploy("Xueni", SALT, INIT_CODE_HASH, initCode, EXPECTED_ADDRESS, deployerPrivateKey);
 
-        bytes memory multiInit = abi.encodePacked(type(MultiHook).creationCode, abi.encode(glyph));
+        bytes memory multiInit = abi.encodePacked(type(MultiHook).creationCode, abi.encode(xueni));
         require(keccak256(multiInit) == MULTI_INIT_CODE_HASH, "MultiHook bytecode changed - re-mine the salt (see above)");
         _deploy("MultiHook", MULTI_SALT, MULTI_INIT_CODE_HASH, multiInit, MULTI_EXPECTED_ADDRESS, deployerPrivateKey);
     }

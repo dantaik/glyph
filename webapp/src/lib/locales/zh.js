@@ -474,7 +474,7 @@ export default {
   'chain.taikoHoodi': 'Taiko Hoodi 测试网',
 
   // --- 第二份合约：钩子，以及由他人代发的文章 ------------------------------
-  'post.contractVersion': ({ version }) => `Glyph v${version}`,
+  'post.contractVersion': ({ version }) => (Number(version) === 2 ? 'Xueni' : 'Glyph'),
   'post.viaHook': '经由钩子',
   'post.relayedBy': '由他人代为发送：',
   'post.hookMark': '钩子',
@@ -492,8 +492,8 @@ export default {
   'hooks.heading': '钩子',
   'hooks.note':
     '可选。钩子是一份在发布过程中运行的合约：它可以拒绝这篇文章、为它收费、把它编入索引，或把它记入某个刊物。文章仍然属于你；钩子只是在它之外多做一些事。本应用从不运行钩子的代码，只显示一篇文章经过了哪个钩子。',
-  'hooks.notDeployed': ({ chain }) => `钩子需要 Glyph v2，而它尚未部署到${chain}；这篇文章将发布到原合约。`,
-  'hooks.target': ({ chain }) => `这篇文章将发布到${chain}上的 Glyph v2。`,
+  'hooks.notDeployed': ({ chain }) => `钩子需要 Xueni，而它尚未部署到${chain}；这篇文章将发布到原合约。`,
+  'hooks.target': ({ chain }) => `这篇文章将发布到${chain}上的 Xueni。`,
   'hooks.mode': '钩子',
   'hooks.none': '无',
   'hooks.single': '一个钩子',
@@ -519,7 +519,7 @@ export default {
   'relay.signing': '请在钱包中签名…',
   'relay.ticketHeading': '已签名，可交由他人代发',
   'relay.ticketNote': ({ index, chain }) =>
-    `把它交给愿意支付 gas 的人。它只对这一篇文章有效——作为你在${chain}上 Glyph v2 的第 ${index} 篇——直到截止时间为止；在此之前你自己在该合约上发布任何文章都会使它作废。目前什么都没有发送。`,
+    `把它交给愿意支付 gas 的人。它只对这一篇文章有效——作为你在${chain}上 Xueni 的第 ${index} 篇——直到截止时间为止；在此之前你自己在该合约上发布任何文章都会使它作废。目前什么都没有发送。`,
   'relay.validity': '有效期',
   'relay.days': ({ days }) => `${days} 天`,
   'relay.copy': '复制',
@@ -532,7 +532,7 @@ export default {
   'relay.pickFile': '选择已签名文章的文件',
   'relay.import': '打开文件…',
   'relay.summary': ({ title, author, chain }) => `《${title}》，作者 ${author}，发往${chain}`,
-  'relay.indexNote': ({ index }) => `作为作者在 Glyph v2 上的第 ${index} 篇`,
+  'relay.indexNote': ({ index }) => `作为作者在 Xueni 上的第 ${index} 篇`,
   'relay.deadline': ({ when }) => `有效期至 ${when}`,
   'relay.valueNote': ({ eth }) => `随同发送 ${eth} 给钩子`,
   'relay.hookNote': ({ hook }) => `经由钩子 ${hook}`,

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 /// @title  IPublishHook — third-party code that runs inside a post.
-/// @notice A hook is a contract an author names when publishing on GlyphV2.
+/// @notice A hook is a contract an author names when publishing on Xueni.
 ///         The core records the post first — the author's head pointer is
 ///         moved and the `Post` event is emitted — and then calls the hook
 ///         once, with everything the event carries plus the payload bytes
@@ -16,7 +16,7 @@ pragma solidity ^0.8.24;
 ///         author of record is decided by the core before the hook runs and
 ///         no hook can change it.
 ///
-///         A hook MUST accept calls only from the GlyphV2 contract (or a
+///         A hook MUST accept calls only from the Xueni contract (or a
 ///         fan-out it explicitly trusts, see hooks/MultiHook.sol); otherwise
 ///         anyone could feed it publishes that never happened. See
 ///         hooks/BasePublishHook.sol for the boilerplate.

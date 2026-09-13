@@ -1,6 +1,6 @@
 // relay.js — a post signed by its author for somebody else to send.
 //
-// GlyphV2's `publishFor` records a post under the author who signed it,
+// Xueni's `publishFor` records a post under the author who signed it,
 // whoever pays the gas. What the author signs is an EIP-712 struct over the
 // exact call — the title, the payload bytes, the hook and its data, the
 // deadline — with their next post index as the nonce, so it lands once, in
@@ -35,7 +35,7 @@ export const ticketFileName = (ticket) =>
   `xueni-signed-post-${lower(ticket.author).slice(2, 10)}-${Number(ticket.index)}.json`;
 
 /**
- * The typed data the author signs, exactly as GlyphV2.publishDigest hashes
+ * The typed data the author signs, exactly as Xueni.publishDigest hashes
  * it. `payload` and `hookData` are the bytes (hex); the struct carries their
  * hashes. `index` is the author's post count on the v2 contract at the time
  * the post will land — their next index.

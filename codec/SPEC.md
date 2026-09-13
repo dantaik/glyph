@@ -387,7 +387,7 @@ The first contract (Glyph, deployed 2026-09-02) has one function:
 function publish(bytes32 title, bytes calldata payload) external;
 ```
 
-The second contract (Glyph v2, glyph-spec §4.1) keeps that function — the same call, byte for byte —
+The second contract (Xueni, glyph-spec §4.1) keeps that function — the same call, byte for byte —
 and adds two:
 
 ```solidity

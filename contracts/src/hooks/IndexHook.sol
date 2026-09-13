@@ -46,7 +46,7 @@ contract IndexHook is BasePublishHook {
 
     error TooManyKeys(uint256 given, uint256 max);
 
-    constructor(address glyph_, address composer_) BasePublishHook(glyph_, composer_) {}
+    constructor(address xueni_, address composer_) BasePublishHook(xueni_, composer_) {}
 
     /// @notice The block holding the key's newest entry (0 when there is none).
     function latestBlock(bytes32 key) external view returns (uint256) {

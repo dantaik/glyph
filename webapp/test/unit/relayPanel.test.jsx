@@ -14,7 +14,7 @@ vi.mock('../../src/lib/publish', () => ({
 }));
 
 const RelayPanel = (await import('../../src/components/RelayPanel')).default;
-const { GLYPH_V2_ADDRESS } = await import('../../src/lib/config');
+const { XUENI_ADDRESS } = await import('../../src/lib/config');
 const { buildTicket, serializeTicket } = await import('../../src/lib/relay');
 const { encodeTitle } = await import('../../src/lib/title');
 const { setLang } = await import('../../src/lib/i18n');
@@ -23,7 +23,7 @@ const AUTHOR = '0x8a1f3b52c9e44e1a9b1f0d2c7a44e0b1d2e3f4a5';
 const ticketFor = (over = {}) =>
   buildTicket({
     chainId: 1,
-    contract: GLYPH_V2_ADDRESS,
+    contract: XUENI_ADDRESS,
     author: AUTHOR,
     title: encodeTitle('Relayed'),
     payload: '0x3b',
@@ -52,7 +52,7 @@ describe('RelayPanel', () => {
     paste(serializeTicket(ticketFor()));
     const summary = document.querySelector('[data-relay-summary]');
     expect(summary.textContent).toContain('“Relayed” by 0x8a1f....f4a5, for Ethereum');
-    expect(summary.textContent).toContain('post #3 on Glyph v2');
+    expect(summary.textContent).toContain('post #3 on Xueni');
     expect(disabled()).toBe(false);
     fireEvent.click(sendButton());
     await waitFor(() => expect(document.querySelector('[data-relay-sent]')).toBeTruthy());

@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {GlyphV2} from "../src/GlyphV2.sol";
+import {Xueni} from "../src/Xueni.sol";
 import {IPublishHook} from "../src/IPublishHook.sol";
 import {BasePublishHook} from "../src/hooks/BasePublishHook.sol";
 import {IndexHook} from "../src/hooks/IndexHook.sol";
@@ -36,7 +36,7 @@ contract HooksTest is Test {
     bytes constant PAYLOAD = hex"0b0e804a7573742070726f73652e0a0a54776f20706172616772617068732e0a03";
     bytes32 constant INDEXED_TOPIC = keccak256("Indexed(bytes32,address,uint256,uint256,uint256,bytes32)");
 
-    GlyphV2 glyph;
+    Xueni xueni;
     MultiHook multi;
     IndexHook index;
     PublicationHook pubs;
@@ -46,11 +46,11 @@ contract HooksTest is Test {
     address carol = makeAddr("carol");
 
     function setUp() public {
-        glyph = new GlyphV2();
-        multi = new MultiHook(address(glyph));
-        index = new IndexHook(address(glyph), address(multi));
-        pubs = new PublicationHook(address(glyph), address(multi));
-        rec = new RecordingHook(glyph);
+        xueni = new Xueni();
+        multi = new MultiHook(address(xueni));
+        index = new IndexHook(address(xueni), address(multi));
+        pubs = new PublicationHook(address(xueni), address(multi));
+        rec = new RecordingHook(xueni);
         vm.roll(100);
     }
 
@@ -71,12 +71,12 @@ contract HooksTest is Test {
 
     function test_theBaseRefusesEveryCallerButTheCoreAndItsComposer() public {
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(BasePublishHook.NotGlyph.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(BasePublishHook.NotXueni.selector, bob));
         index.onPublish(bob, bob, 0, 0, TITLE, PAYLOAD, hex"");
 
         // Straight from the core: fine.
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(index), hex"");
+        xueni.publish(TITLE, PAYLOAD, address(index), hex"");
         assertEq(index.count(index.GLOBAL()), 1);
 
         // Through the composer it trusts: fine. (The data is built first: a
@@ -84,20 +84,20 @@ contract HooksTest is Test {
         (address[] memory hooks, bytes[] memory datas, uint256[] memory values) = one(address(index), hex"", 0);
         bytes memory data = multi.encode(hooks, datas, values);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(multi), data);
+        xueni.publish(TITLE, PAYLOAD, address(multi), data);
         assertEq(index.count(index.GLOBAL()), 2);
     }
 
     function test_aHookThatTrustsNoComposerCannotBeComposed() public {
-        IndexHook lone = new IndexHook(address(glyph), address(0));
+        IndexHook lone = new IndexHook(address(xueni), address(0));
         (address[] memory hooks, bytes[] memory datas, uint256[] memory values) = one(address(lone), hex"", 0);
         bytes memory data = multi.encode(hooks, datas, values);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(BasePublishHook.NotGlyph.selector, address(multi)));
-        glyph.publish(TITLE, PAYLOAD, address(multi), data);
+        vm.expectRevert(abi.encodeWithSelector(BasePublishHook.NotXueni.selector, address(multi)));
+        xueni.publish(TITLE, PAYLOAD, address(multi), data);
         // Directly, it still works.
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(lone), hex"");
+        xueni.publish(TITLE, PAYLOAD, address(lone), hex"");
         assertEq(lone.count(lone.GLOBAL()), 1);
     }
 
@@ -106,13 +106,13 @@ contract HooksTest is Test {
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(BasePublishHook.UnexpectedValue.selector, 1));
-        glyph.publish{value: 1}(TITLE, PAYLOAD, address(index), hex"");
+        xueni.publish{value: 1}(TITLE, PAYLOAD, address(index), hex"");
         assertEq(address(index).balance, 0);
-        assertEq(glyph.count(alice), 0);
+        assertEq(xueni.count(alice), 0);
     }
 
     function test_theBaseAnswersWithTheSelector() public {
-        vm.prank(address(glyph));
+        vm.prank(address(xueni));
         bytes4 answer = index.onPublish(alice, alice, 0, 0, TITLE, PAYLOAD, hex"");
         assertEq(answer, IPublishHook.onPublish.selector);
     }
@@ -124,17 +124,17 @@ contract HooksTest is Test {
         vm.expectEmit(true, true, true, true, address(index));
         emit Indexed(g, alice, 0, 0, 0, TITLE);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(index), hex"");
+        xueni.publish(TITLE, PAYLOAD, address(index), hex"");
         assertEq(index.latestBlock(g), 100);
         assertEq(index.count(g), 1);
 
         vm.roll(200);
         vm.prank(bob);
-        glyph.publish(TITLE, PAYLOAD); // a plain post is not in the index
+        xueni.publish(TITLE, PAYLOAD); // a plain post is not in the index
         vm.expectEmit(true, true, true, true, address(index));
         emit Indexed(g, bob, 1, 100, 1, TITLE);
         vm.prank(bob);
-        glyph.publish(TITLE, PAYLOAD, address(index), hex"");
+        xueni.publish(TITLE, PAYLOAD, address(index), hex"");
         assertEq(index.latestBlock(g), 200);
         assertEq(index.count(g), 2);
     }
@@ -150,7 +150,7 @@ contract HooksTest is Test {
         vm.expectEmit(true, true, true, true, address(index));
         emit Indexed(index.GLOBAL(), alice, 0, 0, 0, TITLE);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
+        xueni.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
         assertEq(index.count(food), 1);
         assertEq(index.count(index.GLOBAL()), 1);
         assertEq(index.count(keccak256("drink")), 0);
@@ -161,11 +161,11 @@ contract HooksTest is Test {
         for (uint256 i; i < keys.length; ++i) keys[i] = bytes32(i);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IndexHook.TooManyKeys.selector, 17, 16));
-        glyph.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
+        xueni.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
         keys = new bytes32[](16);
         for (uint256 i; i < keys.length; ++i) keys[i] = bytes32(i);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
+        xueni.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
         assertEq(index.count(bytes32(uint256(15))), 1);
     }
 
@@ -179,7 +179,7 @@ contract HooksTest is Test {
         for (uint256 i; i < 3; ++i) {
             vm.roll(blocks[i]);
             vm.prank(who[i]);
-            glyph.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
+            xueni.publish(TITLE, PAYLOAD, address(index), abi.encode(keys));
         }
         assertEq(index.latestBlock(key), 130);
         assertEq(index.count(key), 3);
@@ -220,7 +220,7 @@ contract HooksTest is Test {
         vm.expectEmit(true, true, true, true, address(multi));
         emit Composed(alice, 0, hooks);
         vm.prank(alice);
-        glyph.publish{value: 0.01 ether}(TITLE, PAYLOAD, address(multi), data);
+        xueni.publish{value: 0.01 ether}(TITLE, PAYLOAD, address(multi), data);
 
         RecordingHook.Call memory c = rec.last();
         assertEq(c.caller, address(multi));
@@ -233,7 +233,7 @@ contract HooksTest is Test {
         assertEq(c.value, 0);
         assertEq(fee.received(), 0.01 ether);
         assertEq(address(multi).balance, 0);
-        assertEq(address(glyph).balance, 0);
+        assertEq(address(xueni).balance, 0);
     }
 
     function test_theFanOutRefusesMismatchedShapes() public {
@@ -243,44 +243,44 @@ contract HooksTest is Test {
         uint256[] memory values = new uint256[](1);
         vm.prank(alice);
         vm.expectRevert(MultiHook.LengthMismatch.selector);
-        glyph.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
+        xueni.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
 
         vm.prank(alice);
         vm.expectRevert(MultiHook.NoHooks.selector);
-        glyph.publish(TITLE, PAYLOAD, address(multi), abi.encode(new address[](0), new bytes[](0), new uint256[](0)));
+        xueni.publish(TITLE, PAYLOAD, address(multi), abi.encode(new address[](0), new bytes[](0), new uint256[](0)));
 
         datas = new bytes[](1);
         values[0] = 5;
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(MultiHook.ValueMismatch.selector, 5, 4));
-        glyph.publish{value: 4}(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
-        assertEq(glyph.count(alice), 0);
+        xueni.publish{value: 4}(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
+        assertEq(xueni.count(alice), 0);
     }
 
     function test_theFanOutRefusesWhatTheCoreWouldRefuse() public {
         (address[] memory hooks, bytes[] memory datas, uint256[] memory values) = one(bob, hex"", 0);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(MultiHook.NotAHook.selector, bob));
-        glyph.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
+        xueni.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
 
         rec.setMode(RecordingHook.Mode.WrongSelector);
         (hooks, datas, values) = one(address(rec), hex"", 0);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(MultiHook.HookRejected.selector, address(rec), bytes4(0xdeadbeef)));
-        glyph.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
+        xueni.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
 
         rec.setMode(RecordingHook.Mode.Revert);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(RecordingHook.Nope.selector, "hook says no"));
-        glyph.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
-        assertEq(glyph.count(alice), 0);
+        xueni.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
+        assertEq(xueni.count(alice), 0);
     }
 
     function test_theFanOutTakesCallsFromTheCoreOnly() public {
         (address[] memory hooks, bytes[] memory datas, uint256[] memory values) = one(address(rec), hex"", 0);
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(MultiHook.NotGlyph.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(MultiHook.NotXueni.selector, bob));
         multi.onPublish(bob, bob, 0, 0, TITLE, PAYLOAD, abi.encode(hooks, datas, values));
         assertEq(rec.callCount(), 0);
     }
@@ -294,7 +294,7 @@ contract HooksTest is Test {
         datas[1] = hex"02";
         uint256[] memory values = new uint256[](2);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
+        xueni.publish(TITLE, PAYLOAD, address(multi), abi.encode(hooks, datas, values));
         assertEq(rec.callCount(), 2);
         assertEq(rec.last().hookData, hex"02");
     }
@@ -314,7 +314,7 @@ contract HooksTest is Test {
         vm.expectEmit(true, true, true, true, address(pubs));
         emit Published(id, alice, 0, 0, 0, TITLE);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         (,, latest, n) = pubs.publication(id);
         assertEq(latest, 100);
         assertEq(n, 1);
@@ -326,7 +326,7 @@ contract HooksTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NotMember.selector, id, bob));
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
 
         vm.prank(alice);
         pubs.setMember(id, bob, true);
@@ -334,15 +334,15 @@ contract HooksTest is Test {
         vm.expectEmit(true, true, true, true, address(pubs));
         emit Published(id, bob, 0, 0, 0, TITLE);
         vm.prank(bob);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
 
         vm.prank(alice);
         pubs.setMember(id, bob, false);
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NotMember.selector, id, bob));
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         // The refused post never happened, in the core or in the hook.
-        assertEq(glyph.count(bob), 1);
+        assertEq(xueni.count(bob), 1);
         (,,, uint256 n) = pubs.publication(id);
         assertEq(n, 1);
     }
@@ -353,12 +353,12 @@ contract HooksTest is Test {
         vm.prank(alice);
         pubs.setOpen(id, true);
         vm.prank(carol);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         vm.prank(alice);
         pubs.setOpen(id, false);
         vm.prank(carol);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NotMember.selector, id, carol));
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
     }
 
     function test_onlyTheOwnerManagesAndOwnershipMoves() public {
@@ -384,24 +384,24 @@ contract HooksTest is Test {
         // The old owner is not a member by default any more.
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NotMember.selector, id, alice));
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         vm.prank(bob);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
     }
 
     function test_unknownAndMalformedPublicationsAreRefused() public {
         bytes32 nowhere = keccak256("nowhere");
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NoSuchPublication.selector, nowhere));
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(nowhere));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(nowhere));
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NoSuchPublication.selector, nowhere));
         pubs.setOpen(nowhere, true);
         // No data at all: not even an id.
         vm.prank(alice);
         vm.expectRevert();
-        glyph.publish(TITLE, PAYLOAD, address(pubs), hex"");
-        assertEq(glyph.count(alice), 0);
+        xueni.publish(TITLE, PAYLOAD, address(pubs), hex"");
+        assertEq(xueni.count(alice), 0);
     }
 
     function test_namesAreFirstComeAndNeverEmpty() public {
@@ -422,17 +422,17 @@ contract HooksTest is Test {
         pubs.setMember(id, bob, true);
 
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         vm.roll(150);
         vm.expectEmit(true, true, true, true, address(pubs));
         emit Published(id, bob, 1, 100, 0, TITLE);
         vm.prank(bob);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         vm.roll(170);
         vm.expectEmit(true, true, true, true, address(pubs));
         emit Published(id, alice, 2, 150, 1, TITLE);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
+        xueni.publish(TITLE, PAYLOAD, address(pubs), abi.encode(id));
         (,, uint256 latest, uint256 n) = pubs.publication(id);
         assertEq(latest, 170);
         assertEq(n, 3);
@@ -446,7 +446,7 @@ contract HooksTest is Test {
         bytes32 id = pubs.create("Letters home");
         uint256 deadline = block.timestamp + 1 hours;
         bytes memory data = abi.encode(id);
-        bytes32 digest = glyph.publishDigest(signer, TITLE, keccak256(PAYLOAD), address(pubs), keccak256(data), 0, deadline);
+        bytes32 digest = xueni.publishDigest(signer, TITLE, keccak256(PAYLOAD), address(pubs), keccak256(data), 0, deadline);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
         bytes memory sig = abi.encodePacked(r, s, v);
 
@@ -455,14 +455,14 @@ contract HooksTest is Test {
         pubs.setMember(id, relayer, true);
         vm.prank(relayer);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NotMember.selector, id, signer));
-        glyph.publishFor(signer, TITLE, PAYLOAD, address(pubs), data, deadline, sig);
+        xueni.publishFor(signer, TITLE, PAYLOAD, address(pubs), data, deadline, sig);
 
         vm.prank(alice);
         pubs.setMember(id, signer, true);
         vm.expectEmit(true, true, true, true, address(pubs));
         emit Published(id, signer, 0, 0, 0, TITLE);
         vm.prank(relayer);
-        glyph.publishFor(signer, TITLE, PAYLOAD, address(pubs), data, deadline, sig);
+        xueni.publishFor(signer, TITLE, PAYLOAD, address(pubs), data, deadline, sig);
     }
 
     // --- Composed ----------------------------------------------------------------------
@@ -489,13 +489,13 @@ contract HooksTest is Test {
         vm.expectEmit(true, true, true, true, address(multi));
         emit Composed(alice, 0, hooks);
         vm.prank(alice);
-        glyph.publish(TITLE, PAYLOAD, address(multi), data);
+        xueni.publish(TITLE, PAYLOAD, address(multi), data);
 
         // A non-member fails the publication, and nothing of the index moves.
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(PublicationHook.NotMember.selector, id, bob));
-        glyph.publish(TITLE, PAYLOAD, address(multi), data);
+        xueni.publish(TITLE, PAYLOAD, address(multi), data);
         assertEq(index.count(key), 1);
-        assertEq(glyph.count(bob), 0);
+        assertEq(xueni.count(bob), 0);
     }
 }

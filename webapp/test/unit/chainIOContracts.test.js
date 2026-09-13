@@ -68,7 +68,7 @@ vi.mock('../../src/lib/clients', () => ({
 }));
 
 const { createChainIO } = await import('../../src/lib/chainIO');
-const { GLYPH_ADDRESS, GLYPH_V2_ADDRESS } = await import('../../src/lib/config');
+const { GLYPH_ADDRESS, XUENI_ADDRESS } = await import('../../src/lib/config');
 const { abi, abiV2 } = await import('../../src/lib/abi');
 
 const AUTHOR = '0x1111111111111111111111111111111111111111';
@@ -84,7 +84,7 @@ const V2_TOPIC = toEventSelector('Post(address,address,uint256,uint256,bytes32)'
 
 /** A decoded log the way viem's getLogs({ events }) returns it. */
 const decoded = ({ version, block, index, tx, logIndex, hook = null }) => ({
-  address: version === 2 ? GLYPH_V2_ADDRESS : GLYPH_ADDRESS,
+  address: version === 2 ? XUENI_ADDRESS : GLYPH_ADDRESS,
   eventName: 'Post',
   args: {
     author: AUTHOR,
@@ -101,7 +101,7 @@ const decoded = ({ version, block, index, tx, logIndex, hook = null }) => ({
 
 /** The same log undecoded, as a receipt carries it. */
 function toRawLog(l) {
-  const v2 = l.address.toLowerCase() === GLYPH_V2_ADDRESS.toLowerCase();
+  const v2 = l.address.toLowerCase() === XUENI_ADDRESS.toLowerCase();
   return {
     address: l.address,
     topics: v2
@@ -142,7 +142,7 @@ beforeEach(() => {
       },
     ],
   ]);
-  fake.deployed = new Set([GLYPH_ADDRESS.toLowerCase(), GLYPH_V2_ADDRESS.toLowerCase()]);
+  fake.deployed = new Set([GLYPH_ADDRESS.toLowerCase(), XUENI_ADDRESS.toLowerCase()]);
 });
 
 describe('chainIO over two contracts', () => {
@@ -151,7 +151,7 @@ describe('chainIO over two contracts', () => {
     expect(io.versions).toEqual([1, 2]);
     const { rows } = await io.postsInRange(400n, 800n);
     const call = fake.calls.find((c) => c.method === 'getLogs');
-    expect(call.args.address.map((a) => a.toLowerCase())).toEqual([GLYPH_ADDRESS.toLowerCase(), GLYPH_V2_ADDRESS.toLowerCase()]);
+    expect(call.args.address.map((a) => a.toLowerCase())).toEqual([GLYPH_ADDRESS.toLowerCase(), XUENI_ADDRESS.toLowerCase()]);
     expect(call.args.events).toHaveLength(2);
     expect(rows.map((r) => [r.version, Number(r.index), r.hook, r.title])).toEqual([
       [1, 0, null, 'v1#0'],
@@ -175,9 +175,9 @@ describe('chainIO over two contracts', () => {
     expect(await io.latestBlock(AUTHOR, 2)).toBe(700n);
     expect(fake.calls.filter((c) => c.method === 'latestBlock').map((c) => c.address.toLowerCase())).toEqual([
       GLYPH_ADDRESS.toLowerCase(),
-      GLYPH_V2_ADDRESS.toLowerCase(),
+      XUENI_ADDRESS.toLowerCase(),
     ]);
-    fake.deployed.delete(GLYPH_V2_ADDRESS.toLowerCase());
+    fake.deployed.delete(XUENI_ADDRESS.toLowerCase());
     expect(await io.latestBlock(AUTHOR, 2)).toBe(0n);
     expect(await io.count(AUTHOR, 2)).toBe(0n);
     expect(await io.count(AUTHOR, 1)).toBe(3n);
@@ -189,7 +189,7 @@ describe('chainIO over two contracts', () => {
     expect(await io.isDeployed(2)).toBe(true);
     expect(await io.isDeployed(2)).toBe(true);
     expect(fake.calls.filter((c) => c.method === 'getCode')).toHaveLength(1);
-    fake.deployed.delete(GLYPH_V2_ADDRESS.toLowerCase());
+    fake.deployed.delete(XUENI_ADDRESS.toLowerCase());
     const other = createChainIO(167000, silentLog());
     expect(await other.isDeployed(2)).toBe(false);
     expect(await other.isDeployed(1)).toBe(true);

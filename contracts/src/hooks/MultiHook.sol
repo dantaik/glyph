@@ -26,21 +26,21 @@ contract MultiHook is IPublishHook {
         bytes32 title;
     }
 
-    /// @notice The GlyphV2 contract this fan-out serves.
-    address public immutable glyph;
+    /// @notice The Xueni contract this fan-out serves.
+    address public immutable xueni;
 
     /// @notice Which hooks a post went through, in order.
     event Composed(address indexed author, uint256 index, address[] hooks);
 
-    error NotGlyph(address caller);
+    error NotXueni(address caller);
     error NoHooks();
     error LengthMismatch();
     error ValueMismatch(uint256 declared, uint256 sent);
     error NotAHook(address hook);
     error HookRejected(address hook, bytes4 returned);
 
-    constructor(address glyph_) {
-        glyph = glyph_;
+    constructor(address xueni_) {
+        xueni = xueni_;
     }
 
     /// @notice What to put in `hookData` when naming this contract as the hook.
@@ -62,7 +62,7 @@ contract MultiHook is IPublishHook {
         bytes calldata payload,
         bytes calldata hookData
     ) external payable override returns (bytes4) {
-        if (msg.sender != glyph) revert NotGlyph(msg.sender);
+        if (msg.sender != xueni) revert NotXueni(msg.sender);
         (address[] memory hooks, bytes[] memory datas, uint256[] memory values) =
             abi.decode(hookData, (address[], bytes[], uint256[]));
         _fanOut(Forward(sender, author, index, prevBlock, title), payload, hooks, datas, values);

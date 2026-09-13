@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {Glyph} from "../src/Blog.sol";
-import {GlyphV2} from "../src/GlyphV2.sol";
+import {Xueni} from "../src/Xueni.sol";
 import {IPublishHook} from "../src/IPublishHook.sol";
 
 /// @dev The least a hook can do: accept. What the core's side of a hook
@@ -28,10 +28,10 @@ contract NoopHook is IPublishHook {
 ///      key the test holds.
 contract GasProbe {
     Glyph internal immutable v1;
-    GlyphV2 internal immutable v2;
+    Xueni internal immutable v2;
     address internal immutable hook;
 
-    constructor(Glyph v1_, GlyphV2 v2_, address hook_) {
+    constructor(Glyph v1_, Xueni v2_, address hook_) {
         v1 = v1_;
         v2 = v2_;
         hook = hook_;
@@ -122,7 +122,7 @@ contract GasProbe {
 ///         a change somebody should have to explain.
 contract GasTest is Test {
     Glyph internal v1;
-    GlyphV2 internal v2;
+    Xueni internal v2;
     NoopHook internal hook;
     GasProbe internal probe;
 
@@ -132,7 +132,7 @@ contract GasTest is Test {
 
     function setUp() public {
         v1 = new Glyph();
-        v2 = new GlyphV2();
+        v2 = new Xueni();
         hook = new NoopHook();
         probe = new GasProbe(v1, v2, address(hook));
         author = vm.addr(PK);

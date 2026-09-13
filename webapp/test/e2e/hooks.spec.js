@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { decodeFunctionData, parseAbi, toFunctionSelector } from 'viem';
 import { oracle, prepare } from './app.mjs';
 
-const GLYPH_V2 = '0x0000009857c02e4bc9e55b4fc2f6681a8fe23ce1';
+const XUENI = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
 const PUBLISH_WITH_HOOK = toFunctionSelector('publish(bytes32,bytes,address,bytes)');
 const PUBLISH_FOR = toFunctionSelector('publishFor(address,bytes32,bytes,address,bytes,uint256,bytes)');
 const HOOK = '0x00000000000000000000000000000000000000ab';
@@ -25,7 +25,7 @@ test.describe('the second contract: hooks and relayed posts', () => {
     await page.locator(`main a[href="${hooked.href}"]`).first().click();
     await expect(page.locator('article h1')).toHaveText(hooked.title);
     await expect(page.locator('article')).toContainText(hooked.probe);
-    await expect(page.locator('[data-contract-version="2"]')).toHaveText('Glyph v2');
+    await expect(page.locator('[data-contract-version="2"]')).toHaveText('Xueni');
     const provenance = page.locator('[data-provenance]');
     await expect(provenance).toContainText('Through the hook');
     await expect(provenance.locator(`[data-hook="${hooked.hook}"]`)).toHaveText('Fan-out (several hooks)');
@@ -71,7 +71,7 @@ test.describe('the second contract: hooks and relayed posts', () => {
     const sent = await page.evaluate(() => window.__wallet.calls.filter((c) => c.method === 'eth_sendTransaction'));
     expect(sent).toHaveLength(1);
     const tx = sent[0].params[0];
-    expect(tx.to.toLowerCase()).toBe(GLYPH_V2);
+    expect(tx.to.toLowerCase()).toBe(XUENI);
     expect(tx.data.startsWith(PUBLISH_WITH_HOOK)).toBe(true);
     expect(BigInt(tx.value)).toBe(1_000_000_000_000_000n);
     const { args } = decodeFunctionData({ abi: abiV2, data: tx.data });
@@ -88,11 +88,11 @@ test.describe('the second contract: hooks and relayed posts', () => {
     await page.getByRole('button', { name: 'Sign for a relayer instead' }).click();
     const ticketView = page.locator('[data-relay-ticket]');
     await expect(ticketView).toBeVisible({ timeout: 30_000 });
-    await expect(ticketView).toContainText('as your post #1 on Glyph v2 on Ethereum');
+    await expect(ticketView).toContainText('as your post #1 on Xueni on Ethereum');
     const signed = await page.evaluate(() => window.__wallet.calls.filter((c) => c.method === 'eth_signTypedData_v4'));
     expect(signed).toHaveLength(1);
     const typed = JSON.parse(signed[0].params[1]);
-    expect(typed.domain).toMatchObject({ name: 'Glyph', version: '2', chainId: 1, verifyingContract: GLYPH_V2 });
+    expect(typed.domain).toMatchObject({ name: 'Xueni', version: '1', chainId: 1, verifyingContract: XUENI });
     expect(typed.primaryType).toBe('Publish');
     expect(typed.message.author.toLowerCase()).toBe(ACCOUNT.toLowerCase());
     expect(typed.message.index).toBe('0');
@@ -109,7 +109,7 @@ test.describe('the second contract: hooks and relayed posts', () => {
     await expect(page.locator('[data-relay-sent]')).toContainText('Relayed to Ethereum', { timeout: 30_000 });
     const sent = await page.evaluate(() => window.__wallet.calls.filter((c) => c.method === 'eth_sendTransaction'));
     expect(sent).toHaveLength(1);
-    expect(sent[0].params[0].to.toLowerCase()).toBe(GLYPH_V2);
+    expect(sent[0].params[0].to.toLowerCase()).toBe(XUENI);
     expect(sent[0].params[0].data.startsWith(PUBLISH_FOR)).toBe(true);
     const { args } = decodeFunctionData({ abi: abiV2, data: sent[0].params[0].data });
     expect(args[0].toLowerCase()).toBe(ACCOUNT.toLowerCase());

@@ -2,7 +2,7 @@
 //
 // Two contracts, one journal. `abi` is v1 (Blog.sol): what every post so
 // far was written with, and what the command-line tool imports. `abiV2` is
-// GlyphV2.sol: the same two reads and the same plain `publish(bytes32,bytes)`
+// Xueni.sol: the same two reads and the same plain `publish(bytes32,bytes)`
 // (byte-identical, so a plain v2 post costs what a v1 post costs), plus a
 // post through a hook and a post published on an author's behalf. Its Post
 // event carries the hook as a second indexed field.
@@ -48,8 +48,8 @@ export const MULTI_HOOK_DATA_TYPES = [
 ];
 
 /**
- * EIP-712: what an author signs for a relayed post — the struct GlyphV2's
- * `publishDigest` hashes, under the domain `Glyph` / `2` / the chain / the
+ * EIP-712: what an author signs for a relayed post — the struct Xueni's
+ * `publishDigest` hashes, under the domain `Xueni` / `1` / the chain / the
  * contract. `index` is the author's next post index on that contract.
  */
 export const PUBLISH_TYPES = {
@@ -65,8 +65,8 @@ export const PUBLISH_TYPES = {
 };
 
 export const publishDomain = (chainId, verifyingContract) => ({
-  name: 'Glyph',
-  version: '2',
+  name: 'Xueni',
+  version: '1',
   chainId: Number(chainId),
   verifyingContract,
 });

@@ -8,7 +8,7 @@ interface IERC1271 {
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4);
 }
 
-/// @title  GlyphV2 — the ownerless, multi-author, append-only journal, with
+/// @title  Xueni — the ownerless, multi-author, append-only journal, with
 ///         two doors that v1 (Blog.sol) does not have: per-post hooks, and
 ///         publishing on someone's behalf against their signature.
 /// @notice One immutable contract shared by any number of authors. Each
@@ -38,7 +38,7 @@ interface IERC1271 {
 ///         No owner, no upgrade, no funds: every wei that arrives is
 ///         forwarded to the hook the author named, and a call with ETH and no
 ///         hook reverts, so nothing can be stranded here.
-contract GlyphV2 {
+contract Xueni {
     /// @dev Per-author head pointer, packed into one storage slot (as in v1).
     struct AuthorState {
         uint96 latestBlock; // 0 = author has never posted
@@ -78,8 +78,8 @@ contract GlyphV2 {
     );
     bytes32 private constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 private constant NAME_HASH = keccak256("Glyph");
-    bytes32 private constant VERSION_HASH = keccak256("2");
+    bytes32 private constant NAME_HASH = keccak256("Xueni");
+    bytes32 private constant VERSION_HASH = keccak256("1");
 
     /// @dev secp256k1n / 2: a signature whose `s` is above it is the malleated
     ///      twin of a valid one, and is refused (EIP-2).
@@ -103,7 +103,7 @@ contract GlyphV2 {
         return _authors[author].count;
     }
 
-    /// @notice The EIP-712 domain separator: name "Glyph", version "2", this
+    /// @notice The EIP-712 domain separator: name "Xueni", version "1", this
     ///         chain, this contract. Recomputed if the chain id ever changes
     ///         under the cached one (a fork), so a signature never crosses.
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
@@ -124,7 +124,7 @@ contract GlyphV2 {
             uint256[] memory extensions
         )
     {
-        return (hex"0f", "Glyph", "2", block.chainid, address(this), bytes32(0), new uint256[](0));
+        return (hex"0f", "Xueni", "1", block.chainid, address(this), bytes32(0), new uint256[](0));
     }
 
     /// @notice The digest `author` signs for a relayed post. `index` must be

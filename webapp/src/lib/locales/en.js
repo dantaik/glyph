@@ -504,7 +504,8 @@ Drop images into the area below or click to upload; click an image or its name t
   'chain.taikoHoodi': 'Taiko Hoodi testnet',
 
   // --- The second contract: hooks, and posts sent on the author's behalf ---
-  'post.contractVersion': ({ version }) => `Glyph v${version}`,
+  // The contracts by name: the original, `Glyph`, and the second, `Xueni`.
+  'post.contractVersion': ({ version }) => (Number(version) === 2 ? 'Xueni' : 'Glyph'),
   'post.viaHook': 'Through the hook',
   'post.relayedBy': 'Sent on the author’s behalf by',
   'post.hookMark': 'hook',
@@ -523,8 +524,8 @@ Drop images into the area below or click to upload; click an image or its name t
   'hooks.note':
     'Optional. A hook is a contract that runs inside the post: it can refuse it, charge for it, file it in an index, or record it in a publication. The post stays yours; the hook only adds to it. This app never runs a hook’s code — it shows which hook a post went through.',
   'hooks.notDeployed': ({ chain }) =>
-    `Hooks need Glyph v2, which is not deployed on ${chain} yet; this post goes to the original contract.`,
-  'hooks.target': ({ chain }) => `This post goes to Glyph v2 on ${chain}.`,
+    `Hooks need Xueni, which is not deployed on ${chain} yet; this post goes to the original contract.`,
+  'hooks.target': ({ chain }) => `This post goes to Xueni on ${chain}.`,
   'hooks.mode': 'Hook',
   'hooks.none': 'None',
   'hooks.single': 'One hook',
@@ -550,7 +551,7 @@ Drop images into the area below or click to upload; click an image or its name t
   'relay.signing': 'Sign in your wallet…',
   'relay.ticketHeading': 'Signed and ready to relay',
   'relay.ticketNote': ({ index, chain }) =>
-    `Hand this to whoever will pay the gas. It is good for exactly this post, as your post #${index} on Glyph v2 on ${chain}, until the deadline; publishing anything yourself on that contract first cancels it. Nothing has been sent.`,
+    `Hand this to whoever will pay the gas. It is good for exactly this post, as your post #${index} on Xueni on ${chain}, until the deadline; publishing anything yourself on that contract first cancels it. Nothing has been sent.`,
   'relay.validity': 'Valid for',
   'relay.days': ({ days }) => `${days} day${days === 1 ? '' : 's'}`,
   'relay.copy': 'Copy',
@@ -563,7 +564,7 @@ Drop images into the area below or click to upload; click an image or its name t
   'relay.pickFile': 'Choose a signed post file',
   'relay.import': 'Open a file…',
   'relay.summary': ({ title, author, chain }) => `“${title}” by ${author}, for ${chain}`,
-  'relay.indexNote': ({ index }) => `as the author’s post #${index} on Glyph v2`,
+  'relay.indexNote': ({ index }) => `as the author’s post #${index} on Xueni`,
   'relay.deadline': ({ when }) => `valid until ${when}`,
   'relay.valueNote': ({ eth }) => `sends ${eth} along to the hook`,
   'relay.hookNote': ({ hook }) => `through the hook ${hook}`,
