@@ -45,8 +45,8 @@ describe('scanStore — what persistence may claim', () => {
   });
 
   it('a corrupted snapshot reads as a first scan, and is overwritten cleanly', () => {
-    localStorage.setItem('glyph.feedScan.v3.404', '{not json');
-    localStorage.setItem('glyph.authorScan.v3.404', '[1, 2');
+    localStorage.setItem('xueni.feedScan.v3.404', '{not json');
+    localStorage.setItem('xueni.authorScan.v3.404', '[1, 2');
     const store = createScanStore(404);
     expect(store.allPosts()).toEqual([]);
     expect(store.feedCoverage()).toEqual([]);

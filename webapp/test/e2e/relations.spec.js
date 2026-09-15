@@ -37,7 +37,7 @@ test.describe('what a post says about other posts', () => {
 
     // Read the newer one first: that is what teaches this browser the relation.
     await page.goto(newer.href);
-    await expect(page.locator('article .prose-glyph')).toBeVisible();
+    await expect(page.locator('article .prose-xueni')).toBeVisible();
     await expect(page.locator('[data-relations-above]')).toContainText('Supersedes');
 
     await page.goto(older.href);
@@ -57,11 +57,11 @@ test.describe('what a post says about other posts', () => {
     // before the body has been fetched, decoded and cached.
     for (const part of parts) {
       await page.goto(part.href);
-      await expect(page.locator('article .prose-glyph')).toBeVisible();
+      await expect(page.locator('article .prose-xueni')).toBeVisible();
     }
 
     await page.goto(parts[1].href);
-    await expect(page.locator('article .prose-glyph')).toBeVisible();
+    await expect(page.locator('article .prose-xueni')).toBeVisible();
     await expect(page.locator('[data-relations-above]')).toContainText(`Part 2 of ${parts[1].meta.series}`);
     await expect(page.locator('[data-relations-above]')).toContainText('Continues from');
 

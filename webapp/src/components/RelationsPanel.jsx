@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { isReadChain } from '../lib/config';
 import { getReader } from '../lib/data';
 import { chainName, fmtTitle } from '../lib/format';
-import { parsePostRef } from '../lib/glyphRefs';
+import { parsePostRef } from '../lib/postRefs';
 import { t } from '../lib/i18n';
 import { hrefFor } from '../lib/router';
 import { Meta } from './Text';

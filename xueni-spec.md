@@ -5,10 +5,11 @@
 > A multi-author blog that keeps all of its content — text and images — in
 > Ethereum L1 calldata. No off-chain dependencies, designed to outlive its
 > authors and still be readable by their children decades from now.
-> Product name: **雪泥**, written **Xueni** in English (from the idiom 雪泥鸿爪 —
-> the prints a wild goose leaves in the snow). The contract carries that name too,
-> `Xueni` (§4). An earlier contract, `Glyph`, holds the posts published before it;
-> it is immutable and stays on chain, but nothing here reads it any more (§4).
+> Product name: **雪泥**, written **Xueni** in English — snowy mud, from the
+> idiom 雪泥鸿爪, the prints a wild goose leaves in the snow. The contract
+> carries that name too, `Xueni` (§4). An earlier contract holds the posts
+> published before it; it is immutable and stays on chain, but nothing here
+> reads it any more (§4).
 
 ---
 
@@ -220,15 +221,15 @@ contract Xueni {
 - **A packed slot**: `uint96 + uint48 = 144 bits < 256`, so the whole `AuthorState` occupies one slot and each publish is one warm SSTORE. The first post pays the cold-slot fee once (~22k gas).
 - **One sequence per author per chain.** `index` counts that author's posts here, `prevBlock` chains them backwards, and nothing else in the design has to disambiguate them: `(chain, author, index)` is a post's identity in the cache, in an archive bundle and in the reader.
 
-**The contract that came before.** `contracts/src/Blog.sol` — contract name `Glyph`, at
-`0x000000AE2f2249c497cfc5F262dd1491634C361C` — was the first deployment, and its `publish()` is this
-one's byte for byte. It is immutable and stays on chain, so the posts published to it are there for
-good and any explorer will show them; but **nothing in this project reads it any more**. The web app,
-the command-line tool and the macOS application all read Xueni alone, and a post on the earlier
-contract does not appear in the app. Its source and its deploy script stay in the repository, so
-what was deployed and where can still be read. (The name is why `Glyph` turns up in the repository at
-all: renaming that contract would have moved its deterministic address, so it kept the name it was
-deployed under.)
+**The contract that came before.** An earlier contract at
+`0x000000AE2f2249c497cfc5F262dd1491634C361C`, deployed 2026-09-02 on both chains, was the first
+deployment; its `publish()` is this one's byte for byte. It is immutable and stays on chain, so the
+posts published to it are there for good and any explorer will show them; but **nothing in this
+project reads it any more**. The web app, the command-line tool and the macOS application all read
+Xueni alone, and a post on that contract does not appear in the app. Its source is no longer in the
+repository: it could not be renamed with the project — a Solidity contract's name is part of its
+metadata, and renaming it would have moved the deterministic address it is deployed at — and keeping
+a copy under the old name only to never compile it served nothing. Git history has it.
 
 **Two more doors.** A contract with only `publish()` leaves everything a community might want around
 a post — a publication with members, a fee, an index by topic, a collectible, a post submitted for
@@ -443,7 +444,7 @@ import { mainnet } from "viem/chains";
 import { encodeTitle } from "./title";
 import { encodePayload } from "./payload";
 
-const XUENI = "0x0000008D02020df6bCDD56A888cFC9eD9b9053eC";
+const XUENI = "0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9";
 const abi  = parseAbi(["function publish(bytes32 title, bytes payload) external"]);
 
 const wallet = createWalletClient({ chain: mainnet, transport: custom(window.ethereum) });
@@ -483,7 +484,7 @@ export async function publishPost({ title, tags = [], markdown, files = {} }) {
 
 Every read needs an author address, which the front end takes from the URL: `/author/0x…` for an author's list, `/tx/0x…/<event index>` for a single post (one transaction may hold several Post events). **Loading is in two stages**: the title list carries no bodies, and a body is only fetched when a post is opened.
 
-**Local cache**: every body and image is cached permanently in IndexedDB (`glyph-cache`). The content is immutable (it is on-chain calldata), so the cache never expires. A cache hit costs zero network requests.
+**Local cache**: every body and image is cached permanently in IndexedDB (`xueni-cache`). The content is immutable (it is on-chain calldata), so the cache never expires. A cache hit costs zero network requests.
 
 ```js
 import {
@@ -574,7 +575,7 @@ author page costs no further request. A chain where the contract is not deployed
 head-pointer call comes back with no data, which is read as "no posts here" rather than as a failure.
 No sweep reads below the block the contract was deployed in — that block is the floor
 (`deployBlock` in `chains.js`), because no block under it can hold a `Post` event. The persisted
-scan snapshots are keyed per chain, `glyph.feedScan.v3.<chainId>` and `glyph.authorScan.v3.<chainId>`;
+scan snapshots are keyed per chain, `xueni.feedScan.v3.<chainId>` and `xueni.authorScan.v3.<chainId>`;
 the suffix changes whenever what a row means changes, and `.v3` is the first to hold one contract's
 rows, so a browser that has an older snapshot rescans instead of reading back rows from a contract
 this build does not read.
@@ -606,7 +607,7 @@ plus a walk down single blocks. `followFeed.js` merges one such walk per (author
 the very same `AuthorListController` the author pages use — so following somebody and then opening them
 costs nothing more — and marks the frontier where the merge stops being complete, naming the author and
 chain whose walk sits there. `loadMore()` deepens whichever walk is furthest behind, at most three per
-click. The followed list lives in this browser (`glyph.following.v1`), costs no gas and is invisible to
+click. The followed list lives in this browser (`xueni.following.v1`), costs no gas and is invisible to
 the author: following is a decision about what you read, not a fact about them.
 
 **The home feed (no address): the newest N across authors** — the one deliberate range scan in the whole design, used **only for address-less discovery**; the single-author path is unaffected:
@@ -648,7 +649,7 @@ decompressed document as stored, with its compressed and decompressed sizes, and
 exactly those bytes. The write tab reads one back with `markdownImport.js`. That round trip is what
 makes "any editor, decades from now" a fact rather than an intention.
 
-**Render order**: `loadTitleList` → the user clicks → `loadPostBody` (cache-first) → `resolveGlyphRefs` (0x… → a /tx/ path, taking the target's title when the link text is empty) → `resolveImages` (eth: → blob) → the restricted parser renders → sanitize.
+**Render order**: `loadTitleList` → the user clicks → `loadPostBody` (cache-first) → `resolvePostRefs` (0x… → a /tx/ path, taking the target's title when the link text is empty) → `resolveImages` (eth: → blob) → the restricted parser renders → sanitize.
 
 ### 8.1 Cross-article references
 
@@ -696,9 +697,9 @@ code, and any tool that reads JSON can read it decades from now.
 
 ```json
 {
-  "glyph": { "archive": 2 },
+  "xueni": { "archive": 2 },
   "exportedAt": "2026-09-15T12:00:00.000Z",
-  "contract": "0x0000008D02020df6bCDD56A888cFC9eD9b9053eC",
+  "contract": "0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9",
   "scope": { "kind": "author", "address": "0x…" },
   "posts": [
     { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 0,
@@ -717,7 +718,7 @@ code, and any tool that reads JSON can read it decades from now.
 ```
 
 - `scope.kind` is `browser` (everything cached) or `author` (with `address`).
-- `glyph.archive` is the **format version, 2**; a file at any other version is refused rather than
+- `xueni.archive` is the **format version, 2**; a file at any other version is refused rather than
   half-read. Version 1 was the format written while a post could live on either of two contracts: a
   row could carry a `version` and the `contract` it lived on, and the document a `contracts` map.
   There is one contract now (§4), so a row carries neither, `contract` names it once for the whole
@@ -787,11 +788,11 @@ code, and any tool that reads JSON can read it decades from now.
 | Local cache | IndexedDB, never expiring | The content is immutable; a cache hit costs no RPC; ten thousand posts is ~20 MB |
 | Scan coverage | localStorage records **a set of ranges** already scanned, rather than one frontier | Paging back only fills unread gaps; a range already scanned is never scanned again |
 | Request de-duplication | indexed within a session by (author, index) / (txHash, event index) | One post is requested from the node at most once per session, whichever page it is reached from |
-| Interface language | English by default, switchable to Chinese; the choice is stored in `localStorage` (`glyph.lang.v1`) and applied without a reload | The interface is a presentation layer over on-chain content; a post stays in the language it was written in |
+| Interface language | English by default, switchable to Chinese; the choice is stored in `localStorage` (`xueni.lang.v1`) and applied without a reload | The interface is a presentation layer over on-chain content; a post stays in the language it was written in |
 | Extending the protocol | **One optional hook per post**, named by the author in the call, called once after the post is recorded, with the call's ETH forwarded; no registry, no permission flags, the hook an indexed event topic | Uniswap v4's lesson, trimmed to a journal: an immutable core plus third-party code at one fixed point inside the transaction lets publications, fees, indexes and collectibles be built by anyone without touching the core; effects-before-call means no hook can change who wrote what |
 | Publishing for someone else | `publishFor` in the core, against the author's EIP-712 signature, with the author's next post index as the nonce | A hook runs after authorship is decided, so relaying cannot be a hook; the index as nonce keeps signatures in order, unreplayable, and cancellable by the author's own next post |
 | Composing hooks | One hook in the core; `MultiHook` fans a post out to several, each with its own data and share of the ETH | The core stays one call and one check; composition is a hook's business, and a fan-out that trusts the core is all it takes |
-| One contract per chain | Every surface reads `Xueni` and nothing else; the earlier contract (`Blog.sol`, contract name `Glyph`) stays on chain, immutable, but nothing here reads it and its posts do not appear in the app | Reading two contracts and merging them made a post's identity a triple rather than a pair: every cached row, every archived post and every scan snapshot had to carry which contract it came from, and every surface had to merge two streams that could never interleave in a way a reader would notice. One contract is one head pointer, one index sequence and one walk per author per chain. The posts left on the earlier contract are not lost — it is immutable and they are readable through any explorer — they are simply not this journal any more |
+| One contract per chain | Every surface reads `Xueni` and nothing else; the earlier contract at `0x000000AE…361C` stays on chain, immutable, but nothing here reads it and its posts do not appear in the app | Reading two contracts and merging them made a post's identity a triple rather than a pair: every cached row, every archived post and every scan snapshot had to carry which contract it came from, and every surface had to merge two streams that could never interleave in a way a reader would notice. One contract is one head pointer, one index sequence and one walk per author per chain. The posts left on the earlier contract are not lost — it is immutable and they are readable through any explorer — they are simply not this journal any more |
 
 ---
 
@@ -830,26 +831,25 @@ forge script script/Create2DeployXueni.s.sol:Create2DeployXueni \
 ```
 
 ```
-Xueni:      0x0000008D02020df6bCDD56A888cFC9eD9b9053eC   (6 leading zeros)
-  salt            0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56
-  init code hash  0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6
-MultiHook:  0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93   (5 leading zeros; its init code embeds the Xueni address)
+Xueni:      0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9   (6 leading zeros)
+  salt            0x8aa497dea52803954d13c50daba9a4406e3a311f2798d03479c5aa8739f7f135
+  init code hash  0x3c02f70eedda0c718075c36cfb80973b0a56089a9e48028a0edb43193f5b25ca
+MultiHook:  0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10   (5 leading zeros; its init code embeds the Xueni address)
+  salt            0xfffbb2a59c4aca17a58d9dd950e154fd23791d671715de15991faa19a76bd6de
+  init code hash  0x035f84f8912b4ca547346eaa4b24e7ad295a840277f743cdd16506ba8dd048a6
 ```
 
 **The deployment record**
 
-| Contract | Chain | Block | Transaction |
-|---|---|---|---|
-| Xueni | Ethereum mainnet (1) | 25,979,882 | `0x864cf1582f60100b988fe56fac346d9baa681700461a064c78ee8f41976f4b2f` |
-| Xueni | Taiko mainnet (167000) | 11,408,820 | `0xdb0a1b26af7199869573d35a72f912e9fea46f637dcd434fe6536bea43515d48` |
-| MultiHook | Ethereum mainnet (1) | 25,979,883 | `0x9a344d13993d5007a33acfda0c18a137b81aead30333afaa56f5bbcdf0bb5277` |
-| MultiHook | Taiko mainnet (167000) | 11,408,820 | `0xc38e65e01d5f7158e2d0b60059a2ff4d5da7398ea410c6d2194c73fc8edda6d6` |
+Not yet deployed at these addresses. An earlier build of the same contracts was deployed on both
+chains on 2026-09-15 and verified; the salts above were re-mined when the project was renamed, which
+changed the compiled metadata and with it every deterministic address, so those deployments are not
+these addresses. Deploying is one command per chain (above) and costs about 2.3M gas.
 
-Deployed 2026-09-15 by `0x327fa3369B1D1D42120d84bc407e5865ECa7c458`, which holds no privilege over
-either contract — neither has an owner and neither can be upgraded — and both are verified on
-Etherscan and Taikoscan. Each chain's Xueni deployment block is that chain's `deployBlock` in
+Once they are on chain, each chain's Xueni deployment block becomes that chain's `deployBlock` in
 `webapp/src/lib/chains.js`: no block below it can hold a `Post` event, so no sweep ever reads
-further back.
+further back. Until then `deployBlock` holds the height at which the salts were mined, which is a
+safe lower bound — the contracts cannot have been deployed below it.
 
 **Front-end configuration**
 

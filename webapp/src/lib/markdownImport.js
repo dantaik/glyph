@@ -12,7 +12,7 @@ import { TITLE_MAX_BYTES, titleByteLength } from './title';
 
 /**
  * `title` is accepted from a file's front-matter as a convenience — it is how
- * every static-site generator writes one — but it is NOT a Glyph front-matter
+ * every static-site generator writes one — but it is NOT a Xueni front-matter
  * key: on chain the title is its own `bytes32` argument, so importing it here
  * fills the title field and nothing is written under that name.
  */

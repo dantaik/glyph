@@ -6,12 +6,13 @@
 **Summary:** Xueni (雪泥) — an ownerless, multi-author journal stored entirely
 in Ethereum L1 calldata. Solidity contract + Vite/React 19 webapp, with a
 bilingual (English / Chinese) interface that reads in English by default.
-See `README.md` and `glyph-spec.md`.
+See `README.md` and `xueni-spec.md`.
 
 **Key paths:**
 
-- `contracts/src/Blog.sol` — the Glyph contract (shared, non-upgradeable, no owner)
-- `contracts/script/Deploy.s.sol` — Foundry deploy script
+- `contracts/src/Xueni.sol` — the contract (shared, non-upgradeable, no owner)
+- `contracts/script/Create2DeployXueni.s.sol` — Foundry deploy script (CREATE2, one
+  address on every chain)
 - `webapp/src/lib/` — chains (registry: RPCs, deployBlock, scanBlocks), config (active
   chain, reactive), clients (one viem client per chain), chainIO (chain reads for one
   chain), scanner (traversal rules), scanStore (what has been read, one store per chain:
@@ -37,7 +38,7 @@ See `README.md` and `glyph-spec.md`.
   `src-tauri/src/lib.rs` holds the plugins, the menu and the one `transcode_image`
   command; `src-tauri/transcode/` is the image crate and the only Rust tests.
   The web side of the seam is `webapp/src/lib/platform.js`
-- `glyph-spec.md` — full technical spec
+- `xueni-spec.md` — full technical spec
 
 **Workflows:**
 

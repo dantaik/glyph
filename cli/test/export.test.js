@@ -59,7 +59,7 @@ describe('export', () => {
   });
 
   test('the archive carries the format marker, the contract and the scope', async () => {
-    assert.deepEqual(archive.glyph, { archive: ARCHIVE_FORMAT });
+    assert.deepEqual(archive.xueni, { archive: ARCHIVE_FORMAT });
     assert.equal(archive.contract, DEFAULT_XUENI_ADDRESS);
     assert.equal(archive.scope.kind, 'author');
     assert.equal(archive.scope.address.toLowerCase(), author.toLowerCase());

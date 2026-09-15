@@ -88,8 +88,8 @@ describe('the archive format', () => {
       authors: [],
       now: new Date('2026-09-04T12:00:00.000Z'),
     });
-    assert.deepEqual(Object.keys(doc), ['glyph', 'exportedAt', 'contract', 'scope', 'posts', 'images', 'authors']);
-    assert.deepEqual(doc.glyph, { archive: ARCHIVE_FORMAT });
+    assert.deepEqual(Object.keys(doc), ['xueni', 'exportedAt', 'contract', 'scope', 'posts', 'images', 'authors']);
+    assert.deepEqual(doc.xueni, { archive: ARCHIVE_FORMAT });
     assert.equal(doc.exportedAt, '2026-09-04T12:00:00.000Z');
   });
 });

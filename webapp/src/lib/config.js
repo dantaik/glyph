@@ -34,17 +34,17 @@ import {
   isKnownChain,
 } from './chains';
 
-const KEY_CHAIN = 'glyph.chainId.v1'; // the active chain, before every chain was read at once
-const KEY_PUBLISH_CHAIN = 'glyph.publishChain.v1';
-const KEY_RPCS = 'glyph.rpcs.v1'; // { [chainId]: string[] }
-const KEY_RPC_LEGACY = 'glyph.rpc.v1'; // one URL, before per-chain lists
-const KEY_RESCAN_DELAY = 'glyph.rescanDelay.v1';
-const KEY_CACHE_TTL_LEGACY = 'glyph.cacheTtl.v1'; // the same number, when it still meant a cache TTL
+const KEY_CHAIN = 'xueni.chainId.v1'; // the active chain, before every chain was read at once
+const KEY_PUBLISH_CHAIN = 'xueni.publishChain.v1';
+const KEY_RPCS = 'xueni.rpcs.v1'; // { [chainId]: string[] }
+const KEY_RPC_LEGACY = 'xueni.rpc.v1'; // one URL, before per-chain lists
+const KEY_RESCAN_DELAY = 'xueni.rescanDelay.v1';
+const KEY_CACHE_TTL_LEGACY = 'xueni.cacheTtl.v1'; // the same number, when it still meant a cache TTL
 
 /** Window event: the publish chain changed. */
-export const PUBLISH_CHAIN_EVT = 'glyph:publishChain';
+export const PUBLISH_CHAIN_EVT = 'xueni:publishChain';
 /** Window event: some chain's endpoint list changed. */
-export const RPCS_EVT = 'glyph:rpcs';
+export const RPCS_EVT = 'xueni:rpcs';
 
 function lsGet(key) {
   try {

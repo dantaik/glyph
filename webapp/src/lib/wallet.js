@@ -27,7 +27,7 @@ import { t } from './i18n';
 export const noWalletMessage = () => t('wallet.none');
 
 const EVT = 'cairn:wallet';
-const KEY_CHOICE = 'glyph.wallet.choice.v1';
+const KEY_CHOICE = 'xueni.wallet.choice.v1';
 
 /** The two kinds of wallet the app can reach. */
 export const INJECTED = 'injected';

@@ -139,8 +139,8 @@ export function createScanStore(chainId) {
   // Block heights and post indexes mean nothing across chains, so every
   // persisted key is scoped to the chain. The suffix changes whenever what
   // a row means changes; `.v3` is the first to hold one contract's rows.
-  const FEED_KEY = `glyph.feedScan.v3.${id}`;
-  const AUTHOR_KEY = `glyph.authorScan.v3.${id}`;
+  const FEED_KEY = `xueni.feedScan.v3.${id}`;
+  const AUTHOR_KEY = `xueni.authorScan.v3.${id}`;
 
   // --- Session state --------------------------------------------------
 

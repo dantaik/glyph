@@ -39,7 +39,7 @@ describe('following', () => {
     unfollow(B);
     expect(getFollowing()).toEqual([]);
     // The empty list clears the entry rather than storing "[]".
-    expect(localStorage.getItem('glyph.following.v1')).toBeNull();
+    expect(localStorage.getItem('xueni.following.v1')).toBeNull();
   });
 
   it('refuses anything that is not an address', () => {
@@ -51,9 +51,9 @@ describe('following', () => {
   });
 
   it('a corrupted entry reads as an empty list, not a broken page', () => {
-    localStorage.setItem('glyph.following.v1', '{oh no');
+    localStorage.setItem('xueni.following.v1', '{oh no');
     expect(getFollowing()).toEqual([]);
-    localStorage.setItem('glyph.following.v1', JSON.stringify({ addresses: 'nope' }));
+    localStorage.setItem('xueni.following.v1', JSON.stringify({ addresses: 'nope' }));
     expect(getFollowing()).toEqual([]);
   });
 
@@ -70,11 +70,11 @@ describe('following', () => {
   it('notifies listeners on every change', () => {
     let beats = 0;
     const onChange = () => { beats += 1; };
-    window.addEventListener('glyph:following', onChange);
+    window.addEventListener('xueni:following', onChange);
     follow(A);
     unfollow(A);
     setFollowing([B]);
-    window.removeEventListener('glyph:following', onChange);
+    window.removeEventListener('xueni:following', onChange);
     expect(beats).toBe(3);
   });
 

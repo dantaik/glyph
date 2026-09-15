@@ -19,7 +19,7 @@ function iconProps(size) {
  * three toes forward, one behind. The seal face takes the current colour;
  * the print is carved out in the paper tone.
  */
-export function GlyphMark({ size, ...rest }) {
+export function XueniMark({ size, ...rest }) {
   return (
     <svg {...iconProps(size)} {...rest} stroke="none">
       <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5" fill="currentColor" />
@@ -225,7 +225,7 @@ export function EthereumMark({ size, ...rest }) {
 }
 
 /**
- * Taiko's mark — the three folded planes of the taiko drum glyph.
+ * Taiko's mark — the three folded planes of the taiko drum.
  * Same treatment as EthereumMark: real geometry, currentColor fill.
  */
 export function TaikoMark({ size, ...rest }) {

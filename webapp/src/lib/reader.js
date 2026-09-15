@@ -20,7 +20,7 @@ import { baseFeeHistory } from './gasHistory';
 import { FeedController } from './feed';
 import { AuthorListController } from './authorList';
 import { getCachedBody, setCachedBody, getCachedImage, setCachedImage } from './cache';
-import { createRefResolver } from './glyphRefs';
+import { createRefResolver } from './postRefs';
 import { getBodyIndex } from './bodyIndex';
 import { createEns } from './ens';
 
@@ -195,8 +195,8 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
       baseFeeHistory(readerFacade, opts),
     );
 
-  /** Rewrite `0x<txhash>/<n>` article refs to in-app links (glyphRefs.js). */
-  const resolveGlyphRefs = createRefResolver(findMetaByTx, id);
+  /** Rewrite `0x<txhash>/<n>` article refs to in-app links (postRefs.js). */
+  const resolvePostRefs = createRefResolver(findMetaByTx, id);
 
   /**
    * `{ block, ts, secondsPerBlock }` — the chain's newest block and how
@@ -362,7 +362,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     loadPostText,
     index,
     baseFees,
-    resolveGlyphRefs,
+    resolvePostRefs,
     resolveImages,
     loadImageBytes,
     imageRefsIn,

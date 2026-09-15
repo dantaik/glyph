@@ -6,7 +6,7 @@ so the reader, the write tab, the caches and both chains are the code in
 `webapp/`, unchanged. What lives in this directory is the window around it
 and the three things a WKWebView cannot do on its own.
 
-**Download**: `https://github.com/dantaik/glyph/releases/latest/download/Xueni-macOS.dmg`
+**Download**: `https://github.com/dantaik/xueni/releases/latest/download/Xueni-macOS.dmg`
 
 ## Why Tauri and not Electron
 

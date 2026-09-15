@@ -25,10 +25,10 @@ const taikoHoodi = {
  * command-line tool both import this file); config.js re-exports it and
  * applies the build-time override for a private redeploy.
  */
-export const DEFAULT_XUENI_ADDRESS = '0x0000008D02020df6bCDD56A888cFC9eD9b9053eC';
+export const DEFAULT_XUENI_ADDRESS = '0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9';
 
 /** The fan-out hook deployed beside it (contracts/src/hooks/MultiHook.sol). */
-export const DEFAULT_MULTI_HOOK_ADDRESS = '0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93';
+export const DEFAULT_MULTI_HOOK_ADDRESS = '0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10';
 
 /** The built-in address — plain Node's view of the deployment. */
 export const defaultContractAddress = () => DEFAULT_XUENI_ADDRESS;
@@ -51,9 +51,11 @@ export const CHAINS = {
     // "Load earlier posts" click. Blocks already read are free and don't count.
     // 270,000 blocks ≈ 37 days of Ethereum at 12s a block.
     scanBlocks: 270_000,
-    // The block the contract was deployed in (tx 0x864c…4b2f). No block
-    // below it can hold a Post event, so no sweep ever reads that far.
-    deployBlock: 25_979_882,
+    // The sweep's floor: no block below it can hold a Post event. The
+    // contracts were re-mined at this height and deploy at or above it, so
+    // this is a safe lower bound — raise it to the deployment block once
+    // they are on chain.
+    deployBlock: 25_980_362,
     wallet: {
       chainName: 'Ethereum Mainnet',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -73,8 +75,8 @@ export const CHAINS = {
     // Per scan (see Ethereum above). 270,000 blocks ≈ 6 days of Taiko at
     // ~2s a block.
     scanBlocks: 270_000,
-    // Deployment tx 0xdb0a…5d48.
-    deployBlock: 11_408_820,
+    // The sweep's floor (see Ethereum above).
+    deployBlock: 11_411_659,
     wallet: {
       chainName: 'Taiko Alethia',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },

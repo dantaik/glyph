@@ -1,17 +1,17 @@
 # Xueni · 雪泥
 
-A multi-author writing system that lives entirely on Ethereum (**Xueni** is the pinyin of 雪泥, from
-the idiom 雪泥鸿爪 — the prints a wild goose leaves in the snow). **One non-upgradeable,
+A multi-author writing system that lives entirely on Ethereum (**Xueni** is the pinyin of 雪泥,
+snowy mud, from the idiom 雪泥鸿爪 — the prints a wild goose leaves in the snow). **One non-upgradeable,
 ownerless smart contract**, in which every wallet is its own author (`msg.sender`). Text,
 titles, tags and images all live in L1 calldata, with no off-chain dependencies.
 
 The interface reads in **English by default and can be switched to Chinese** at any time.
 
-Technical design: [`glyph-spec.md`](./glyph-spec.md)
+Technical design: [`xueni-spec.md`](./xueni-spec.md)
 
 ## Download for macOS
 
-[**Xueni for macOS**](https://github.com/dantaik/glyph/releases/latest/download/Xueni-macOS.dmg) —
+[**Xueni for macOS**](https://github.com/dantaik/xueni/releases/latest/download/Xueni-macOS.dmg) —
 one universal application for Apple Silicon and Intel, macOS 13 or later, around ten megabytes. It is
 this repository's web app in a window, not a second program: the same reader, the same permanent
 caches, the same two chains, and links to explorers open in your own browser. Publishing from it signs
@@ -284,14 +284,14 @@ chain with one replayable transaction (a one-time account) — so **Xueni has th
 chain**:
 
 ```
-Xueni address:     0x0000008D02020df6bCDD56A888cFC9eD9b9053eC   (6 leading zeros)
-salt:              0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56
+Xueni address:     0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9   (6 leading zeros)
+salt:              0x8aa497dea52803954d13c50daba9a4406e3a311f2798d03479c5aa8739f7f135
 deployer (proxy):  0x4e59b44847b379578588920cA78FbF26c0B4956C
-init code hash:    0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6
+init code hash:    0x3c02f70eedda0c718075c36cfb80973b0a56089a9e48028a0edb43193f5b25ca
 
-MultiHook address: 0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93  (5 leading zeros; constructed with the Xueni address)
-salt:              0xdc284105e2f18cd3db78e88dcd75b3596e2b64c85d8da994e018d23941ac49eb
-init code hash:    0x0e015a32a032e837072b30a8f87083159a0e4d9b633910264fd871821289d1de
+MultiHook address: 0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10  (5 leading zeros; constructed with the Xueni address)
+salt:              0xfffbb2a59c4aca17a58d9dd950e154fd23791d671715de15991faa19a76bd6de
+init code hash:    0x035f84f8912b4ca547346eaa4b24e7ad295a840277f743cdd16506ba8dd048a6
 ```
 
 The fan-out hook (`src/hooks/MultiHook.sol`) is deployed the same way and lands at an address of its
@@ -300,9 +300,9 @@ own that is likewise the same on every chain. Both are built into the front end
 without them reads as empty. `forge inspect src/Xueni.sol:Xueni bytecode` gives the init code to mine
 a new salt with if the source changes.
 
-An earlier contract (`src/Blog.sol:Glyph`, `0x000000AE2f2249c497cfc5F262dd1491634C361C`) holds the
-posts published before Xueni. It is immutable and stays on chain, but nothing here reads it any more:
-the app, the command-line tool and the macOS app read Xueni alone.
+An earlier contract at `0x000000AE2f2249c497cfc5F262dd1491634C361C` holds the posts published before
+Xueni. It is immutable and stays on chain, but nothing here reads it any more: the app, the
+command-line tool and the macOS app read Xueni alone.
 
 - **The deploy script**: `script/Create2DeployXueni.s.sol`, idempotent (if an address already holds
   code it verifies and exits). Anyone may run it, and the deployer holds no privilege.
@@ -326,8 +326,8 @@ the app, the command-line tool and the macOS app read Xueni alone.
   `--chain <chainid>` and let forge build the URL rather than naming a V1 endpoint, which is retired:
 
   ```bash
-  XUENI=0x0000008D02020df6bCDD56A888cFC9eD9b9053eC
-  HOOK=0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93
+  XUENI=0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9
+  HOOK=0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10
   forge verify-contract $XUENI src/Xueni.sol:Xueni --chain 1 --etherscan-api-key $ETHERSCAN_API_KEY --watch
   forge verify-contract $HOOK src/hooks/MultiHook.sol:MultiHook --chain 1 \
     --constructor-args $(cast abi-encode 'constructor(address)' $XUENI) \
@@ -338,28 +338,26 @@ the app, the command-line tool and the macOS app read Xueni alone.
 
 ## Deployment record
 
-**Xueni** — the contract every surface reads — at `0x0000008D02020df6bCDD56A888cFC9eD9b9053eC` on both chains:
+| Contract | Address (every chain) | Ethereum | Taiko |
+|---|---|---|---|
+| Xueni | `0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9` | not yet deployed | not yet deployed |
+| MultiHook | `0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10` | not yet deployed | not yet deployed |
 
-| Chain | Chain ID | Deployment block | Deployment tx | Deployer | Date | Verified |
-|---|---|---|---|---|---|---|
-| Ethereum mainnet | 1 | 25,979,882 | [0x864c…4b2f](https://etherscan.io/tx/0x864cf1582f60100b988fe56fac346d9baa681700461a064c78ee8f41976f4b2f) | `0x327f…c458` | 2026-09-15 | ✅ [Etherscan](https://etherscan.io/address/0x0000008D02020df6bCDD56A888cFC9eD9b9053eC#code) |
-| Taiko mainnet | 167000 | 11,408,820 | [0xdb0a…5d48](https://taikoscan.io/tx/0xdb0a1b26af7199869573d35a72f912e9fea46f637dcd434fe6536bea43515d48) | `0x327f…c458` | 2026-09-15 | ✅ [Taikoscan](https://taikoscan.io/address/0x0000008D02020df6bCDD56A888cFC9eD9b9053eC#code) |
+An earlier build of the same two contracts was deployed on both chains on 2026-09-15, by
+`0x327fa3369B1D1D42120d84bc407e5865ECa7c458`, and verified. Renaming the project changed a comment
+in `Xueni.sol`, which changed its compiled metadata, its init code hash and therefore every
+deterministic address — so the salts above were re-mined and those deployments are not these
+addresses. Deploying is one command per chain (above); it costs about 2.3M gas, and the deployer
+holds no privilege over either contract, neither of which has an owner or can be upgraded.
 
-**MultiHook** — the fan-out hook beside it — at `0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93`:
+Add the block, the transaction and the explorer link per chain here once they are on chain, and
+raise each chain's `deployBlock` in `webapp/src/lib/chains.js` to the Xueni deployment block. Until
+then `deployBlock` holds the height at which the salts were mined: a safe floor, since the contracts
+cannot have been deployed below it.
 
-| Chain | Chain ID | Deployment block | Deployment tx | Deployer | Date | Verified |
-|---|---|---|---|---|---|---|
-| Ethereum mainnet | 1 | 25,979,883 | [0x9a34…5277](https://etherscan.io/tx/0x9a344d13993d5007a33acfda0c18a137b81aead30333afaa56f5bbcdf0bb5277) | `0x327f…c458` | 2026-09-15 | ✅ [Etherscan](https://etherscan.io/address/0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93#code) |
-| Taiko mainnet | 167000 | 11,408,820 | [0xc38e…a6d6](https://taikoscan.io/tx/0xc38e65e01d5f7158e2d0b60059a2ff4d5da7398ea410c6d2194c73fc8edda6d6) | `0x327f…c458` | 2026-09-15 | ✅ [Taikoscan](https://taikoscan.io/address/0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93#code) |
-
-The deployer address `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` holds no privilege over either
-contract; neither has an owner and neither can be upgraded. Each chain's Xueni deployment block is its
-`deployBlock` in `webapp/src/lib/chains.js`: no block below it can hold a Post event, so no sweep ever
-reads that far.
-
-The earlier contract (`Glyph`, `0x000000AE2f2249c497cfc5F262dd1491634C361C`, deployed 2026-09-02 on
-both chains and verified) is no longer read by anything here. Posts published to it stay where they
-are, on chain and readable through an explorer, but they do not appear in this app.
+The earlier contract at `0x000000AE2f2249c497cfc5F262dd1491634C361C`, deployed 2026-09-02 on both
+chains and verified, is no longer read by anything here. Posts published to it stay where they are,
+on chain and readable through an explorer, but they do not appear in this app.
 
 ## License
 

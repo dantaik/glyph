@@ -122,7 +122,7 @@
 }
 
 /* Body prose is the same face as everything else; code keeps its box, not a face of its own. */
-.prose-glyph {
+.prose-xueni {
   font-size: var(--article-size);
   line-height: 1.75;
   letter-spacing: 0.015em;
@@ -135,23 +135,23 @@
 }
 
 
-.prose-glyph h1, .prose-glyph h2, .prose-glyph h3 {
+.prose-xueni h1, .prose-xueni h2, .prose-xueni h3 {
   text-align: left; letter-spacing: 0.01em; color: var(--color-ink);
 }
 /* Content headings sit clearly below the page title (24–28px). */
-.prose-glyph h1 { font-size: 1.35em; line-height: 1.5;  font-weight: 700; margin: 2.2em 0 0.9em; }
-.prose-glyph h2 { font-size: 1.25em; line-height: 1.55; font-weight: 700; margin: 2em 0 0.8em;
+.prose-xueni h1 { font-size: 1.35em; line-height: 1.5;  font-weight: 700; margin: 2.2em 0 0.9em; }
+.prose-xueni h2 { font-size: 1.25em; line-height: 1.55; font-weight: 700; margin: 2em 0 0.8em;
                   padding-left: 0.6em; border-left: 3px solid var(--color-accent); }
-.prose-glyph h3 { font-size: 1.12em; line-height: 1.6;  font-weight: 600; margin: 1.8em 0 0.6em; }
+.prose-xueni h3 { font-size: 1.12em; line-height: 1.6;  font-weight: 600; margin: 1.8em 0 0.6em; }
 
-.prose-glyph p { margin: 1.25em 0; overflow-wrap: break-word; }
+.prose-xueni p { margin: 1.25em 0; overflow-wrap: break-word; }
 /* Editorial opening lift — an essay's first paragraph carries a little more
    weight. Not when it holds a photo: what follows the image in that same
    paragraph is a caption, and a caption reading LARGER than the body is
    backwards. Such a paragraph stays at the body size. */
-.prose-glyph > p:first-of-type:not(:has(img)) { font-size: 1.06em; }
+.prose-xueni > p:first-of-type:not(:has(img)) { font-size: 1.06em; }
 
-.prose-glyph a {
+.prose-xueni a {
   color: var(--color-accent);
   text-decoration: underline;
   text-decoration-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
@@ -159,45 +159,45 @@
   overflow-wrap: anywhere;
   transition: text-decoration-color 150ms;
 }
-.prose-glyph a:hover { text-decoration-color: var(--color-accent); }
-.prose-glyph strong { font-weight: 700; }
-.prose-glyph em { font-style: italic; }
+.prose-xueni a:hover { text-decoration-color: var(--color-accent); }
+.prose-xueni strong { font-weight: 700; }
+.prose-xueni em { font-style: italic; }
 
-.prose-glyph ul, .prose-glyph ol { margin: 1.25em 0; padding-left: 1.4em; }
-.prose-glyph li { margin: 0.4em 0; padding-left: 0.2em; }
-.prose-glyph ul { list-style: disc; }
-.prose-glyph ol { list-style: decimal; }
-.prose-glyph li::marker { color: var(--color-ink-ghost); font-variant-numeric: tabular-nums; }
+.prose-xueni ul, .prose-xueni ol { margin: 1.25em 0; padding-left: 1.4em; }
+.prose-xueni li { margin: 0.4em 0; padding-left: 0.2em; }
+.prose-xueni ul { list-style: disc; }
+.prose-xueni ol { list-style: decimal; }
+.prose-xueni li::marker { color: var(--color-ink-ghost); font-variant-numeric: tabular-nums; }
 
-.prose-glyph blockquote {
+.prose-xueni blockquote {
   margin: 1.6em 0; padding: 0.2em 0 0.2em 1.2em;
   border-left: 2px solid var(--color-accent);
   color: var(--color-ink-soft); font-size: 0.97em; font-style: normal; /* no italic CJK quotes */
 }
 
-.prose-glyph code {
+.prose-xueni code {
   font-size: 0.9em; letter-spacing: normal;
   background: var(--color-paper-sunken); border: 1px solid var(--color-edge);
   border-radius: 4px; padding: 0.15em 0.4em; overflow-wrap: anywhere;
 }
-.prose-glyph pre {
+.prose-xueni pre {
   background: var(--color-paper-sunken);   /* NOT inverted — letters, not a dev blog */
   border: 1px solid var(--color-edge); border-radius: 8px;
   padding: 1em 1.25em; margin: 1.6em 0; overflow-x: auto;
   font-size: 0.85em; line-height: 1.7; text-align: left;
 }
-.prose-glyph pre code { background: transparent; border: 0; padding: 0; font-size: 1em; }
+.prose-xueni pre code { background: transparent; border: 0; padding: 0; font-size: 1em; }
 
-.prose-glyph img { display: block; margin: 2em auto; max-width: 100%; border-radius: 6px; }
-.dark .prose-glyph img { filter: brightness(0.88); transition: filter 150ms; }
-.dark .prose-glyph img:hover { filter: none; }
+.prose-xueni img { display: block; margin: 2em auto; max-width: 100%; border-radius: 6px; }
+.dark .prose-xueni img { filter: brightness(0.88); transition: filter 150ms; }
+.dark .prose-xueni img:hover { filter: none; }
 
-.prose-glyph hr { border: 0; margin: 2.5em 0; text-align: center; }
-.prose-glyph hr::before { content: "※"; color: var(--color-ink-ghost); font-size: 0.9em; }
+.prose-xueni hr { border: 0; margin: 2.5em 0; text-align: center; }
+.prose-xueni hr::before { content: "※"; color: var(--color-ink-ghost); font-size: 0.9em; }
 
-.prose-glyph table { width: 100%; margin: 1.6em 0; border-collapse: collapse; font-size: 0.9em; text-align: left; }
-.prose-glyph th, .prose-glyph td { padding: 0.5em 0.75em; border-bottom: 1px solid var(--color-edge); }
-.prose-glyph th { font-weight: 600; }
+.prose-xueni table { width: 100%; margin: 1.6em 0; border-collapse: collapse; font-size: 0.9em; text-align: left; }
+.prose-xueni th, .prose-xueni td { padding: 0.5em 0.75em; border-bottom: 1px solid var(--color-edge); }
+.prose-xueni th { font-weight: 600; }
 
 .prose-compact { --article-size: 1rem; }
 
@@ -223,7 +223,7 @@
   }
 
   /* The article takes the page: no app column, no maximum measure. */
-  main, article, .article-column, .prose-glyph {
+  main, article, .article-column, .prose-xueni {
     max-width: none !important;
     width: auto !important;
     margin: 0 !important;
@@ -232,12 +232,12 @@
     background: transparent !important;
   }
 
-  .prose-glyph a { color: #000 !important; text-decoration: underline; }
-  .prose-glyph img { max-width: 100% !important; filter: none !important; page-break-inside: avoid; }
-  .prose-glyph h1, .prose-glyph h2, .prose-glyph h3 { page-break-after: avoid; }
-  .prose-glyph blockquote, .prose-glyph pre, .prose-glyph table { page-break-inside: avoid; }
+  .prose-xueni a { color: #000 !important; text-decoration: underline; }
+  .prose-xueni img { max-width: 100% !important; filter: none !important; page-break-inside: avoid; }
+  .prose-xueni h1, .prose-xueni h2, .prose-xueni h3 { page-break-after: avoid; }
+  .prose-xueni blockquote, .prose-xueni pre, .prose-xueni table { page-break-inside: avoid; }
 
-  .prose-glyph pre {
+  .prose-xueni pre {
     background: transparent !important;
     border: 1px solid #ccc !important;
   }

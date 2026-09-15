@@ -155,7 +155,7 @@ export default function MarkdownEditor({
 
       {mode === 'preview' && (
         <div
-          className="rounded-xl border border-edge bg-paper-raised px-6 py-5 prose-glyph prose-compact overflow-auto"
+          className="rounded-xl border border-edge bg-paper-raised px-6 py-5 prose-xueni prose-compact overflow-auto"
           style={{ maxHeight: height }}
           dangerouslySetInnerHTML={{ __html: previewHtml }}
         />

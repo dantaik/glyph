@@ -9,7 +9,7 @@ input always gives the same bytes.
 
 **The specification is [`SPEC.md`](./SPEC.md).** It is normative and versioned; this package is its
 reference implementation, and the test suite here is the conformance suite. The design of the whole
-system — why a post is shaped like this — is [`../glyph-spec.md`](../glyph-spec.md).
+system — why a post is shaped like this — is [`../xueni-spec.md`](../xueni-spec.md).
 
 ## The four forms of a post
 

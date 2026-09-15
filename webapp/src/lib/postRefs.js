@@ -1,4 +1,4 @@
-// glyphRefs.js — cross-article references (§8.1 of the spec).
+// postRefs.js — cross-article references (§8.1 of the spec).
 //
 // In-article reference form — the publish tx hash itself is the target:
 //   [text](0x<txhash>/<eventIndex>)
@@ -93,7 +93,7 @@ export function createRefResolver(findMetaByTx, chainId) {
     return titleCache.get(key);
   }
 
-  return async function resolveGlyphRefs(markdown) {
+  return async function resolvePostRefs(markdown) {
     if (!markdown) return markdown;
     const refs = [...markdown.matchAll(REF_RE)];
     if (refs.length === 0) return markdown;

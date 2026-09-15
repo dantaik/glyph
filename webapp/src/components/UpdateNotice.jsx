@@ -16,9 +16,9 @@ import { Micro } from './Text';
  *
  * On the web this renders nothing and asks nothing.
  */
-const LATEST_RELEASE_API = 'https://api.github.com/repos/dantaik/glyph/releases/latest';
-const LATEST_RELEASE_PAGE = 'https://github.com/dantaik/glyph/releases/latest';
-const SEEN_KEY = 'glyph.desktop.updateSeen.v1';
+const LATEST_RELEASE_API = 'https://api.github.com/repos/dantaik/xueni/releases/latest';
+const LATEST_RELEASE_PAGE = 'https://github.com/dantaik/xueni/releases/latest';
+const SEEN_KEY = 'xueni.desktop.updateSeen.v1';
 const A_DAY = 24 * 60 * 60 * 1000;
 
 /** The version whose notice was dismissed, or null. */

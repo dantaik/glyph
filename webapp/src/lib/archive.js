@@ -24,7 +24,7 @@ import { chainName } from './format';
 import { parsePayloadText } from './payloadText';
 import { ADDRESS_RE } from './router';
 
-/** The format version, as `glyph.archive`. Bumping it is breaking the file. */
+/** The format version, as `xueni.archive`. Bumping it is breaking the file. */
 export const ARCHIVE_FORMAT = 2;
 
 /** Every image on chain is WebP: the writers only ever produce that. */
@@ -38,7 +38,7 @@ const num = (v) => (typeof v === 'bigint' ? Number(v) : Number(v ?? 0));
 export const archiveFileName = (scope, now = new Date()) => {
   const day = now.toISOString().slice(0, 10);
   const who = scope?.kind === 'author' ? `-${lower(scope.address).slice(2, 10)}` : '';
-  return `glyph-archive${who}-${day}.xueni.json`;
+  return `xueni-archive${who}-${day}.xueni.json`;
 };
 
 // --- Collecting -----------------------------------------------------------
@@ -173,7 +173,7 @@ export async function collectAuthorArchive(view, author, { onProgress = null, no
 
 function build({ scope, posts, images, authors, now }) {
   return {
-    glyph: { archive: ARCHIVE_FORMAT },
+    xueni: { archive: ARCHIVE_FORMAT },
     exportedAt: now.toISOString(),
     // `contract` names the journal every post here lives on.
     contract: XUENI_ADDRESS,
@@ -217,7 +217,7 @@ export function parseArchive(text) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { doc: null, problems: [t('archive.notArchive')], summary: [] };
   }
-  const version = raw.glyph?.archive;
+  const version = raw.xueni?.archive;
   if (version == null) return { doc: null, problems: [t('archive.notArchive')], summary: [] };
   if (Number(version) !== ARCHIVE_FORMAT) {
     return { doc: null, problems: [t('archive.wrongVersion', { version })], summary: [] };
@@ -259,7 +259,7 @@ export function parseArchive(text) {
   if (whole.length > 0) summary.push(t('archive.completeAuthors', { count: whole.length }));
 
   return {
-    doc: { ...raw, glyph: { archive: ARCHIVE_FORMAT }, posts, images, authors },
+    doc: { ...raw, xueni: { archive: ARCHIVE_FORMAT }, posts, images, authors },
     problems,
     summary,
   };

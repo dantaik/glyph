@@ -56,7 +56,7 @@ in it but the letter, even while the terminal shows what is happening.
 Failures exit 1.
 
 **One contract.** Every reading command reads Xueni (hooks and `publishFor`,
-glyph-spec §4) at its CREATE2 address, the same on every chain, and follows
+xueni-spec §4) at its CREATE2 address, the same on every chain, and follows
 one reverse-linked list per author. A post that went through a hook carries
 that hook's address as `hook` in `--json`; a post sent on its author's behalf
 names its relayer there too.

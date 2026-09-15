@@ -4,7 +4,7 @@ import { oracle, prepare } from './app.mjs';
 /** Open a post and wait for its body to be on the page. */
 async function openPost(page, href) {
   await page.goto(href);
-  await expect(page.locator('article .prose-glyph')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('article .prose-xueni')).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('reading a post', () => {
@@ -38,7 +38,7 @@ test.describe('reading a post', () => {
     expect(withImages).toBeTruthy();
     await openPost(page, withImages.href);
 
-    const image = page.locator('article .prose-glyph img').first();
+    const image = page.locator('article .prose-xueni img').first();
     await expect(image).toBeVisible({ timeout: 30_000 });
     const alt = await image.getAttribute('alt');
     await image.click();
@@ -80,7 +80,7 @@ test.describe('reading a post', () => {
     const { posts } = await oracle(request);
     const post = posts[0];
     await page.goto(`${post.href}?headless=1`);
-    await expect(page.locator('article .prose-glyph')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('article .prose-xueni')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('header')).toHaveCount(1); // the article's own, not the masthead
     await expect(page.locator('nav[aria-label]')).toHaveCount(0);
   });
@@ -96,7 +96,7 @@ test.describe('reading a post', () => {
     await expect(page.locator('[data-noprint]').first()).toBeHidden();
     for (const el of await page.locator('[data-noprint]').all()) await expect(el).toBeHidden();
     // What is left is the letter, and where to find it on chain.
-    await expect(page.locator('article .prose-glyph')).toBeVisible();
+    await expect(page.locator('article .prose-xueni')).toBeVisible();
     await expect(page.locator('[data-printonly]')).toContainText(post.txHash);
     await page.emulateMedia({ media: 'screen' });
     await expect(page.locator('[data-printonly]')).toBeHidden();

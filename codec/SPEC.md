@@ -9,7 +9,7 @@ an author's behalf, §6), and how that call data becomes the post again. The lib
 file (`xueni-codec`, see [`README.md`](./README.md)) is the reference implementation, and its test
 suite, with the vectors in [`test/vectors.json`](./test/vectors.json), is the conformance suite.
 
-[`../glyph-spec.md`](../glyph-spec.md) is the design document of the whole system: why the contract
+[`../xueni-spec.md`](../xueni-spec.md) is the design document of the whole system: why the contract
 is shaped as it is, how a reader finds posts, what the Markdown subset is. This specification is the
 normative statement of one seam in it — its §5 (the payload) and the calldata around it — written so
 that a second implementation, in another language or decades from now, can be checked against it.
@@ -80,9 +80,9 @@ implementation MAY provide one direction only. Both directions are pure: they de
 their input (and, for a writer, the compressor it is given).
 
 Out of scope, and specified elsewhere: images (each one its own transaction, referenced from the body
-as `eth:0x…`, glyph-spec §6); the Markdown subset and how it is rendered (glyph-spec §8) — except for
+as `eth:0x…`, xueni-spec §6); the Markdown subset and how it is rendered (xueni-spec §8) — except for
 the security requirements §10 places on a renderer; what a chain slug in a post reference resolves to
-(the application's registry, glyph-spec §5.1); transaction size and gas ceilings (glyph-spec §11 —
+(the application's registry, xueni-spec §5.1); transaction size and gas ceilings (xueni-spec §11 —
 informative note in §6.4).
 
 ## 2. Format version 1 at a glance
@@ -156,7 +156,7 @@ The Markdown body, as a string. It is carried **byte for byte**: a writer MUST N
 way — not its line endings, not its trailing whitespace, not a byte-order mark it begins with. A
 writer MUST refuse a body containing a control character other than TAB, LF, FF or CR (C0, DEL or
 C1, §10.3); refusing is not altering. What the body may contain beyond that is the Markdown subset of
-glyph-spec §8; this specification does not check it, and §10.2 says what a renderer must do with it.
+xueni-spec §8; this specification does not check it, and §10.2 says what a renderer must do with it.
 
 ### 3.4 The metadata
 
@@ -381,13 +381,13 @@ store, and the raw view, archives and the command-line tool all carry it as `com
 
 ### 6.1 The functions
 
-The first contract (Glyph, deployed 2026-09-02) has one function:
+The first contract (Xueni, deployed 2026-09-02) has one function:
 
 ```solidity
 function publish(bytes32 title, bytes calldata payload) external;
 ```
 
-The second contract (Xueni, glyph-spec §4.1) keeps that function — the same call, byte for byte —
+The second contract (Xueni, xueni-spec §4.1) keeps that function — the same call, byte for byte —
 and adds two:
 
 ```solidity
@@ -403,7 +403,7 @@ transaction's calldata only, is never copied to storage or to the event, and is 
 names a contract the core calls once the post is recorded, with `hookData` for it (the zero address
 is "no hook"); `author` is whose list the post joins when someone else submits it, `deadline` is
 when the author's signature stops being valid, and `signature` is the author's, over an EIP-712
-digest of everything else (glyph-spec §4.1). This specification carries them through and does not
+digest of everything else (xueni-spec §4.1). This specification carries them through and does not
 interpret them.
 
 The selectors are the first four bytes of the keccak256 of each signature:
@@ -505,7 +505,7 @@ names the author from the transaction's sender names the wrong one; the event, o
 names. Decoding events is a client's job and outside this specification.
 
 There is no size ceiling in the format. In practice a transaction is bounded by the transaction
-pool's size limit (128 KiB on geth's default, see glyph-spec §11 and `webapp/src/lib/limits.js`),
+pool's size limit (128 KiB on geth's default, see xueni-spec §11 and `webapp/src/lib/limits.js`),
 which binds long before the per-transaction gas cap; a writer that wants to refuse an oversize post
 before signing measures the payload (§5) against that ceiling — and, in the two longer forms, the
 hook data and the signature that ride beside it.
@@ -602,7 +602,7 @@ becomes something a browser executes, and it has been exploited: `marked` does n
 image's alt text, so `![x" onerror="alert(1)](https://x)` left the attribute and became a live event
 handler. A reader that renders the body:
 
-- MUST NOT pass raw HTML through. The Markdown subset (glyph-spec §8) has no raw HTML; a renderer
+- MUST NOT pass raw HTML through. The Markdown subset (xueni-spec §8) has no raw HTML; a renderer
   MUST drop or escape any it meets.
 - MUST sanitize the **rendered HTML** against an allowlist of tags and attributes **after**
   rendering, not the Markdown before — the alt-text breakout is invisible to a Markdown-level
@@ -614,7 +614,7 @@ handler. A reader that renders the body:
   in-app path `/…`; for an image, `https:`, `http:`, `blob:` (an on-chain image the reader resolved,
   §10.5) and `data:image/`. Everything else — `javascript:`, `vbscript:`, `data:text/html`, a scheme
   hidden behind whitespace or an HTML entity — MUST be removed, not merely escaped.
-- MUST rewrite an in-article post reference (`[text](0x<64 hex>[/n])`, glyph-spec §8.1) to the
+- MUST rewrite an in-article post reference (`[text](0x<64 hex>[/n])`, xueni-spec §8.1) to the
   reader's own path only after checking it against the reference grammar of §3.4; the target's title,
   when used as the link text, is text (§10.3).
 
@@ -667,7 +667,7 @@ size of the call data and allocates at most one copy of the payload; parsing the
 over its lines; nothing recurses. A title is 32 bytes by construction.
 
 **Many posts.** Reading a post is bounded, but a reader that reads many — a feed, an archive import —
-is bounded only by how many it reads; that is the application's budget (glyph-spec §7), not the
+is bounded only by how many it reads; that is the application's budget (xueni-spec §7), not the
 codec's.
 
 ### 10.5 Images

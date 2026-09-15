@@ -10,7 +10,7 @@ const ARCHIVE_FORMAT = 2;
 /** Open a post and wait for its body to be on the page (and so, cached). */
 async function readPost(page, href) {
   await page.goto(href);
-  await expect(page.locator('article .prose-glyph')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('article .prose-xueni')).toBeVisible({ timeout: 30_000 });
 }
 
 /** Download whatever the click produces, parsed. */
@@ -33,8 +33,8 @@ test.describe('archive bundles', () => {
       section.getByRole('button', { name: 'Export everything read here' }).click(),
     );
 
-    expect(name).toMatch(/^glyph-archive-\d{4}-\d{2}-\d{2}\.xueni\.json$/);
-    expect(doc.glyph).toEqual({ archive: ARCHIVE_FORMAT });
+    expect(name).toMatch(/^xueni-archive-\d{4}-\d{2}-\d{2}\.xueni\.json$/);
+    expect(doc.xueni).toEqual({ archive: ARCHIVE_FORMAT });
     expect(doc.scope).toEqual({ kind: 'browser' });
     // Every post whose body was read carries its exact stored text.
     for (const post of chosen) {
@@ -106,9 +106,9 @@ test.describe('archive bundles', () => {
 
     // A settings file offered to the archive importer.
     await page.locator('[data-archive-section] input[type=file]').setInputFiles({
-      name: 'glyph-settings.json',
+      name: 'xueni-settings.json',
       mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify({ glyph: { settings: 1 }, theme: 'dark' })),
+      buffer: Buffer.from(JSON.stringify({ xueni: { settings: 1 }, theme: 'dark' })),
     });
     await expect(page.locator('[data-archive-review]')).toContainText('not an archive file');
 
@@ -116,9 +116,9 @@ test.describe('archive bundles', () => {
     await page.locator('input[aria-label="Choose a settings file"]').setInputFiles({
       name: 'bundle.xueni.json',
       mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify({ glyph: { archive: 1 }, posts: [] })),
+      buffer: Buffer.from(JSON.stringify({ xueni: { archive: 1 }, posts: [] })),
     });
-    await expect(page.locator('[data-settings-review]')).toContainText('glyph.settings marker is missing');
+    await expect(page.locator('[data-settings-review]')).toContainText('xueni.settings marker is missing');
   });
 
   test('a bundle from another deployment of the contract is refused', async ({ page }) => {
@@ -129,7 +129,7 @@ test.describe('archive bundles', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(
         JSON.stringify({
-          glyph: { archive: ARCHIVE_FORMAT },
+          xueni: { archive: ARCHIVE_FORMAT },
           contract: '0x1111111111111111111111111111111111111111',
           posts: [],
         }),

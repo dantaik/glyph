@@ -308,7 +308,7 @@ export default {
   'archive.applied': ({ posts, images, skipped }) =>
     `新增 ${posts} 篇文章和 ${images} 张图片，其中 ${skipped} 篇本来就在。`,
   'archive.notJson': '不是有效的 JSON 文件。',
-  'archive.notArchive': '这不是存档文件（缺少 glyph.archive 标记）。',
+  'archive.notArchive': '这不是存档文件（缺少 xueni.archive 标记）。',
   'archive.wrongVersion': ({ version }) => `不支持版本 ${version} 的存档。`,
   'archive.wrongContract': ({ contract }) => `这个存档来自另一份合约部署（${contract}）。`,
   'archive.droppedPosts': ({ count }) => `忽略 ${count} 篇格式错误或链未知的文章。`,
@@ -427,7 +427,7 @@ export default {
   // --- 读取设置文件 --------------------------------------------------------
   'settingsFile.notJson': '不是有效的 JSON 文件。',
   'settingsFile.notObject': '文件内容不是一个设置对象。',
-  'settingsFile.notGlyph': '这不是雪泥的设置文件（缺少 glyph.settings 标记）。',
+  'settingsFile.notXueni': '这不是雪泥的设置文件（缺少 xueni.settings 标记）。',
   'settingsFile.badFormat': ({ format, supported }) =>
     `设置文件格式版本 ${format} 不受支持（本版本支持 ${supported}）。`,
   'settingsFile.rpcsShape': 'rpcs 应是按链 ID 分组的节点列表。',

@@ -8,23 +8,21 @@ interface IERC1271 {
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4);
 }
 
-/// @title  Xueni — the ownerless, multi-author, append-only journal, with
-///         two doors that v1 (Blog.sol) does not have: per-post hooks, and
-///         publishing on someone's behalf against their signature.
+/// @title  Xueni — the ownerless, multi-author, append-only journal.
 /// @notice One immutable contract shared by any number of authors. Each
 ///         author is their own stream — an O(1) head pointer and a reverse
-///         block-linked list, exactly as in v1 — and the body still lives only
-///         in the transaction's calldata, never in the event.
+///         block-linked list — and the body lives only in the transaction's
+///         calldata, never in the event.
 ///
-///         What is new:
+///         Three doors, all landing in the same `_publish`:
 ///
 ///         * `publish(title, payload, hook, hookData)` — after the post is
 ///           recorded, the core calls `hook.onPublish(...)` once, forwarding
 ///           the call's ETH. The hook may gate, charge, index or mint; it
 ///           cannot change who the author is. The hook is an indexed field
-///           of the `Post` event, so a reader can filter by it. The two-
-///           argument `publish(title, payload)` is byte-identical to v1's
-///           call and costs the same, plus one event topic.
+///           of the `Post` event, so a reader can filter by it. The plain
+///           two-argument `publish(title, payload)` costs one event topic
+///           less, having no hook to name.
 ///
 ///         * `publishFor(author, ..., deadline, signature)` — anyone may
 ///           submit a post the author signed (EIP-712). The nonce is the
@@ -39,7 +37,7 @@ interface IERC1271 {
 ///         forwarded to the hook the author named, and a call with ETH and no
 ///         hook reverts, so nothing can be stranded here.
 contract Xueni {
-    /// @dev Per-author head pointer, packed into one storage slot (as in v1).
+    /// @dev Per-author head pointer, packed into one storage slot.
     struct AuthorState {
         uint96 latestBlock; // 0 = author has never posted
         uint48 count;       // total posts by this author (== next post's index)
@@ -150,9 +148,8 @@ contract Xueni {
 
     // --- Publishing --------------------------------------------------------
 
-    /// @notice Publish one article, exactly as v1 does: the same selector,
-    ///         the same calldata, no hook. `payload` rides in the calldata
-    ///         only; the contract never reads it.
+    /// @notice Publish one article, with no hook. `payload` rides in the
+    ///         calldata only; the contract never reads it.
     function publish(bytes32 title, bytes calldata payload) external {
         _publish(msg.sender, msg.sender, _authors[msg.sender], title, payload, address(0), payload[:0]);
     }

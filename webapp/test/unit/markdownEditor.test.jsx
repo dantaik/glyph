@@ -15,7 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const previewImages = () => [...document.querySelectorAll('.prose-glyph img')].map((img) => img.getAttribute('src'));
+const previewImages = () => [...document.querySelectorAll('.prose-xueni img')].map((img) => img.getAttribute('src'));
 
 describe('the preview pane', () => {
   it('shows an image attached to this draft', async () => {
@@ -59,15 +59,15 @@ describe('the preview pane', () => {
     // The sanitizer refuses `eth:` as an image source, so what is left is an
     // image with no source showing its alt text — the same thing a post page
     // shows for an image its node cannot serve.
-    await waitFor(() => expect(document.querySelector('.prose-glyph img')).toBeTruthy());
+    await waitFor(() => expect(document.querySelector('.prose-xueni img')).toBeTruthy());
     expect(previewImages()).toEqual(['']);
-    expect(document.querySelector('.prose-glyph img').getAttribute('alt')).toBe('a photograph');
+    expect(document.querySelector('.prose-xueni img').getAttribute('alt')).toBe('a photograph');
   });
 
   it('does not compute a preview while the editor is being typed in', () => {
     const resolveEth = vi.fn(async (md) => ({ markdown: md, urls: [] }));
     render(<MarkdownEditor value="![](upload:img1)" onChange={() => {}} mode="edit" resolveEth={resolveEth} />);
     expect(resolveEth).not.toHaveBeenCalled();
-    expect(document.querySelector('.prose-glyph')).toBeNull();
+    expect(document.querySelector('.prose-xueni')).toBeNull();
   });
 });

@@ -15,7 +15,7 @@
 // read, and `authors[].complete` is what lets an importing browser claim it
 // has the whole of that author rather than a sample.
 
-/** The format version, as `glyph.archive`. Bumping it is breaking the file. */
+/** The format version, as `xueni.archive`. Bumping it is breaking the file. */
 export const ARCHIVE_FORMAT = 2;
 
 /** Every image on chain is WebP — the writers only ever produce that. */
@@ -71,7 +71,7 @@ export const archiveImage = ({ chainId, txHash, bytes }) => ({
  */
 export function buildArchive({ contract, scope, posts, images, authors, now = new Date() }) {
   return {
-    glyph: { archive: ARCHIVE_FORMAT },
+    xueni: { archive: ARCHIVE_FORMAT },
     exportedAt: now.toISOString(),
     // `contract` names the journal every post here lives on.
     contract,

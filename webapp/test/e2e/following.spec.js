@@ -61,7 +61,7 @@ test.describe('following authors', () => {
       expect.poll(async () => (await postHrefs(page)).length, { timeout: 60_000 }).toBe(mine.length);
 
     await prepare(page, {
-      storage: { 'glyph.following.v1': JSON.stringify({ addresses: [author.toLowerCase()] }) },
+      storage: { 'xueni.following.v1': JSON.stringify({ addresses: [author.toLowerCase()] }) },
     });
     await page.goto('/following');
     await settled();
@@ -71,7 +71,7 @@ test.describe('following authors', () => {
     // Come back as somebody who last read just before the third-newest post.
     // Rewind from another page: leaving `/following` is what records a visit.
     await page.goto('/');
-    await page.evaluate((ts) => localStorage.setItem('glyph.followingSeen.v1', String(ts)), mine[2].ts);
+    await page.evaluate((ts) => localStorage.setItem('xueni.followingSeen.v1', String(ts)), mine[2].ts);
     await page.goto('/following');
     await settled();
     await expect(divider).toHaveCount(1);

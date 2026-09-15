@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { decodeFunctionData, parseAbi, toFunctionSelector } from 'viem';
 import { oracle, prepare } from './app.mjs';
 
-const XUENI = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
+const XUENI = '0x0000003ce1a46c7fbb02b9e1a0a4709ad9cb15d9';
 const PUBLISH_WITH_HOOK = toFunctionSelector('publish(bytes32,bytes,address,bytes)');
 const PUBLISH_FOR = toFunctionSelector('publishFor(address,bytes32,bytes,address,bytes,uint256,bytes)');
 const HOOK = '0x00000000000000000000000000000000000000ab';

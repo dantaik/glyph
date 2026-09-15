@@ -1,6 +1,6 @@
 // ens.js — the identity layer the contract deliberately does not have.
 //
-// Glyph knows only addresses: an author IS a wallet, there is no
+// Xueni knows only addresses: an author IS a wallet, there is no
 // registration, and the contract would be worse if there were. But
 // `0x8a1f…f4a5` is not a name, and a journal whose authors cannot be named
 // is a journal nobody can recommend to anybody. ENS is the answer already

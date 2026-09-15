@@ -328,7 +328,7 @@ Drop images into the area below or click to upload; click an image or its name t
   'archive.applied': ({ posts, images, skipped }) =>
     `Added ${posts} post${posts === 1 ? '' : 's'} and ${images} image${images === 1 ? '' : 's'}. ${skipped} were already here.`,
   'archive.notJson': 'Not a valid JSON file.',
-  'archive.notArchive': 'This is not an archive file (the glyph.archive marker is missing).',
+  'archive.notArchive': 'This is not an archive file (the xueni.archive marker is missing).',
   'archive.wrongVersion': ({ version }) => `Archive version ${version} is not supported.`,
   'archive.wrongContract': ({ contract }) =>
     `This archive is from a different deployment of the contract (${contract}).`,
@@ -453,7 +453,7 @@ Drop images into the area below or click to upload; click an image or its name t
   // --- Reading a settings file --------------------------------------------
   'settingsFile.notJson': 'Not a valid JSON file.',
   'settingsFile.notObject': 'The file does not contain a settings object.',
-  'settingsFile.notGlyph': 'This is not a Xueni settings file (the glyph.settings marker is missing).',
+  'settingsFile.notXueni': 'This is not a Xueni settings file (the xueni.settings marker is missing).',
   'settingsFile.badFormat': ({ format, supported }) =>
     `Settings file format version ${format} is not supported (this version supports ${supported}).`,
   'settingsFile.rpcsShape': 'rpcs should be endpoint lists grouped by chain ID.',
@@ -504,7 +504,7 @@ Drop images into the area below or click to upload; click an image or its name t
   'chain.taikoHoodi': 'Taiko Hoodi testnet',
 
   // --- Hooks, and posts sent on the author's behalf ---
-  // The contracts by name: the original, `Glyph`, and the second, `Xueni`.
+  // The contracts by name: the original, `Xueni`, and the second, `Xueni`.
   'post.viaHook': 'Through the hook',
   'post.relayedBy': 'Sent on the author’s behalf by',
   'post.hookMark': 'hook',

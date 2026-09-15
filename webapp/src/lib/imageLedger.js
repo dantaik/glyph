@@ -13,7 +13,7 @@
 // own ledger and simply pays once itself, and clearing site data costs one
 // duplicate transaction, never correctness.
 
-const KEY = 'glyph.images.v1';
+const KEY = 'xueni.images.v1';
 
 /** Entries kept per chain. A prolific writer's whole history, and then some. */
 export const LEDGER_MAX = 500;

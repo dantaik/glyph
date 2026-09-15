@@ -91,7 +91,7 @@ describe('scanStore', () => {
     store.rememberFeedRange(5n, 15n);
     store.setFeedScanHead(15n);
     store.persistFeedScan();
-    const saved = JSON.parse(localStorage.getItem('glyph.feedScan.v3.1'));
+    const saved = JSON.parse(localStorage.getItem('xueni.feedScan.v3.1'));
     expect(saved.head).toBe('15');
     expect(saved.segments).toEqual([[5, 15]]);
     expect(saved.rows).toHaveLength(2);
@@ -125,7 +125,7 @@ describe('scanStore', () => {
     store.rememberPosts(rows);
     store.rememberFeedRange(900n, 2000n);
     store.persistFeedScan();
-    const saved = JSON.parse(localStorage.getItem('glyph.feedScan.v3.1'));
+    const saved = JSON.parse(localStorage.getItem('xueni.feedScan.v3.1'));
     expect(saved.rows).toHaveLength(FEED_ROW_CAP);
     // The newest FEED_ROW_CAP rows sit in blocks 1050..1349; blocks below the
     // oldest kept row are no longer claimed.

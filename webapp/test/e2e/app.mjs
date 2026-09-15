@@ -2,7 +2,7 @@
 // outside world kept out, the oracle, and the wallet.
 import { walletScript } from './wallet.mjs';
 
-export const RPC = process.env.GLYPH_RPC_URL ?? 'http://127.0.0.1:8545';
+export const RPC = process.env.XUENI_RPC_URL ?? 'http://127.0.0.1:8545';
 export const ETH = 1;
 export const TAIKO = 167000;
 
@@ -27,8 +27,8 @@ export async function prepare(page, { scenario = 'default', wallet = null, stora
   );
   await page.addInitScript(
     ({ rpcs, storage }) => {
-      localStorage.setItem('glyph.rpcs.v1', JSON.stringify(rpcs));
-      localStorage.setItem('glyph.log.v1', '0');
+      localStorage.setItem('xueni.rpcs.v1', JSON.stringify(rpcs));
+      localStorage.setItem('xueni.log.v1', '0');
       for (const [k, v] of Object.entries(storage)) localStorage.setItem(k, v);
     },
     { rpcs: rpcLists(scenario), storage },

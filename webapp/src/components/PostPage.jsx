@@ -18,7 +18,7 @@ import {
 } from '../lib/format';
 import { downloadText, postFileName } from '../lib/download';
 import { setPendingDraftPatch } from '../lib/drafts';
-import { formatPostRef } from '../lib/glyphRefs';
+import { formatPostRef } from '../lib/postRefs';
 import { hookInfo } from '../lib/hookRegistry';
 import { t, useLang } from '../lib/i18n';
 import { AlertCircle } from './Icons';
@@ -98,7 +98,7 @@ export default function PostPage({
       setRaw(b.text != null ? b : null);
       setShowRaw(false);
       setFromCache(res.fromCache);
-      const md = await reader.resolveGlyphRefs(b.markdown);
+      const md = await reader.resolvePostRefs(b.markdown);
       const { markdown: resolved, urls } = await reader.resolveImages(md);
       urlsRef.current = urls;
       setHtml(renderMarkdown(resolved));
@@ -382,10 +382,10 @@ export default function PostPage({
 
       {loaded && (
         <div
-          className="article-column prose-glyph"
+          className="article-column prose-xueni"
           dangerouslySetInnerHTML={{ __html: html }}
           onClick={(e) => {
-            // 0x… cross-article refs render as in-app post links (glyphRefs)
+            // 0x… cross-article refs render as in-app post links (postRefs)
             // — route them instead of reloading the page. The chain segment
             // is optional here so a ref written before the prefix, or by
             // hand, still lands somewhere sensible: this post's own chain.

@@ -72,7 +72,7 @@ describe('FollowingPage', () => {
   it('divides what is new from what was read last visit', async () => {
     const posts = postsOf(A0);
     expect(posts.length).toBeGreaterThan(2);
-    localStorage.setItem('glyph.followingSeen.v1', String(posts[2].ts));
+    localStorage.setItem('xueni.followingSeen.v1', String(posts[2].ts));
     follow(A0);
 
     const { container } = mount();
@@ -97,7 +97,7 @@ describe('FollowingPage', () => {
 
   it('with everything read there is no divider at all', async () => {
     const posts = postsOf(A0);
-    localStorage.setItem('glyph.followingSeen.v1', String(posts[0].ts));
+    localStorage.setItem('xueni.followingSeen.v1', String(posts[0].ts));
     follow(A0);
     const { container } = mount();
     await settled(container, posts.length);

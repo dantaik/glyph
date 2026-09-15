@@ -20,9 +20,9 @@ import {
 } from '../../src/lib/relay';
 import { encodeTitle } from '../../src/lib/title';
 
-const CONTRACT = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
+const CONTRACT = '0x0000003ce1a46c7fbb02b9e1a0a4709ad9cb15d9';
 const AUTHOR = '0x8a1f3b52c9e44e1a9b1f0d2c7a44e0b1d2e3f4a5';
-const HOOK = '0x00000e2b71d66e5feda58a70e6d5ae3762a18d93';
+const HOOK = '0x0000098b1f5b2fb1f7251af47f8df15eb319ed10';
 const SIG = `0x${'ab'.repeat(32)}${'cd'.repeat(32)}1b`;
 const PAYLOAD = toHex(new TextEncoder().encode('# The drums\n\nThey beat all afternoon.\n'));
 
@@ -143,7 +143,7 @@ describe('the ticket', () => {
   it('says what is wrong with a file that is not one', () => {
     expect(parseTicket('not json').problems).toEqual([{ code: 'notJson' }]);
     expect(parseTicket('[]').problems).toEqual([{ code: 'notTicket' }]);
-    expect(parseTicket('{"glyph":{"archive":1}}').problems).toEqual([{ code: 'notTicket' }]);
+    expect(parseTicket('{"xueni":{"archive":1}}').problems).toEqual([{ code: 'notTicket' }]);
     expect(parseTicket('{"xueni":{"relay":2}}').problems).toEqual([{ code: 'wrongFormat', format: 2 }]);
     const broken = { ...ticket, author: 'xiaoman.eth', title: '0x12', deadline: 0, signature: 'nope' };
     const { ticket: none, problems } = parseTicket(JSON.stringify(broken));

@@ -5,7 +5,7 @@ import SettingsPage from '../../src/components/SettingsPage';
 import { getLang, setLang } from '../../src/lib/i18n';
 import { getRescanDelayMs, getRpcUrls, hasCustomRpcs } from '../../src/lib/config';
 
-const file = (body, name = 'glyph-settings-2026-09-03.json') =>
+const file = (body, name = 'xueni-settings-2026-09-03.json') =>
   new File([JSON.stringify(body)], name, { type: 'application/json' });
 
 const pickFile = (f) => fireEvent.change(screen.getByLabelText('Choose a settings file'), { target: { files: [f] } });
@@ -22,14 +22,14 @@ afterEach(() => {
 describe('SettingsPage — backup and restore', () => {
   it('imports a settings file after showing what it will change', async () => {
     render(<SettingsPage navigate={vi.fn()} />);
-    pickFile(file({ glyph: { settings: 1 }, rpcs: { 167000: ['https://taiko.example/rpc'] }, rescanDelayMinutes: 3 }));
+    pickFile(file({ xueni: { settings: 1 }, rpcs: { 167000: ['https://taiko.example/rpc'] }, rescanDelayMinutes: 3 }));
     expect(await screen.findByText('Taiko: 1 custom endpoints')).toBeTruthy();
     expect(screen.getByText('Rescan delay: 3 minutes')).toBeTruthy();
     expect(getRpcUrls(167000)).not.toContain('https://taiko.example/rpc'); // nothing applied yet
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(getRpcUrls(167000)).toEqual(['https://taiko.example/rpc']);
     expect(getRescanDelayMs()).toBe(180_000);
-    expect(screen.getByRole('status').textContent).toMatch(/Applied the settings in glyph-settings-2026-09-03.json/);
+    expect(screen.getByRole('status').textContent).toMatch(/Applied the settings in xueni-settings-2026-09-03.json/);
     // The page shows the restored list at once.
     await waitFor(() => expect(screen.getByTitle('https://taiko.example/rpc')).toBeTruthy());
     expect(screen.getByDisplayValue('3')).toBeTruthy();
@@ -37,7 +37,7 @@ describe('SettingsPage — backup and restore', () => {
 
   it('shows the problems with a file it cannot use, and offers no apply', async () => {
     render(<SettingsPage navigate={vi.fn()} />);
-    pickFile(file({ glyph: { settings: 2 }, theme: 'dark' }, 'old.json'));
+    pickFile(file({ xueni: { settings: 2 }, theme: 'dark' }, 'old.json'));
     expect(await screen.findByText(/version 2 is not supported/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
     const card = document.querySelector('[data-settings-review]');
@@ -47,7 +47,7 @@ describe('SettingsPage — backup and restore', () => {
 
   it('a partly usable file applies its good part and lists the rest', async () => {
     render(<SettingsPage navigate={vi.fn()} />);
-    pickFile(file({ glyph: { settings: 1 }, rpcs: { 1: ['https://eth.example', 'nope'] }, theme: 'blue' }));
+    pickFile(file({ xueni: { settings: 1 }, rpcs: { 1: ['https://eth.example', 'nope'] }, theme: 'blue' }));
     expect(await screen.findByText('Ethereum: 1 custom endpoints')).toBeTruthy();
     expect(screen.getByText('Ethereum: ignoring 1 entries that are not http(s) URLs.')).toBeTruthy();
     expect(screen.getByText('theme should be light, dark or null (follow the system).')).toBeTruthy();
@@ -61,7 +61,7 @@ describe('SettingsPage — backup and restore', () => {
     let downloadName = null;
     URL.createObjectURL = vi.fn((blob) => {
       saved = blob;
-      return 'blob:glyph';
+      return 'blob:xueni';
     });
     URL.revokeObjectURL = vi.fn();
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click() {
@@ -69,7 +69,7 @@ describe('SettingsPage — backup and restore', () => {
     });
     render(<SettingsPage navigate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /Export settings/ }));
-    expect(downloadName).toMatch(/^glyph-settings-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(downloadName).toMatch(/^xueni-settings-\d{4}-\d{2}-\d{2}\.json$/);
     expect(saved.type).toBe('application/json');
     const text = await new Promise((resolve) => {
       const r = new FileReader();
@@ -77,11 +77,11 @@ describe('SettingsPage — backup and restore', () => {
       r.readAsText(saved);
     });
     expect(JSON.parse(text)).toMatchObject({
-      glyph: { settings: 1 },
+      xueni: { settings: 1 },
       rescanDelayMinutes: 1,
       lang: 'en',
     });
-    expect(screen.getByRole('status').textContent).toMatch(/Exported glyph-settings-/);
+    expect(screen.getByRole('status').textContent).toMatch(/Exported xueni-settings-/);
   });
 });
 
@@ -92,7 +92,7 @@ describe('SettingsPage — language', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '中文' }));
     expect(getLang()).toBe('zh');
-    expect(localStorage.getItem('glyph.lang.v1')).toBe('zh');
+    expect(localStorage.getItem('xueni.lang.v1')).toBe('zh');
     expect(document.documentElement.lang).toBe('zh-CN');
     await waitFor(() => expect(screen.getByRole('heading', { name: '设置' })).toBeTruthy());
 
@@ -102,7 +102,7 @@ describe('SettingsPage — language', () => {
 
   it('a settings file carrying a language applies it, and confirms in that language', async () => {
     render(<SettingsPage navigate={vi.fn()} />);
-    pickFile(file({ glyph: { settings: 1 }, lang: 'zh' }, 'lang.json'));
+    pickFile(file({ xueni: { settings: 1 }, lang: 'zh' }, 'lang.json'));
     expect(await screen.findByText('Language: 中文')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(getLang()).toBe('zh');

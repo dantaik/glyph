@@ -8,8 +8,8 @@ import {MultiHook} from "../src/hooks/MultiHook.sol";
 
 /// @title CREATE2 deterministic deployment of Xueni and its fan-out hook.
 ///
-/// @notice The same procedure as Create2Deploy.s.sol: both contracts go
-///         through the canonical deterministic deployment proxy (Arachnid,
+/// @notice Both contracts go through the canonical deterministic
+///         deployment proxy (Arachnid,
 ///         0x4e59b44847b379578588920ca78fbf26c0b4956c) with fixed salts, so
 ///         each lands at ONE address on every EVM chain. The MultiHook's init
 ///         code embeds the Xueni address, which is itself deterministic, so
@@ -32,14 +32,14 @@ contract Create2DeployXueni is Script {
     address internal constant PROXY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     // --- Xueni (6 leading zeros) ---
-    bytes32 internal constant SALT = 0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56;
-    bytes32 internal constant INIT_CODE_HASH = 0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6;
-    address internal constant EXPECTED_ADDRESS = 0x0000008D02020df6bCDD56A888cFC9eD9b9053eC;
+    bytes32 internal constant SALT = 0x8aa497dea52803954d13c50daba9a4406e3a311f2798d03479c5aa8739f7f135;
+    bytes32 internal constant INIT_CODE_HASH = 0x3c02f70eedda0c718075c36cfb80973b0a56089a9e48028a0edb43193f5b25ca;
+    address internal constant EXPECTED_ADDRESS = 0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9;
 
     // --- MultiHook(Xueni) (5 leading zeros) ---
-    bytes32 internal constant MULTI_SALT = 0xdc284105e2f18cd3db78e88dcd75b3596e2b64c85d8da994e018d23941ac49eb;
-    bytes32 internal constant MULTI_INIT_CODE_HASH = 0x0e015a32a032e837072b30a8f87083159a0e4d9b633910264fd871821289d1de;
-    address internal constant MULTI_EXPECTED_ADDRESS = 0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93;
+    bytes32 internal constant MULTI_SALT = 0xfffbb2a59c4aca17a58d9dd950e154fd23791d671715de15991faa19a76bd6de;
+    bytes32 internal constant MULTI_INIT_CODE_HASH = 0x035f84f8912b4ca547346eaa4b24e7ad295a840277f743cdd16506ba8dd048a6;
+    address internal constant MULTI_EXPECTED_ADDRESS = 0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10;
 
     function run() external {
         if (PROXY.code.length == 0) {

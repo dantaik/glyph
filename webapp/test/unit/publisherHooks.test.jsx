@@ -32,7 +32,7 @@ vi.mock('../../src/lib/publish', async () => {
       return {
         xueni: { relay: 1 },
         chainId: args.chainId,
-        contract: '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec',
+        contract: '0x0000003ce1a46c7fbb02b9e1a0a4709ad9cb15d9',
         author: '0x327fa3369b1d1d42120d84bc407e5865eca7c458',
         title: `0x${'00'.repeat(32)}`,
         titleText: args.title,

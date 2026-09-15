@@ -52,7 +52,7 @@ import {
 } from '../../src/lib/fixtureWorld.js';
 import { buildPayloadText } from '../../src/lib/payloadText.js';
 
-const PORT = Number(process.argv[2] || process.env.GLYPH_RPC_PORT || 8545);
+const PORT = Number(process.argv[2] || process.env.XUENI_RPC_PORT || 8545);
 // The contract, at its deterministic address (Xueni.sol: hooks and relayed
 // posts). Every post is served from it, with its event, and the worlds'
 // posts carry its call forms.
@@ -358,7 +358,7 @@ function nameFromDns(hex) {
 
 /**
  * Answer an `eth_call` to the ENS universal resolver, or `undefined` when the
- * call is not one (in which case the caller decodes it as a Glyph call).
+ * call is not one (in which case the caller decodes it as a Xueni call).
  */
 function ensCall(c, call) {
   if (c.id !== 1) return undefined;
@@ -551,5 +551,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`glyph mock rpc on http://127.0.0.1:${PORT}  scenarios: ${Object.keys(SCENARIOS).join(', ')}`);
+  console.log(`xueni mock rpc on http://127.0.0.1:${PORT}  scenarios: ${Object.keys(SCENARIOS).join(', ')}`);
 });

@@ -12,9 +12,9 @@ test.describe('settings', () => {
       page.waitForEvent('download'),
       page.getByRole('button', { name: /Export settings/ }).click(),
     ]);
-    expect(download.suggestedFilename()).toMatch(/^glyph-settings-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(download.suggestedFilename()).toMatch(/^xueni-settings-\d{4}-\d{2}-\d{2}\.json$/);
     const doc = JSON.parse(readFileSync(await download.path(), 'utf8'));
-    expect(doc.glyph).toEqual({ settings: 1 });
+    expect(doc.xueni).toEqual({ settings: 1 });
     expect(doc.rpcs['167000']).toEqual(rpcLists('default')[167000]);
     expect(doc).toMatchObject({ rescanDelayMinutes: 1, lang: 'en', theme: null, log: false });
 
@@ -26,7 +26,7 @@ test.describe('settings', () => {
       theme: 'dark',
     };
     await page.locator('input[aria-label="Choose a settings file"]').setInputFiles({
-      name: 'glyph-settings-edited.json',
+      name: 'xueni-settings-edited.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(edited)),
     });
@@ -47,7 +47,7 @@ test.describe('settings', () => {
     await page.locator('input[aria-label="Choose a settings file"]').setInputFiles({
       name: 'later.json',
       mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify({ glyph: { settings: 9 }, theme: 'dark' })),
+      buffer: Buffer.from(JSON.stringify({ xueni: { settings: 9 }, theme: 'dark' })),
     });
     const review = page.locator('[data-settings-review]');
     await expect(review).toContainText('version 9 is not supported');

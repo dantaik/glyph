@@ -196,7 +196,7 @@ export function fmtAbsTime(ts) {
  * where it becomes a sentence. Anything else here is a provider's own
  * English, matched by keyword.
  */
-export const NODE_BEHIND_CODE = 'glyph:node-behind';
+export const NODE_BEHIND_CODE = 'xueni:node-behind';
 const NODE_BEHIND_RE = new RegExp(`^${NODE_BEHIND_CODE} (\\d+)$`);
 
 /** Turn a raw provider error into a short, human-friendly hint. */

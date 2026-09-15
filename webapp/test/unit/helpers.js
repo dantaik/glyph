@@ -17,10 +17,10 @@ export const silentLog = () => ({
 });
 
 const STORAGE_KEYS = (chainId) => [
-  `glyph.feedScan.v2.${chainId}`,
-  `glyph.authorScan.v2.${chainId}`,
-  'glyph.feedScan.v1',
-  'glyph.authorScan.v1',
+  `xueni.feedScan.v2.${chainId}`,
+  `xueni.authorScan.v2.${chainId}`,
+  'xueni.feedScan.v1',
+  'xueni.authorScan.v1',
 ];
 
 /** A store seeded from nothing: this chain's persisted keys are cleared first. */

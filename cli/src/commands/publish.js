@@ -51,7 +51,7 @@ export const OPTIONS = {
  * first heading, else the file name.
  *
  * `title:` is accepted from front-matter as a convenience — every static
- * site generator writes one — but it is NOT a Glyph front-matter key: on
+ * site generator writes one — but it is NOT a Xueni front-matter key: on
  * chain the title is its own bytes32 argument, so it is read here and
  * written nowhere.
  */
