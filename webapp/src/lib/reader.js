@@ -50,10 +50,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
   const chain = getChain(id);
   const log = rpcLog.scoped(chain.name);
   const io = makeIO ? makeIO(id, log) : createChainIO(id, log);
-  // The contracts this chain is read on. The store is told, so coverage
-  // recorded by a build that read fewer of them is not taken on trust.
-  const versions = io.versions ?? [1];
-  const store = ownStore ?? getScanStore(id, versions);
+  const store = ownStore ?? getScanStore(id);
   // Two caches, because there are two kinds of read.
   //
   // `forever` holds what the chain cannot change: a post's metadata is
@@ -112,7 +109,7 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
 
   // --- Post metadata by deep link ----------------------------------------
 
-  const metaKey = (author, index, version = 1) => `meta:${addrKey(author)}:${index}:v${Number(version ?? 1)}`;
+  const metaKey = (author, index) => `meta:${addrKey(author)}:${index}`;
   const txMetaKey = (txHash, eventIndex) => `txmeta:${String(txHash).toLowerCase()}:${eventIndex}`;
 
   /**
@@ -122,29 +119,28 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
    */
   function cacheMetaBoth(meta) {
     if (!meta) return meta;
-    forever(metaKey(meta.author, meta.index, meta.version), () => Promise.resolve(meta));
+    forever(metaKey(meta.author, meta.index), () => Promise.resolve(meta));
     forever(txMetaKey(meta.txHash, meta.eventIndex ?? 0), () => Promise.resolve(meta));
     return meta;
   }
 
   /**
-   * Find the metadata for a single (author, index) on one contract — deep
-   * links and prev/next navigation. Answered outright when the post has
-   * already been read this session; otherwise walks the reverse chain,
-   * reusing covered blocks.
+   * Find the metadata for a single (author, index) — deep links and
+   * prev/next navigation. Answered outright when the post has already been
+   * read this session; otherwise walks the reverse chain, reusing covered
+   * blocks.
    */
-  function findTitleMeta(author, targetIndex, version = 1) {
+  function findTitleMeta(author, targetIndex) {
     // Guard against garbage from the URL (?i=abc): BigInt(NaN) throws, and
     // negative / fractional indexes can never match a real post.
     if (!Number.isSafeInteger(targetIndex) || targetIndex < 0) return Promise.resolve(null);
-    const v = Number(version ?? 1);
-    return forever(metaKey(author, targetIndex, v), async () => {
-      const known = store.knownPost(author, BigInt(targetIndex), v);
+    return forever(metaKey(author, targetIndex), async () => {
+      const known = store.knownPost(author, BigInt(targetIndex));
       if (known) {
         log.fromCache('post', `#${targetIndex} of ${short(author)}`, 'already loaded');
         return cacheMetaBoth(known);
       }
-      const head = await io.latestBlock(author, v);
+      const head = await io.latestBlock(author);
       const found = await scanner.findAuthorPost({
         store,
         log,
@@ -152,7 +148,6 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
         targetIndex,
         startBlock: head,
         fetchBlock: (block) => io.authorPostsInBlock(author, block),
-        version: v,
       });
       store.persistAuthorScan(author);
       return cacheMetaBoth(found);
@@ -184,20 +179,8 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     });
   }
 
-  /** How many posts `author` has on one contract of this chain. */
-  const countOf = (author, version = 1) =>
-    volatile(`count:${addrKey(author)}:v${Number(version ?? 1)}`, () => io.count(author, version));
-
-  /** How many posts `author` has on this chain, every contract together. */
-  const count = (author) =>
-    volatile(`count:${addrKey(author)}`, async () => {
-      const parts = await Promise.all(versions.map((v) => countOf(author, v)));
-      return parts.reduce((sum, n) => sum + BigInt(n ?? 0), 0n);
-    });
-
-  /** Whether one contract version has code on this chain (v1 always has). */
-  const isDeployed = (version) =>
-    io.isDeployed ? io.isDeployed(version) : Promise.resolve(Number(version) === 1);
+  /** How many posts `author` has on this chain. */
+  const count = (author) => volatile(`count:${addrKey(author)}`, () => io.count(author));
 
   /** Whether an address is a contract account (holds code) on this chain. */
   const hasCode = (address) => (io.hasCode ? io.hasCode(address) : Promise.resolve(false));
@@ -368,9 +351,6 @@ export function createReader(chainId, { makeIO = null, store: ownStore = null } 
     findTitleMeta,
     findMetaByTx,
     count,
-    countOf,
-    versions,
-    isDeployed,
     hasCode,
     clock,
     blockTime,

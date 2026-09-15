@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-// publisherHooks.test.jsx — the write tab on a chain where the v2 contract
-// is deployed: the hook section, publishing through a hook, and signing a
-// post for a relayer instead of sending it.
+// publisherHooks.test.jsx — the write tab: the hook section, publishing
+// through a hook, and signing a post for a relayer instead of sending it.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -49,14 +48,10 @@ vi.mock('../../src/lib/publish', async () => {
   };
 });
 
-let v2 = true;
-// One reader object, handed out every time: the write tab keys its
-// "is v2 here?" effect on the reader, as the real `getReader` returns the
-// same one per chain, and a fresh object per render would loop forever.
+// One reader object, handed out every time: the real `getReader` returns
+// the same one per chain, and a fresh object per render would loop forever.
 const reader = {
   chainId: 1,
-  isDeployed: async (version) => (version === 2 ? v2 : true),
-  countOf: async () => 3n,
   count: async () => 3n,
   baseFees: async () => [],
   resolveImages: async (md) => ({ markdown: md, urls: [] }),
@@ -90,7 +85,6 @@ const titleBox = () => screen.getByPlaceholderText(t('publish.titlePlaceholder')
 beforeEach(async () => {
   localStorage.clear();
   setLang('en');
-  v2 = true;
   published.length = 0;
   signed.length = 0;
   await clearDraft();
@@ -100,11 +94,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('the write tab with the v2 contract', () => {
-  it('offers a hook and publishes through it to v2', async () => {
+describe('the write tab', () => {
+  it('offers a hook and publishes through it', async () => {
     render(<Publisher />);
-    await waitFor(() => expect(document.querySelector('[data-publish-target="2"]')).toBeTruthy());
-    expect(screen.getByText('This post goes to Xueni on Ethereum.')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('This post goes to Xueni on Ethereum.')).toBeTruthy());
     fireEvent.change(titleBox(), { target: { value: 'Through a hook' } });
     fireEvent.click(screen.getByRole('button', { name: 'One hook' }));
     fireEvent.change(screen.getByLabelText('Hook address'), { target: { value: '0x00000000000000000000000000000000000000ab' } });
@@ -114,7 +107,6 @@ describe('the write tab with the v2 contract', () => {
     expect(published[0]).toMatchObject({
       chainId: 1,
       title: 'Through a hook',
-      version: 2,
       hook: '0x00000000000000000000000000000000000000ab',
       hookData: '0x01',
       value: 0n,
@@ -124,7 +116,7 @@ describe('the write tab with the v2 contract', () => {
 
   it('will not publish through a hook that is malformed', async () => {
     render(<Publisher />);
-    await waitFor(() => expect(document.querySelector('[data-publish-target="2"]')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'One hook' })).toBeTruthy());
     fireEvent.change(titleBox(), { target: { value: 'Nope' } });
     fireEvent.click(screen.getByRole('button', { name: 'One hook' }));
     fireEvent.change(screen.getByLabelText('Hook address'), { target: { value: '0x12' } });
@@ -135,7 +127,7 @@ describe('the write tab with the v2 contract', () => {
 
   it('signs for a relayer instead of sending, and shows the ticket', async () => {
     render(<Publisher />);
-    await waitFor(() => expect(document.querySelector('[data-publish-target="2"]')).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('Valid for')).toBeTruthy());
     fireEvent.change(titleBox(), { target: { value: 'Signed, not sent' } });
     fireEvent.change(screen.getByLabelText('Valid for'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign for a relayer instead' }));
@@ -147,16 +139,4 @@ describe('the write tab with the v2 contract', () => {
     expect(document.querySelector('[data-relay-ticket] textarea').value).toContain('"xueni"');
   });
 
-  it('without v2 on the chain, says so and publishes to v1', async () => {
-    v2 = false;
-    render(<Publisher />);
-    await waitFor(() => expect(document.querySelector('[data-publish-target="1"]')).toBeTruthy());
-    expect(screen.getByText(/Hooks need Xueni, which is not deployed on Ethereum yet/)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Sign for a relayer instead' })).toBeNull();
-    expect(document.querySelector('[data-relay-panel]')).toBeNull();
-    fireEvent.change(titleBox(), { target: { value: 'Plain' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Publish on-chain' }));
-    await waitFor(() => expect(published).toHaveLength(1));
-    expect(published[0]).toMatchObject({ version: 1, hook: null, hookData: '0x' });
-  });
 });

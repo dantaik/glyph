@@ -503,9 +503,8 @@ Drop images into the area below or click to upload; click an image or its name t
   'chain.sepolia': 'Sepolia testnet',
   'chain.taikoHoodi': 'Taiko Hoodi testnet',
 
-  // --- The second contract: hooks, and posts sent on the author's behalf ---
+  // --- Hooks, and posts sent on the author's behalf ---
   // The contracts by name: the original, `Glyph`, and the second, `Xueni`.
-  'post.contractVersion': ({ version }) => (Number(version) === 2 ? 'Xueni' : 'Glyph'),
   'post.viaHook': 'Through the hook',
   'post.relayedBy': 'Sent on the author’s behalf by',
   'post.hookMark': 'hook',
@@ -523,8 +522,6 @@ Drop images into the area below or click to upload; click an image or its name t
   'hooks.heading': 'Hook',
   'hooks.note':
     'Optional. A hook is a contract that runs inside the post: it can refuse it, charge for it, file it in an index, or record it in a publication. The post stays yours; the hook only adds to it. This app never runs a hook’s code — it shows which hook a post went through.',
-  'hooks.notDeployed': ({ chain }) =>
-    `Hooks need Xueni, which is not deployed on ${chain} yet; this post goes to the original contract.`,
   'hooks.target': ({ chain }) => `This post goes to Xueni on ${chain}.`,
   'hooks.mode': 'Hook',
   'hooks.none': 'None',

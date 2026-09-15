@@ -12,9 +12,9 @@
 // announced extension, or WalletConnect where a build carries a project id.
 
 import { createWalletClient, custom, toHex } from 'viem';
-import { GLYPH_ADDRESS, XUENI_ADDRESS, contractAddress } from './config';
+import { XUENI_ADDRESS } from './config';
 import { getChain } from './chains';
-import { abi, abiV2 } from './abi';
+import { abi } from './abi';
 import { getClient } from './clients';
 import { encodeTitle } from './title';
 import { encodePayload } from './payload';
@@ -258,11 +258,10 @@ export async function measurePayload({ tags = [], markdown, files = {}, meta = {
 /**
  * Publish a post on `chainId`.
  * `meta` is the rest of the front-matter — the language, the relations —
- * which rides in the same payload as the tags (spec §5.1). `version` picks
- * the contract: v1 (the default) or v2; on v2, `hook`, `hookData` and
- * `value` put the post through a hook (the four-argument call) — with none
- * of them, the plain call, byte-identical to v1's.
- * @param {{ chainId: number, title: string, tags?: string[], markdown: string, meta?: object, version?: number, hook?: string | null, hookData?: string, value?: bigint }} draft
+ * which rides in the same payload as the tags (spec §5.1). `hook`,
+ * `hookData` and `value` put the post through a hook (the four-argument
+ * call); with none of them, the plain two-argument call.
+ * @param {{ chainId: number, title: string, tags?: string[], markdown: string, meta?: object, hook?: string | null, hookData?: string, value?: bigint }} draft
  * @returns {Promise<`0x${string}`>} tx hash of the publish call
  */
 export async function publishPost({
@@ -271,7 +270,6 @@ export async function publishPost({
   tags = [],
   markdown,
   meta = {},
-  version = 1,
   hook = null,
   hookData = '0x',
   value = 0n,
@@ -280,21 +278,11 @@ export async function publishPost({
   const payload = await encodePayload({ tags, markdown, meta });
   const titleHex = encodeTitle(title);
   const hooked = (hook && hook.toLowerCase() !== ZERO_ADDRESS) || (hookData && String(hookData).toLowerCase() !== '0x');
-  if (Number(version) !== 2) {
-    if (hooked || BigInt(value ?? 0) !== 0n) throw new Error('hooks need the v2 contract');
-    return wallet.writeContract({
-      account,
-      address: GLYPH_ADDRESS,
-      abi,
-      functionName: 'publish',
-      args: [titleHex, toHex(payload)],
-    });
-  }
   if (!hooked) {
     return wallet.writeContract({
       account,
       address: XUENI_ADDRESS,
-      abi: abiV2,
+      abi,
       functionName: 'publish',
       args: [titleHex, toHex(payload)],
     });
@@ -302,7 +290,7 @@ export async function publishPost({
   return wallet.writeContract({
     account,
     address: XUENI_ADDRESS,
-    abi: abiV2,
+    abi,
     functionName: 'publish',
     args: [titleHex, toHex(payload), hook ?? ZERO_ADDRESS, hookData ?? '0x'],
     value: BigInt(value ?? 0),
@@ -311,10 +299,10 @@ export async function publishPost({
 
 /**
  * Sign a post for somebody else to send (Xueni.publishFor), and hand
- * back the ticket that carries it. The author's next index on the v2
- * contract is read fresh from the node — it is the nonce, so a stale count
- * would sign a post that can never land. The wallet is asked for an
- * EIP-712 signature, never a transaction; nothing is sent.
+ * back the ticket that carries it. The author's next index is read fresh
+ * from the node — it is the nonce, so a stale count would sign a post that
+ * can never land. The wallet is asked for an EIP-712 signature, never a
+ * transaction; nothing is sent.
  * @returns {Promise<object>} the ticket (see relay.js)
  */
 export async function signRelayTicket({
@@ -329,12 +317,12 @@ export async function signRelayTicket({
   days = 7,
 }) {
   const { wallet, account } = await getWallet(chainId);
-  const contract = contractAddress(2);
+  const contract = XUENI_ADDRESS;
   const payload = toHex(await encodePayload({ tags, markdown, meta }));
   const titleHex = encodeTitle(title);
   const index = await getClient(chainId).readContract({
     address: contract,
-    abi: abiV2,
+    abi,
     functionName: 'count',
     args: [account],
   });
@@ -365,7 +353,7 @@ export async function relayTicket(ticket, { chainId }) {
   return wallet.writeContract({
     account,
     address: ticket.contract,
-    abi: abiV2,
+    abi,
     functionName: 'publishFor',
     args: publishForArgs(ticket),
     value: BigInt(ticket.value ?? 0),

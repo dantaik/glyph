@@ -299,12 +299,6 @@ export default function PostPage({
           <ChainChip chainId={reader.chainId} navigate={navigate} />
           <Dot />
           <span>{fmtIndex(meta.index)}</span>
-          {Number(meta.version ?? 1) !== 1 && (
-            <>
-              <Dot />
-              <span data-contract-version={meta.version}>{t('post.contractVersion', { version: meta.version })}</span>
-            </>
-          )}
           {relTime && (
             <>
               <Dot />

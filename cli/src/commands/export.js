@@ -20,7 +20,7 @@ import { parseAddressArg, readArgs, readRpcOverrides, resolveChain } from '../ar
 import { onChain } from '../chain.js';
 import { imageRefs } from '../images.js';
 import { help, msg } from '../messages.js';
-import { CONTRACT_VERSIONS, DEFAULT_GLYPH_ADDRESS, defaultContractAddress } from '../shared.js';
+import { DEFAULT_XUENI_ADDRESS } from '../shared.js';
 import { errorText, fail, note, print, printJson } from '../out.js';
 import { readersFor } from '../walk.js';
 
@@ -49,16 +49,11 @@ export function titleSlug(title) {
  * it is the post's identity within its author's list, it sorts the directory
  * the way the list reads, and it keeps two posts written on one day with the
  * same title from becoming one file.
- *
- * A post on the second contract ends in `.v2.md`: the author has a list on
- * each contract, so index 0 exists on both, and the two must not become one
- * file. Names of posts on the first contract are exactly what they were.
  */
 export function postFileName(row) {
   const date = row.ts == null ? 'undated' : new Date(Number(row.ts) * 1000).toISOString().slice(0, 10);
   const slug = titleSlug(row.title) || String(row.txHash).slice(2, 10);
-  const version = Number(row.version ?? 1);
-  return `${date}-${row.index}-${slug}${version === 1 ? '' : `.v${version}`}.md`;
+  return `${date}-${row.index}-${slug}.md`;
 }
 
 export async function run(argv) {
@@ -80,7 +75,7 @@ export async function run(argv) {
   for (const reader of readers) {
     note(msg.walkingChain(reader.name, address));
     const dir = join(out, reader.slug);
-    const { rows, head, heads, complete } = await onChain(reader.name, () => reader.walkAuthor(address));
+    const { rows, head, complete } = await onChain(reader.name, () => reader.walkAuthor(address));
     if (rows.length === 0) {
       // An author with nothing on this chain gets no directory and no
       // `authors` entry: an entry with a head of zero would tell an importing
@@ -97,7 +92,7 @@ export async function run(argv) {
     for (const row of rows) {
       const body = await onChain(reader.name, () => reader.postBody(row.txHash));
       writeFileSync(join(dir, postFileName(row)), body.text, 'utf8');
-      posts.push(archivePost({ chainId: reader.chainId, row, body, contract: defaultContractAddress(row.version ?? 1) }));
+      posts.push(archivePost({ chainId: reader.chainId, row, body }));
       for (const txHash of imageRefs(body.markdown)) {
         if (seenImages.has(txHash)) continue;
         seenImages.add(txHash);
@@ -112,15 +107,11 @@ export async function run(argv) {
         }
       }
     }
-    // The author has a list on each contract; `heads` is where each was
-    // walked from (the contracts they wrote on), `head` the newest of them.
+    // `head` is the block the walk started from: the author's newest post.
     authors.push({
       chainId: reader.chainId,
       address: rows[0].author,
       head: Number(head),
-      heads: Object.fromEntries(
-        CONTRACT_VERSIONS.filter((v) => (heads?.[v] ?? 0n) > 0n).map((v) => [v, Number(heads[v])]),
-      ),
       complete,
     });
     perChain.push({
@@ -134,8 +125,7 @@ export async function run(argv) {
   }
 
   const doc = buildArchive({
-    contract: DEFAULT_GLYPH_ADDRESS,
-    contracts: Object.fromEntries(CONTRACT_VERSIONS.map((v) => [v, defaultContractAddress(v)])),
+    contract: DEFAULT_XUENI_ADDRESS,
     scope: { kind: 'author', address: authors[0]?.address ?? address },
     posts,
     images,

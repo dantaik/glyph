@@ -21,7 +21,7 @@ describe('MergedAuthorList', () => {
     // Both walks reached the author's first post: nothing more, no frontier.
     expect(snap.hasMore).toBe(false);
     expect(snap.frontier).toBeNull();
-    expect(snap.chains.map((c) => [c.chainId, c.count, c.hasMore])).toEqual([[1, 5, false], [167000, 3, false]]);
+    expect(snap.chains.map((c) => [c.chainId, c.count, c.hasMore])).toEqual([[1, 6, false], [167000, 3, false]]);
   });
 
   it('an author who wrote on one chain only', async () => {
@@ -30,7 +30,7 @@ describe('MergedAuthorList', () => {
     await list.refresh();
     const snap = await settle(list);
     expect(snap.rows.every((r) => r.chainId === 167000)).toBe(true);
-    expect(snap.rows).toHaveLength(3);
+    expect(snap.rows).toHaveLength(4);
     expect(snap.frontier).toBeNull();
     expect(snap.hasMore).toBe(false);
   });
@@ -87,14 +87,14 @@ describe('MergedAuthorList', () => {
     const list = view.authorList(A0);
     await list.refresh();
     let snap = await settle(list);
-    expect(snap.rows).toHaveLength(5);
+    expect(snap.rows).toHaveLength(6);
     expect(snap.chains[1].error).toMatch(/taiko down/);
     expect(snap.frontier).toMatchObject({ after: -1, leaders: [{ chainId: 167000, state: 'error' }] });
     expect(snap.hasMore).toBe(true);
     broken = false;
     await list.retry();
     snap = await settle(list);
-    expect(snap.rows).toHaveLength(8);
+    expect(snap.rows).toHaveLength(9);
     expect(snap.frontier).toBeNull();
   });
 
@@ -103,8 +103,8 @@ describe('MergedAuthorList', () => {
     const list = view.authorList(A0);
     await list.refresh();
     const snap = await settle(list);
-    expect(snap.rows).toHaveLength(5);
+    expect(snap.rows).toHaveLength(6);
     expect(snap.frontier).toBeNull();
-    expect(snap.rows.map((r) => Number(r.index))).toEqual([4, 3, 2, 1, 0]);
+    expect(snap.rows.map((r) => Number(r.index))).toEqual([5, 4, 3, 2, 1, 0]);
   });
 });

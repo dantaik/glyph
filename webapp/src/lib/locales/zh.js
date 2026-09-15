@@ -474,7 +474,6 @@ export default {
   'chain.taikoHoodi': 'Taiko Hoodi 测试网',
 
   // --- 第二份合约：钩子，以及由他人代发的文章 ------------------------------
-  'post.contractVersion': ({ version }) => (Number(version) === 2 ? 'Xueni' : 'Glyph'),
   'post.viaHook': '经由钩子',
   'post.relayedBy': '由他人代为发送：',
   'post.hookMark': '钩子',
@@ -492,7 +491,6 @@ export default {
   'hooks.heading': '钩子',
   'hooks.note':
     '可选。钩子是一份在发布过程中运行的合约：它可以拒绝这篇文章、为它收费、把它编入索引，或把它记入某个刊物。文章仍然属于你；钩子只是在它之外多做一些事。本应用从不运行钩子的代码，只显示一篇文章经过了哪个钩子。',
-  'hooks.notDeployed': ({ chain }) => `钩子需要 Xueni，而它尚未部署到${chain}；这篇文章将发布到原合约。`,
   'hooks.target': ({ chain }) => `这篇文章将发布到${chain}上的 Xueni。`,
   'hooks.mode': '钩子',
   'hooks.none': '无',

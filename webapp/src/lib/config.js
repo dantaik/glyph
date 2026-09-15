@@ -18,16 +18,15 @@
 // first and falls back to the next when one fails, so a flaky public node
 // degrades instead of breaking the page.
 //
-// GLYPH_ADDRESS identifies the deployed contract and isn't user-tunable.
+// XUENI_ADDRESS identifies the deployed contract and isn't user-tunable.
 // CREATE2 puts it at the same address on every chain, so it is a constant,
 // not configuration: the deployed address is the built-in default and the
-// app works out of the box on any host. VITE_GLYPH_ADDRESS overrides it only
-// for a private redeploy (a changed Blog.sol yields a different address).
+// app works out of the box on any host. VITE_XUENI_ADDRESS overrides it only
+// for a private redeploy (a changed Xueni.sol yields a different address).
 
 import { useSyncExternalStore } from 'react';
 import {
   DEFAULT_CHAIN_ID,
-  DEFAULT_GLYPH_ADDRESS,
   DEFAULT_XUENI_ADDRESS,
   DEFAULT_MULTI_HOOK_ADDRESS,
   SELECTABLE_CHAIN_IDS,
@@ -80,29 +79,17 @@ const subscribeTo = (name) => (callback) => {
 // The deployed address itself lives in chains.js, so that plain Node can
 // read it without Vite; it is re-exported here, where it has always been
 // imported from.
-export { DEFAULT_GLYPH_ADDRESS, DEFAULT_XUENI_ADDRESS };
+export { DEFAULT_XUENI_ADDRESS };
 
-export const GLYPH_ADDRESS = import.meta.env.VITE_GLYPH_ADDRESS || DEFAULT_GLYPH_ADDRESS;
-
-/** The v2 contract (hooks, relayed posts); VITE_XUENI_ADDRESS overrides it for a private redeploy. */
+/** The contract every chain is read on; VITE_XUENI_ADDRESS overrides it for a private redeploy. */
 export const XUENI_ADDRESS = import.meta.env.VITE_XUENI_ADDRESS || DEFAULT_XUENI_ADDRESS;
 
-/** The fan-out hook beside v2; VITE_MULTI_HOOK_ADDRESS overrides it. */
+/** The fan-out hook beside it; VITE_MULTI_HOOK_ADDRESS overrides it. */
 export const MULTI_HOOK_ADDRESS = import.meta.env.VITE_MULTI_HOOK_ADDRESS || DEFAULT_MULTI_HOOK_ADDRESS;
 
-/** The contracts every chain is read on, oldest first: `{ version, address }`. */
-export const CONTRACTS = Object.freeze([
-  Object.freeze({ version: 1, address: GLYPH_ADDRESS }),
-  Object.freeze({ version: 2, address: XUENI_ADDRESS }),
-]);
-
-/** The address of one contract version, or null for a version this build does not know. */
-export const contractAddress = (version) =>
-  CONTRACTS.find((c) => c.version === Number(version))?.address ?? null;
-
-/** The version a contract address is, or null for an address that is not one of ours. */
-export const contractVersionOf = (address) =>
-  CONTRACTS.find((c) => c.address.toLowerCase() === String(address ?? '').toLowerCase())?.version ?? null;
+/** Whether `address` is the contract this build reads. */
+export const isContractAddress = (address) =>
+  String(address ?? '').toLowerCase() === XUENI_ADDRESS.toLowerCase();
 
 /** The chain the env vars describe (VITE_RPC_URL applies to this one). */
 const ENV_CHAIN_ID = (() => {

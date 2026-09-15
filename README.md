@@ -40,15 +40,13 @@ is ready, so import the repository as it is. `npm run build` puts the output in 
 
 ```bash
 cd contracts && forge install foundry-rs/forge-std
-forge script script/Create2Deploy.s.sol:Create2DeployGlyph \
-  --rpc-url $ETH_RPC --broadcast   # PRIVATE_KEY comes from the environment (the script reads it with vm.envUint)
 forge script script/Create2DeployXueni.s.sol:Create2DeployXueni \
-  --rpc-url $ETH_RPC --broadcast   # the second contract (hooks, publishFor) and the fan-out hook beside it
+  --rpc-url $ETH_RPC --broadcast   # the contract and the fan-out hook beside it
+                                   # (PRIVATE_KEY comes from the environment; the script reads it with vm.envUint)
 
 # Point the front end at your own copy. Vite inlines these at build time, so a
 # change here means rebuilding.
 cat > webapp/.env.local <<EOF
-VITE_GLYPH_ADDRESS=0xYourDeployedAddress
 VITE_XUENI_ADDRESS=0xYourXueniAddress
 VITE_MULTI_HOOK_ADDRESS=0xYourFanOutAddress
 VITE_RPC_URL=https://eth.drpc.org
@@ -72,15 +70,13 @@ chain to publish to (it follows the wallet's own network until you pick one, and
 and switch the wallet's network in one click when it is on the wrong chain → then a title (32 bytes at
 most) + tags + a Markdown body (CodeMirror editing, full-width preview) → publish. To reference another
 post from the body, write `[text](0xTXHASH/0)` (spec §8.1).
-**Hooks (the second contract)**: where Xueni is deployed on the publish chain, the Write tab says so
-and a post can go through a **hook** — a contract of anyone's, named per post, that the journal calls once
-after the post is recorded, with the call's ETH and whatever data you attach: a publication with members,
-a fee, an index by topic, a collectible (spec §4.1). "None" is a plain post and costs what it costs on v1;
-"One hook" takes an address, hex data and an amount of ETH; "Several hooks" packs a list of them into the
-fan-out hook deployed beside the contract. The estimate shows the ETH going to the hook. A post page
-shows the contract it lives on, the hook it went through (named where this build knows the address) and
-its data in "Raw"; the reader never runs anything for a hook. Both contracts are read together on every
-chain, so nothing moves and nothing needs migrating.
+**Hooks**: a post can go through a **hook** — a contract of anyone's, named per post, that the journal
+calls once after the post is recorded, with the call's ETH and whatever data you attach: a publication
+with members, a fee, an index by topic, a collectible (spec §4.1). "None" is a plain post and costs the
+least; "One hook" takes an address, hex data and an amount of ETH; "Several hooks" packs a list of them
+into the fan-out hook deployed beside the contract. The estimate shows the ETH going to the hook. A post
+page shows the hook it went through (named where this build knows the address) and its data in "Raw";
+the reader never runs anything for a hook.
 **Relaying (`publishFor`)**: "Sign for a relayer instead" signs the post with the wallet (EIP-712, no
 transaction, no gas) and produces a **ticket** — one small JSON file naming the chain, the contract, the
 post, the hook, the deadline you chose (1, 7 or 30 days) and the signature. Anyone can paste or open
@@ -228,7 +224,7 @@ const callData = postToCallData({ title, tags, markdown, meta });   // what a wa
 const post = callDataToPost(tx.input);                              // { title, tags, markdown, meta, text, compressedBytes, call }
 ```
 
-Revision 1.2 of the spec covers the second contract's two other calls — a post through a hook
+Revision 1.2 of the spec covers the contract's two other calls — a post through a hook
 (`publish(bytes32,bytes,address,bytes)`) and a post relayed on the author's behalf (`publishFor`) —
 which the codec tells apart by selector and reports in `call` (the hook, its data, and for a relayed
 post the author, deadline and signature); `postToCallData(post, { hook, hookData })` and
@@ -249,13 +245,12 @@ npm run build       # build the site into dist/
 npm run test:e2e    # Playwright (Chromium): the built output + a local JSON-RPC mock node (both chains)
 npm run check       # all three
 
-cd contracts && forge install foundry-rs/forge-std && forge test   # the second contract and its hooks (Foundry)
+cd contracts && forge install foundry-rs/forge-std && forge test   # the contract and its hooks (Foundry)
 ```
 
-The contract tests (`contracts/test/`) cover `Xueni` — the plain call's parity with v1, hooks that
-gate, charge, record, reject and re-enter, ETH forwarding, `publishFor` with EOA (65- and 64-byte),
-ERC-1271 and malleated signatures, deadlines and the index-as-nonce — and the three shipped hooks.
-`Blog.sol` itself is unchanged and stays deployed as it is.
+The contract tests (`contracts/test/`) cover `Xueni` — the plain call, hooks that gate, charge,
+record, reject and re-enter, ETH forwarding, `publishFor` with EOA (65- and 64-byte), ERC-1271 and
+malleated signatures, deadlines and the index-as-nonce — and the three shipped hooks.
 
 The e2e mock node (`webapp/test/e2e/rpcServer.mjs`) serves the demo world (`src/lib/fixtureWorld.js`) over
 JSON-RPC at the real contract's deployment heights: `eth_getLogs` returns ABI-encoded Post events whose
@@ -289,37 +284,28 @@ chain with one replayable transaction (a one-time account) — so **Xueni has th
 chain**:
 
 ```
-contract address: 0x000000AE2f2249c497cfc5F262dd1491634C361C   (6 leading zeros)
-salt:             0x00436d208c20757dde791d2c0c0909a2c8ea61482d3fa516692d9ee5244440f1
-deployer (proxy): 0x4e59b44847b379578588920cA78FbF26c0B4956C
-init code hash:   0x2d087c683d199f0d5d835f323462ddb3680ba048a4ef29f350dd784f3402b5cb
-```
-
-The first Solidity contract is still named `Glyph`: the name is part of the compiled metadata, so the
-init code hash — and with it the address the contract already lives at on every chain — depends on it.
-The second contract, not yet deployed, carries the product's name, `Xueni`.
-
-The second contract (`src/Xueni.sol`, hooks and `publishFor`, spec §4.1) and the fan-out hook beside
-it (`src/hooks/MultiHook.sol`) are deployed the same way, by `script/Create2DeployXueni.s.sol`, each to an
-address of its own that is likewise the same on every chain:
-
-```
-Xueni address:  0x0000008D02020df6bCDD56A888cFC9eD9b9053eC   (6 leading zeros)
-salt:             0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56
-init code hash:   0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6
+Xueni address:     0x0000008D02020df6bCDD56A888cFC9eD9b9053eC   (6 leading zeros)
+salt:              0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56
+deployer (proxy):  0x4e59b44847b379578588920cA78FbF26c0B4956C
+init code hash:    0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6
 
 MultiHook address: 0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93  (5 leading zeros; constructed with the Xueni address)
 salt:              0xdc284105e2f18cd3db78e88dcd75b3596e2b64c85d8da994e018d23941ac49eb
 init code hash:    0x0e015a32a032e837072b30a8f87083159a0e4d9b633910264fd871821289d1de
 ```
 
-Both are built into the front end (`DEFAULT_XUENI_ADDRESS`, `DEFAULT_MULTI_HOOK_ADDRESS`), which reads
-them on every chain whether or not they are deployed there yet — a chain without them reads as empty, and
-the Write tab offers hooks and relaying only where `eth_getCode` finds the contract. `forge inspect
-src/Xueni.sol:Xueni bytecode` gives the init code to mine a new salt with if the source changes.
+The fan-out hook (`src/hooks/MultiHook.sol`) is deployed the same way and lands at an address of its
+own that is likewise the same on every chain. Both are built into the front end
+(`DEFAULT_XUENI_ADDRESS`, `DEFAULT_MULTI_HOOK_ADDRESS`), which reads them on every chain — a chain
+without them reads as empty. `forge inspect src/Xueni.sol:Xueni bytecode` gives the init code to mine
+a new salt with if the source changes.
 
-- **The deploy script**: `script/Create2Deploy.s.sol`, idempotent (if the address already holds code it
-  verifies and exits). Anyone may run it, and the deployer holds no privilege.
+An earlier contract (`src/Blog.sol:Glyph`, `0x000000AE2f2249c497cfc5F262dd1491634C361C`) holds the
+posts published before Xueni. It is immutable and stays on chain, but nothing here reads it any more:
+the app, the command-line tool and the macOS app read Xueni alone.
+
+- **The deploy script**: `script/Create2DeployXueni.s.sol`, idempotent (if an address already holds
+  code it verifies and exits). Anyone may run it, and the deployer holds no privilege.
 - **Chains where the proxy is missing**: first send ≥ 0.01 ETH (100,000 gas × 100 gwei) to the one-time
   signing account `0x3fab184622dc19b6109349b94811493bf2a45362`, then replay the raw signed transaction from
   `output/deployment.json` in Arachnid's repository (replaying it on any chain produces the same proxy
@@ -329,37 +315,51 @@ src/Xueni.sol:Xueni bytecode` gives the init code to mine a new salt with if the
   cast publish 0xf8a58085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf31ba02222222222222222222222222222222222222222222222222222222222222222a02222222222222222222222222222222222222222222222222222222222222222
   ```
 
-- **Bytecode drift**: any change to `Blog.sol` changes the init code hash, and therefore the address. Mine a
-  new salt and update the three constants in `Create2Deploy.s.sol`:
+- **Bytecode drift**: any change to `Xueni.sol` changes the init code hash, and therefore the address. Mine a
+  new salt and update the constants in `Create2DeployXueni.s.sol`:
 
   ```bash
-  cast create2 --starts-with 000000 --init-code $(forge inspect src/Blog.sol:Glyph bytecode)
+  cast create2 --starts-with 000000 --init-code $(forge inspect src/Xueni.sol:Xueni bytecode)
   ```
 
-- **Verifying the contract**: `forge verify-contract 0x000000AE2f2249c497cfc5F262dd1491634C361C src/Blog.sol:Glyph --chain <chainid> --etherscan-api-key $KEY`
-- **An ordinary deployment** (the address then varies by chain): `forge script script/Deploy.s.sol:DeployBlog --rpc-url $ETH_RPC --broadcast`
+- **Verifying the contracts**: the explorer API is Etherscan's V2, one key for every chain — pass
+  `--chain <chainid>` and let forge build the URL rather than naming a V1 endpoint, which is retired:
+
+  ```bash
+  XUENI=0x0000008D02020df6bCDD56A888cFC9eD9b9053eC
+  HOOK=0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93
+  forge verify-contract $XUENI src/Xueni.sol:Xueni --chain 1 --etherscan-api-key $ETHERSCAN_API_KEY --watch
+  forge verify-contract $HOOK src/hooks/MultiHook.sol:MultiHook --chain 1 \
+    --constructor-args $(cast abi-encode 'constructor(address)' $XUENI) \
+    --etherscan-api-key $ETHERSCAN_API_KEY --watch
+  ```
+
+  Taiko is the same with `--chain 167000`; its source lands on Taikoscan, which shares the API.
 
 ## Deployment record
 
-Contract address (identical on every chain): `0x000000AE2f2249c497cfc5F262dd1491634C361C`
+**Xueni** — the contract every surface reads — at `0x0000008D02020df6bCDD56A888cFC9eD9b9053eC` on both chains:
 
-| Chain | Chain ID | Deployment tx | Deployer | Date | Verified |
-|---|---|---|---|---|---|
-| Ethereum mainnet | 1 | [0x5f16…ce9a](https://etherscan.io/tx/0x5f16b4d2375109968578502bdf899ded4cc7fc6c2608bbb738ffa7dbdc3bce9a) | `0x327f…c458` | 2026-09-02 | ✅ [Etherscan](https://etherscan.io/address/0x000000AE2f2249c497cfc5F262dd1491634C361C#code) |
-| Taiko mainnet | 167000 | [0x6c66…dae7](https://taikoscan.io/tx/0x6c6645e2258432d01fae5e9e0f6b5c33bccade234a9628afced413e600e0dae7) | `0x327f…c458` | 2026-09-02 | ✅ [Taikoscan](https://taikoscan.io/address/0x000000AE2f2249c497cfc5F262dd1491634C361C#code) |
+| Chain | Chain ID | Deployment block | Deployment tx | Deployer | Date | Verified |
+|---|---|---|---|---|---|---|
+| Ethereum mainnet | 1 | 25,979,882 | [0x864c…4b2f](https://etherscan.io/tx/0x864cf1582f60100b988fe56fac346d9baa681700461a064c78ee8f41976f4b2f) | `0x327f…c458` | 2026-09-15 | ✅ [Etherscan](https://etherscan.io/address/0x0000008D02020df6bCDD56A888cFC9eD9b9053eC#code) |
+| Taiko mainnet | 167000 | 11,408,820 | [0xdb0a…5d48](https://taikoscan.io/tx/0xdb0a1b26af7199869573d35a72f912e9fea46f637dcd434fe6536bea43515d48) | `0x327f…c458` | 2026-09-15 | ✅ [Taikoscan](https://taikoscan.io/address/0x0000008D02020df6bCDD56A888cFC9eD9b9053eC#code) |
 
-The deployer address `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` holds no privilege over the contract,
-which has no owner and cannot be upgraded.
+**MultiHook** — the fan-out hook beside it — at `0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93`:
 
-**Xueni** (`0x0000008D02020df6bCDD56A888cFC9eD9b9053eC`) and the fan-out hook
-(`0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93`) are **not deployed yet** on either chain. Their addresses
-are fixed by the salts above and pinned in `script/Create2DeployXueni.s.sol`, which verifies the address it
-gets before it stops; the front end already reads both addresses and lights up the hook and relay
-features on a chain the moment code appears there. Add a row here per chain when that happens.
+| Chain | Chain ID | Deployment block | Deployment tx | Deployer | Date | Verified |
+|---|---|---|---|---|---|---|
+| Ethereum mainnet | 1 | 25,979,883 | [0x9a34…5277](https://etherscan.io/tx/0x9a344d13993d5007a33acfda0c18a137b81aead30333afaa56f5bbcdf0bb5277) | `0x327f…c458` | 2026-09-15 | ✅ [Etherscan](https://etherscan.io/address/0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93#code) |
+| Taiko mainnet | 167000 | 11,408,820 | [0xc38e…a6d6](https://taikoscan.io/tx/0xc38e65e01d5f7158e2d0b60059a2ff4d5da7398ea410c6d2194c73fc8edda6d6) | `0x327f…c458` | 2026-09-15 | ✅ [Taikoscan](https://taikoscan.io/address/0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93#code) |
 
-| Chain | Chain ID | Deployment tx | Deployer | Date | Verified |
-|---|---|---|---|---|---|
-| — | — | not yet deployed | — | — | — |
+The deployer address `0x327fa3369B1D1D42120d84bc407e5865ECa7c458` holds no privilege over either
+contract; neither has an owner and neither can be upgraded. Each chain's Xueni deployment block is its
+`deployBlock` in `webapp/src/lib/chains.js`: no block below it can hold a Post event, so no sweep ever
+reads that far.
+
+The earlier contract (`Glyph`, `0x000000AE2f2249c497cfc5F262dd1491634C361C`, deployed 2026-09-02 on
+both chains and verified) is no longer read by anything here. Posts published to it stay where they
+are, on chain and readable through an explorer, but they do not appear in this app.
 
 ## License
 

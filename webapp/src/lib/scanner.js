@@ -70,7 +70,7 @@ export async function sweepFeed({
   const take = (rows) => {
     for (const row of rows) {
       if (olderThan && !isOlder(row, olderThan)) continue;
-      const id = postId(row.author, row.index, row.version);
+      const id = postId(row.author, row.index);
       if (taken.has(id)) continue;
       taken.add(id);
       out.push(row);
@@ -159,26 +159,25 @@ const nodeBehind = (block) =>
   Object.assign(new Error(`${NODE_BEHIND_CODE} ${block}`), { nodeBehind: true, block });
 
 /**
- * Rows for one block of `author`'s chain on one contract (`version`),
- * newest (highest index) first — so the last entry is the block's oldest
- * post, the one whose prevBlock continues the chain. Covered blocks never
- * reach `fetchBlock`.
+ * Rows for one block of `author`'s chain, newest (highest index) first — so
+ * the last entry is the block's oldest post, the one whose prevBlock
+ * continues the chain. Covered blocks never reach `fetchBlock`.
  *
  * Every block asked for here is one the chain points at — the author's
- * latestBlock() or a prevBlock — so it holds at least one of their posts on
- * that contract. An empty answer is a node that hasn't caught up (public
- * gateways answer eth_call and eth_getLogs from different nodes), never the
- * truth: it is not recorded as coverage, and the walk fails so it can be
- * retried. Coverage that claims the block yet holds none of the author's
- * posts there is the same thing, left behind by an earlier read, and the
- * block is read again.
+ * latestBlock() or a prevBlock — so it holds at least one of their posts.
+ * An empty answer is a node that hasn't caught up (public gateways answer
+ * eth_call and eth_getLogs from different nodes), never the truth: it is
+ * not recorded as coverage, and the walk fails so it can be retried.
+ * Coverage that claims the block yet holds none of the author's posts there
+ * is the same thing, left behind by an earlier read, and the block is read
+ * again.
  *
- * @param fetchBlock async (block) => meta[]  (that author's posts, every contract)
+ * @param fetchBlock async (block) => meta[]  (that author's posts in the block)
  */
-export async function authorRowsAt({ store, log, author, block, fetchBlock, version = 1 }) {
+export async function authorRowsAt({ store, log, author, block, fetchBlock }) {
   const at = BigInt(block);
   if (seg.segmentAt(store.authorCoverage(author), at)) {
-    const held = store.authorPostsInBlock(author, at, version);
+    const held = store.authorPostsInBlock(author, at);
     if (held.length > 0) {
       log.fromCache('author', `block ${log.b(at)}`, `${held.length} posts`, 'already scanned');
       return held;
@@ -186,30 +185,28 @@ export async function authorRowsAt({ store, log, author, block, fetchBlock, vers
   }
   await store.once(`author:${addrKey(author)}:${at}`, async () => {
     // A parallel walk may have read it while we waited our turn.
-    if (store.authorPostsInBlock(author, at, version).length > 0) return;
+    if (store.authorPostsInBlock(author, at).length > 0) return;
     const rows = await fetchBlock(at);
     if (rows.length === 0) throw nodeBehind(at);
     store.rememberPosts(rows);
     store.rememberAuthorBlock(author, at);
   });
-  const rows = store.authorPostsInBlock(author, at, version);
-  // The block was read (for every contract) and holds the author's posts on
-  // some other contract, but not on this one: the head that named it was
-  // answered by a node ahead of the one that served the logs.
+  const rows = store.authorPostsInBlock(author, at);
+  // The block was read and holds none of the author's posts: the head that
+  // named it was answered by a node ahead of the one that served the logs.
   if (rows.length === 0) throw nodeBehind(at);
   return rows;
 }
 
 /**
- * Find one (author, index) on one contract by walking back from
- * `startBlock`. Returns the row, or null when the chain descends past the
- * target without holding it.
+ * Find one (author, index) by walking back from `startBlock`. Returns the
+ * row, or null when the chain descends past the target without holding it.
  */
-export async function findAuthorPost({ store, log, author, targetIndex, startBlock, fetchBlock, version = 1 }) {
+export async function findAuthorPost({ store, log, author, targetIndex, startBlock, fetchBlock }) {
   const target = BigInt(targetIndex);
   let block = BigInt(startBlock);
   while (block > 0n) {
-    const rows = await authorRowsAt({ store, log, author, block, fetchBlock, version });
+    const rows = await authorRowsAt({ store, log, author, block, fetchBlock });
     if (rows.length === 0) return null;
     const hit = rows.find((m) => m.index === target);
     if (hit) return hit;

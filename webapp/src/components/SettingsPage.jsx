@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { defaultRpcs } from '../lib/chains';
-import { GLYPH_ADDRESS, READ_CHAIN_IDS, getRescanDelayMs, getRpcUrls, hasCustomRpcs, hasOverrides, resetEndpointConfig, saveRescanDelay, saveRpcUrls, useRpcVersion } from '../lib/config';
+import { XUENI_ADDRESS, READ_CHAIN_IDS, getRescanDelayMs, getRpcUrls, hasCustomRpcs, hasOverrides, resetEndpointConfig, saveRescanDelay, saveRpcUrls, useRpcVersion } from '../lib/config';
 import { chainName, shortAddr } from '../lib/format';
 import { LANGS, LANG_NAMES, setLang, useLang, useT } from '../lib/i18n';
 import { ChevronDown, ChevronUp, Plus, Trash } from './Icons';
@@ -81,7 +81,7 @@ export default function SettingsPage({ navigate }) {
         subtitle={hasOverrides() ? t('settings.customized') : t('settings.defaults')}
       />
 
-      <Note className="mb-8 max-w-2xl">{t('settings.intro', { address: shortAddr(GLYPH_ADDRESS) })}</Note>
+      <Note className="mb-8 max-w-2xl">{t('settings.intro', { address: shortAddr(XUENI_ADDRESS) })}</Note>
 
       <section className="mb-10">
         <SectionHeader label={t('settings.languageHeading')} />

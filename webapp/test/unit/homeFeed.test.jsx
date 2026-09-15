@@ -97,7 +97,7 @@ describe('HomeFeed over two chains', () => {
     expect(container.querySelector('[data-frontier]')).toBeNull();
     expect(view.feed.getSnapshot().frontier).toBeNull();
     // Everything both worlds hold now shows, in the oracle's order.
-    const oracle = expectedMergedOrder(buildWorlds([1, 167000], { now: NOW }), { limit: view.feed.pageSize }).map(postHref);
+    const oracle = expectedMergedOrder(buildWorlds([1, 167000], { now: NOW })).map(postHref);
     expect(postHrefs(container)).toEqual(oracle);
     expect(postHrefs(container).length).toBeGreaterThan(before);
   });

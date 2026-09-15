@@ -6,9 +6,9 @@
 > Ethereum L1 calldata. No off-chain dependencies, designed to outlive its
 > authors and still be readable by their children decades from now.
 > Product name: **雪泥**, written **Xueni** in English (from the idiom 雪泥鸿爪 —
-> the prints a wild goose leaves in the snow). The first Solidity contract keeps
-> its original name, `Glyph` — renaming it would move its deterministic address;
-> the second contract (§4.1), deployed later, carries the product's name, `Xueni`.
+> the prints a wild goose leaves in the snow). The contract carries that name too,
+> `Xueni` (§4). An earlier contract, `Glyph`, holds the posts published before it;
+> it is immutable and stays on chain, but nothing here reads it any more (§4).
 
 ---
 
@@ -17,8 +17,7 @@
 1. [Core principles](#1-core-principles)
 2. [Architecture](#2-architecture)
 3. [Cost](#3-cost)
-4. [The contract, `Blog.sol`](#4-the-contract-blogsol) (contract name `Glyph`)
-   · [4.1 The second contract, `Xueni.sol`: hooks and `publishFor`](#41-the-second-contract-xuenisol-hooks-and-publishfor)
+4. [The contract, `Xueni.sol`](#4-the-contract-xuenisol)
 5. [Payload encoding (`payload.js`)](#5-payload-encoding-payloadjs)
    · [5.1 Front-matter keys](#51-front-matter-keys)
 6. [The publish pipeline, `publish.js`](#6-the-publish-pipeline-publishjs)
@@ -62,8 +61,8 @@ draft = { title, tags[], markdown, files[] }    each image = one plain-calldata 
 2. rewrite upload:KEY into eth:0x<txhash>
 3. payload = brotli( [optional ---\ntags: a, b\n---] + markdown utf8 )
 4. title32 = utf8(title) right-padded with zeros to 32 bytes
-5. publish(title32, payload)                    the Glyph contract (shared, ownerless):
-      │                                           emit Post(msg.sender, index, prevBlock, title32)
+5. publish(title32, payload)                    the Xueni contract (shared, ownerless):
+      │                                           emit Post(msg.sender, hook, index, prevBlock, title32)
       ▼                                           state[msg.sender] = {latestBlock=now, count+=1}
                                                   *payload bytes stay in the tx calldata; the event carries none*
 Reader side (blogReader.js)
@@ -89,7 +88,7 @@ B. opening one post
 | Body + tags | brotli q11 of Markdown (+ front-matter) | publish() bytes argument | the publish transaction's calldata |
 | Images | WebP q60 | a separate plain-calldata self-send | transaction history, referenced by txhash |
 
-> **Why isn't the body in the event?** One `eth_getLogs` pulls all of `log.data` back to the client. For "show a page of 20 titles" to be cheap, the body must not be in the event — this was the key architectural change in v2. Putting the body in the publish transaction's calldata (which the contract never reads) both saves the ~20% extra gas that LOG data costs and gives the title-list query a fixed bandwidth.
+> **Why isn't the body in the event?** One `eth_getLogs` pulls all of `log.data` back to the client. For "show a page of 20 titles" to be cheap, the body must not be in the event — this was the key architectural change of the design's second iteration. Putting the body in the publish transaction's calldata (which the contract never reads) both saves the ~20% extra gas that LOG data costs and gives the title-list query a fixed bandwidth.
 
 **Author discovery is out-of-band.** The front end takes the author's address from the URL (`/author/0x…`, or `/author/<name>.eth` resolved through ENS); the contract keeps no "author directory" at all, and stays minimal. **When the home page is opened with no address**, the front end falls back to one bounded scan of recent blocks to list the newest N posts network-wide (best-effort, see §7) — without changing the contract. A reader who follows authors rather than browsing skips that scan entirely (§7, "The following feed").
 
@@ -106,16 +105,16 @@ Basis: plain calldata is priced at the **EIP-7623 floor**: `tokens = zero bytes 
 **The general formulas**
 ```
 one plain-calldata tx:      gas ≈ 21,000 + 40 × bytes
-one article tx (v2):        gas ≈ 21,000
+one article tx:             gas ≈ 21,000
                                 + 40 × (4 + 32 + payload bytes)  ← selector + title + payload
                                 + 64 × 10                        ← ABI offset/length (mostly zero bytes)
-                                + ~1,893                         ← LOG: signature + author topics, 96B of data (EIP-2929)
+                                + ~2,268                         ← LOG: signature + author + hook topics, 96B of data
                                 + 200                            ← warm SLOAD + warm SSTORE (packed slot, EIP-2929)
                                 + (first post +~24,000)          ← cold SLOAD + cold slot initialisation
 ```
 
 **Body (one post of ~1,000 Chinese characters, with 2 tags)**
-About 1,400–1,600 bytes after brotli; the whole publish transaction is around **~85,000 gas** (about 15% less than v1, which put the body in the event).
+About 1,400–1,600 bytes after brotli; the whole publish transaction is around **~85,000 gas** (about 15% less than the first design, which put the body in the event).
 At ~0.23 gwei and ETH ≈ $1,690: **≈ $0.033 per post, ≈ $33 for a thousand**.
 
 **Images (measured on this repository's sample image, 1310×772)** — by encoding:
@@ -140,13 +139,19 @@ At ~0.23 gwei and ETH ≈ $1,690: **≈ $0.033 per post, ≈ $33 for a thousand*
 
 ---
 
-## 4. The contract, `Blog.sol`
+## 4. The contract, `Xueni.sol`
+
+One contract, at the same CREATE2 address on every EVM chain (§11), ownerless and non-upgradeable,
+shared by every author. It has three doors: the plain `publish()`, a post through a **hook** the
+author names, and a post submitted **for** an author against their signature. The journal underneath
+is the same whichever door a post comes through — an O(1) head pointer per author and a reverse
+block-linked list — and the body still lives only in the transaction's calldata, never in the event.
 
 ```solidity
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract Blog {
+contract Xueni {
     struct AuthorState {
         uint96 latestBlock; // 0 = author has never posted
         uint48 count;       // total posts by this author (== next post's index)
@@ -155,6 +160,7 @@ contract Blog {
 
     event Post(
         address indexed author,
+        address indexed hook,   // the hook it went through, or the zero address
         uint256 index,
         uint256 prevBlock,
         bytes32 title
@@ -172,13 +178,26 @@ contract Blog {
     ///         `payload` rides in the tx calldata only — the contract never
     ///         reads it. Off-chain schema: brotli(Markdown + optional YAML front-matter tags).
     function publish(bytes32 title, bytes calldata payload) external {
-        payload; // silence "unused parameter" warning
-        AuthorState memory s = _authors[msg.sender];
-        emit Post(msg.sender, s.count, s.latestBlock, title);
-        _authors[msg.sender] = AuthorState({
-            latestBlock: uint96(block.number),
-            count: s.count + 1
-        });
+        _publish(msg.sender, msg.sender, _authors[msg.sender], title, payload, address(0), payload[:0]);
+    }
+
+    /// @dev Effects first, then the event, then the hook: a hook that
+    ///      re-enters publishes as itself, after this post.
+    function _publish(
+        address sender, address author, AuthorState memory s, bytes32 title,
+        bytes calldata payload, address hook, bytes calldata hookData
+    ) private {
+        _authors[author] = AuthorState({latestBlock: uint96(block.number), count: s.count + 1});
+        emit Post(author, hook, s.count, s.latestBlock, title);
+        if (hook == address(0)) {
+            if (msg.value != 0) revert ValueWithoutHook();
+            return;
+        }
+        if (hook.code.length == 0) revert NotAHook(hook);
+        bytes4 answer = IPublishHook(hook).onPublish{value: msg.value}(
+            sender, author, s.count, s.latestBlock, title, payload, hookData
+        );
+        if (answer != IPublishHook.onPublish.selector) revert HookRejected(hook, answer);
     }
 }
 ```
@@ -186,25 +205,30 @@ contract Blog {
 **The points that matter**
 
 - **No owner, no constructor arguments.** Any address can `publish()`, and the deployer has no privilege of any kind.
-- **`payload` never enters contract logic; it only sits in the tx calldata.** The reader gets it back with `eth_getTransactionByHash(log.transactionHash).input` and then `decodeFunctionData` to recover `(bytes32, bytes)`. This keeps the event data tiny — a title-list query only ever downloads ~96 bytes per post.
+- **`payload` never enters contract logic; it only sits in the tx calldata.** The reader gets it back with `eth_getTransactionByHash(log.transactionHash).input` and then `decodeFunctionData` to recover the call's arguments. This keeps the event data tiny — a title-list query only ever downloads ~96 bytes per post.
 - **`author` is indexed**, so the reader can use `eth_getLogs({ args: { author } })` to pick that author's logs precisely out of a single block. It costs +375 gas per post.
 - **A packed slot**: `uint96 + uint48 = 144 bits < 256`, so the whole `AuthorState` occupies one slot and each publish is one warm SSTORE. The first post pays the cold-slot fee once (~22k gas).
+- **One sequence per author per chain.** `index` counts that author's posts here, `prevBlock` chains them backwards, and nothing else in the design has to disambiguate them: `(chain, author, index)` is a post's identity in the cache, in an archive bundle and in the reader.
 
-### 4.1 The second contract, `Xueni.sol`: hooks and `publishFor`
+**The contract that came before.** `contracts/src/Blog.sol` — contract name `Glyph`, at
+`0x000000AE2f2249c497cfc5F262dd1491634C361C` — was the first deployment, and its `publish()` is this
+one's byte for byte. It is immutable and stays on chain, so the posts published to it are there for
+good and any explorer will show them; but **nothing in this project reads it any more**. The web app,
+the command-line tool and the macOS application all read Xueni alone, and a post on the earlier
+contract does not appear in the app. Its source and its deploy script stay in the repository, so
+what was deployed and where can still be read. (The name is why `Glyph` turns up in the repository at
+all: renaming that contract would have moved its deterministic address, so it kept the name it was
+deployed under.)
 
-The contract above is immutable and stays where it is; every post on it stays readable forever. But
-it has one door, `publish()`, and everything a community might want around a post — a publication
-with members, a fee, an index by topic, a collectible, a post submitted for someone who cannot pay
-gas — would have to be built beside it with no way to run inside the post. `Xueni.sol` is the
-same journal with two more doors, deployed as a second contract at its own CREATE2 address (§11),
-and read by every surface alongside the first (§7). Its design borrows the one idea of Uniswap v4's
-hooks that fits an ownerless journal: **the core stays minimal and immutable, and third-party code
-runs at a fixed point inside the core's own transaction, chosen per call by the person paying.**
+**Two more doors.** A contract with only `publish()` leaves everything a community might want around
+a post — a publication with members, a fee, an index by topic, a collectible, a post submitted for
+someone who cannot pay gas — to be built beside it, with no way to run inside the post. Xueni borrows
+the one idea of Uniswap v4's hooks that fits an ownerless journal: **the core stays minimal and
+immutable, and third-party code runs at a fixed point inside the core's own transaction, chosen per
+call by the person paying.**
 
 ```solidity
-event Post(address indexed author, address indexed hook, uint256 index, uint256 prevBlock, bytes32 title);
-
-function publish(bytes32 title, bytes calldata payload) external;                       // v1's call, byte for byte
+function publish(bytes32 title, bytes calldata payload) external;                       // the plain call
 function publish(bytes32 title, bytes calldata payload, address hook, bytes calldata hookData) external payable;
 function publishFor(address author, bytes32 title, bytes calldata payload, address hook,
                     bytes calldata hookData, uint256 deadline, bytes calldata signature) external payable;
@@ -231,13 +255,13 @@ is the whole protocol, and the constraints are the design:
 - **One hook per post, chosen per post, no registration.** There is no registry to own and nothing
   for a deployer to approve. Composition is a hook's job, not the core's: `MultiHook` (below) fans
   one post out to several.
-- **The hook is an indexed topic** of the v2 `Post` event. "Every post that went through this
+- **The hook is an indexed topic** of the `Post` event. "Every post that went through this
   publication" is one `eth_getLogs` filter, the same way "every post by this author" is.
 - **No ETH is ever held.** Every wei is forwarded to the hook the author named; a call with ETH and
   no hook reverts (`ValueWithoutHook`). The core has no balance, no owner, no upgrade path.
-- **The plain call is v1's.** `publish(bytes32,bytes)` has the same selector and the same calldata
-  on both contracts, so every encoder, the codec's vectors and every archived transaction carry over;
-  on v2 it costs one extra event topic.
+- **The plain call is the one the first contract had.** `publish(bytes32,bytes)` keeps the same
+  selector and the same calldata, so every encoder, the codec's vectors and every archived
+  transaction carry over unchanged; recording the post costs one extra event topic and the dispatch.
 
 **Publishing on someone's behalf.** A hook cannot decide authorship, so relaying is in the core.
 `publishFor` records a post under `author` when the caller presents the author's EIP-712 signature
@@ -254,8 +278,8 @@ delegated wallet still signs with its key. `publishDigest(...)` and `eip712Domai
 public so wallets and tools build the same digest.
 
 **The hooks shipped with it** (`contracts/src/hooks/`). Each one extends `BasePublishHook`, which
-accepts calls only from the v2 contract or from the fan-out it was told to trust — a hook that
-took `onPublish` from anyone could be fed posts that never happened — and refuses ETH unless the
+accepts calls only from Xueni or from the fan-out it was told to trust — a hook that took
+`onPublish` from anyone could be fed posts that never happened — and refuses ETH unless the
 hook says it takes it:
 
 | Hook | What it does | `hookData` |
@@ -273,12 +297,14 @@ a 2 KiB payload, everything but the hook already warm, measured from inside a co
 test runner's own transaction wrapping does not enter into it; a real transaction adds the same
 21,000 base, the same calldata and the same cold-access charges to each line):
 
-| Call | Gas | Over the plain v1 call |
+| Call | Gas | Over the plain call |
 |---|---|---|
-| `Glyph.publish` (v1) | 4,016 | — |
-| `Xueni.publish(title, payload)` | 4,776 | +760: the hook topic (375), the dispatch and the checks |
-| `Xueni.publish(…, hook, data)`, a hook that only accepts | 10,163 | +5,387 for the call itself: the cold hook (2,600), the call, the payload copied for it, the selector checked; the hook's own work comes on top |
-| `Xueni.publishFor` (EOA signature) | 11,583 | +6,807: `ecrecover` (3,000), the digest, the count read for the nonce |
+| `publish(title, payload)` | 4,776 | — |
+| `publish(…, hook, data)`, a hook that only accepts | 10,163 | +5,387 for the call itself: the cold hook (2,600), the call, the payload copied for it, the selector checked; the hook's own work comes on top |
+| `publishFor` (EOA signature) | 11,583 | +6,807: `ecrecover` (3,000), the digest, the count read for the nonce |
+
+The plain call is 760 gas dearer than the identical call on the first contract (4,016 in the same
+test, which keeps it as a baseline): the hook topic (375), the dispatch and the checks.
 
 Two things put those numbers in proportion. First, a post's gas is its calldata: a 2 KiB letter
 is ~33,000 gas of calldata at 16 a byte, so even the relayed call adds about a fifth to the cheapest
@@ -295,12 +321,11 @@ under 400 gas, and dropping the hook from the event's topics 375, neither ever v
 post. The 128 KiB transaction ceiling (§11) is unchanged; a post through a hook is a few hundred
 bytes longer than the same post without one, and a relayed one about a hundred more.
 
-**The reader's side.** A post now has three coordinates — chain, contract, and (author, index) on
-that contract — and the app reads both contracts on every chain as one journal (§7). A post page
-shows which contract holds it, the hook it went through (named where the app knows the address,
-the address otherwise), and, for a relayed post, who sent it on the author's behalf. The write tab
-offers the hook (none, one, or several through the fan-out) where v2 is deployed on the publish
-chain, and "sign for a relayer instead", which produces a **ticket** — one JSON file holding the
+**The reader's side.** A post has two coordinates — the chain, and `(author, index)` on it — because
+there is one contract per chain and one sequence per author on it (§7). A post page shows the hook it
+went through (named where the app knows the address, the address otherwise) and, for a relayed post,
+who sent it on the author's behalf. The write tab offers the hook (none, one, or several through the
+fan-out), and "sign for a relayer instead", which produces a **ticket** — one JSON file holding the
 signed post, the target contract and chain, and the signature — that anyone can submit from the
 relay panel of their own write tab. A hook is a stranger's contract: the reader shows what the
 chain says about it and never runs anything for it.
@@ -408,7 +433,7 @@ import { mainnet } from "viem/chains";
 import { encodeTitle } from "./title";
 import { encodePayload } from "./payload";
 
-const GLYPH = "0xYourGlyphContractAddress";
+const XUENI = "0x0000008D02020df6bCDD56A888cFC9eD9b9053eC";
 const abi  = parseAbi(["function publish(bytes32 title, bytes payload) external"]);
 
 const wallet = createWalletClient({ chain: mainnet, transport: custom(window.ethereum) });
@@ -429,12 +454,14 @@ async function storeImage(bytes) {
 // 3. Replace `upload:KEY` refs with `eth:0x<txhash>` after uploading.
 async function embedImages(markdown, files) { /* ... regex-replace the image refs ... */ }
 
-// 4. Encode payload + title, publish().
+// 4. Encode payload + title, publish(). A post that names a hook goes
+//    through the four-argument overload instead (§4), with the hook's ETH
+//    as the transaction's value.
 export async function publishPost({ title, tags = [], markdown, files = {} }) {
   const finalMd = await embedImages(markdown, files);
   const payload = await encodePayload({ tags, markdown: finalMd });
   return wallet.writeContract({
-    account, address: GLYPH, abi, functionName: "publish",
+    account, address: XUENI, abi, functionName: "publish",
     args: [encodeTitle(title), toHex(payload)],
   });
 }
@@ -460,7 +487,7 @@ const abi = parseAbi([
   "function latestBlock(address author) view returns (uint256)",
   "function count(address author) view returns (uint256)",
   "function publish(bytes32 title, bytes payload) external",
-  "event Post(address indexed author, uint256 index, uint256 prevBlock, bytes32 title)",
+  "event Post(address indexed author, address indexed hook, uint256 index, uint256 prevBlock, bytes32 title)",
 ]);
 
 const client = createPublicClient({ chain: mainnet, transport: http("https://YOUR_RPC") });
@@ -468,23 +495,26 @@ const POST_EVENT = abi.find((x) => x.type === "event" && x.name === "Post");
 
 async function postsInBlock(author, block) {
   const logs = await client.getLogs({
-    address: GLYPH, event: POST_EVENT, args: { author },
+    address: XUENI, event: POST_EVENT, args: { author },
     fromBlock: block, toBlock: block,
   });
   logs.sort((a, b) => Number(b.args.index - a.args.index));
   return logs;
 }
 
+const ZERO = "0x0000000000000000000000000000000000000000";
+
 const toMeta = (log, block) => ({
   author: log.args.author, index: log.args.index, block,
   prevBlock: log.args.prevBlock, txHash: log.transactionHash,
+  hook: log.args.hook === ZERO ? null : log.args.hook,   // which hook it went through
   title: decodeTitle(log.args.title),
 });
 
 // A. Title list — no body bytes downloaded.
 export async function loadTitleList(author, n) {
   let block = await client.readContract({
-    address: GLYPH, abi, functionName: "latestBlock", args: [author],
+    address: XUENI, abi, functionName: "latestBlock", args: [author],
   });
   const out = [];
   while (out.length < n && block > 0n) {
@@ -521,20 +551,23 @@ container.innerHTML = renderMarkdown(md);
 > Reading N titles is N serial single-block queries, each downloading a few hundred bytes of log. N=20 takes ~0.5–1s; on a cache hit the body appears instantly.
 > Clicking a post → one `getTransactionByHash` → one brotli decompress → render. After the first visit everything is cached in IndexedDB and later visits make no RPC calls at all.
 
-**Two contracts, one journal.** Since §4.1 there are two contracts on each chain, and every read
-above runs over both: `eth_getLogs` takes both addresses in one request (the two `Post` events
-have different topics and are told apart by the log's address), an author has a head pointer and a
-count on each contract, and their list is the two walks merged by block, with the same frontier
-hold-back the two-chain merge uses (a post from the slower walk is not shown until the faster one
-has passed its block). A post's identity gained a coordinate — `(author, index)` is per contract,
-so the cache and the archive bundle carry a `version` (1 or 2) and the contract's address on every
-v2 row. A post's previous and next (the cards under it, `←` and `→`) are its neighbours in that
-merged list, found through the same controller the author page uses — so a post on the second
-contract is followed by the author's older post whichever contract holds it, and opening a post from
-the author page costs no further request. Where v2 is not yet deployed on a chain, its reads come
-back empty and cost one `eth_getCode` to learn so; nothing else changes. The scan coverage a browser has recorded is fingerprinted with the
-set of contracts it was scanned for, so a build that adds a contract rescans rather than trusts
-coverage that never looked at it.
+**One contract, one journal.** Every read above runs against one address on each chain (§4):
+`eth_getLogs` names it and the one `Post` topic, an author has a single head pointer and a single
+count, and their list is one walk down the `prevBlock` chain. What is merged is the CHAINS, not
+contracts — the author's walk on each chain, ordered by time, with the frontier hold-back that keeps
+a post from the slower walk hidden until the faster one has passed its block (`mergedAuthorList.js`).
+A post's identity is therefore `(chain, author, index)`, and nothing a row carries names a contract
+or a format version; what it does carry, from the event's second topic, is the `hook` the post went
+through, or null. A post's previous and next (the cards under it, `←` and `→`) are its neighbours in
+that merged list, found through the same controller the author page uses, so opening a post from the
+author page costs no further request. A chain where the contract is not deployed reads as empty: the
+head-pointer call comes back with no data, which is read as "no posts here" rather than as a failure.
+No sweep reads below the block the contract was deployed in — that block is the floor
+(`deployBlock` in `chains.js`), because no block under it can hold a `Post` event. The persisted
+scan snapshots are keyed per chain, `glyph.feedScan.v3.<chainId>` and `glyph.authorScan.v3.<chainId>`;
+the suffix changes whenever what a row means changes, and `.v3` is the first to hold one contract's
+rows, so a browser that has an older snapshot rescans instead of reading back rows from a contract
+this build does not read.
 
 **Local search.** Finding by tag or by word is answered from `bodyIndex.js` plus the bodies this
 browser holds — never from the node, which cannot filter inside compressed calldata, and never from a
@@ -579,7 +612,7 @@ export async function loadRecentAcrossAuthors(n, { windowSize = 800, maxWindows 
   const out = [];
   for (let w = 0; w < maxWindows && out.length < n && toBlock > 0n; w++) {
     const fromBlock = toBlock >= BigInt(windowSize) ? toBlock - BigInt(windowSize) + 1n : 0n;
-    const logs = await client.getLogs({ address: GLYPH, event: POST_EVENT, fromBlock, toBlock });
+    const logs = await client.getLogs({ address: XUENI, event: POST_EVENT, fromBlock, toBlock });
     logs.sort((a, b) => a.blockNumber !== b.blockNumber
       ? Number(b.blockNumber - a.blockNumber) : b.logIndex - a.logIndex); // newest first
     for (const log of logs) { out.push(toMeta(log, log.blockNumber)); if (out.length >= n) break; }
@@ -653,34 +686,35 @@ code, and any tool that reads JSON can read it decades from now.
 
 ```json
 {
-  "glyph": { "archive": 1 },
-  "exportedAt": "2026-09-04T12:00:00.000Z",
-  "contract": "0x000000AE2f2249c497cfc5F262dd1491634C361C",
-  "contracts": { "1": "0x000000AE2f2249c497cfc5F262dd1491634C361C", "2": "0x0000008D02020df6bCDD56A888cFC9eD9b9053eC" },
+  "glyph": { "archive": 2 },
+  "exportedAt": "2026-09-15T12:00:00.000Z",
+  "contract": "0x0000008D02020df6bCDD56A888cFC9eD9b9053eC",
   "scope": { "kind": "author", "address": "0x…" },
   "posts": [
-    { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 5,
-      "block": 25945650, "prevBlock": 25901234, "logIndex": 12, "ts": 1757000000,
-      "title": "A letter before the solstice",
-      "text": "---\ntags: letters home\n---\n\nXiaoman, …", "compressedBytes": 1432 },
     { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 0,
-      "block": 25990000, "prevBlock": 0, "logIndex": 3, "ts": 1757900000,
+      "block": 25985120, "prevBlock": 0, "logIndex": 12, "ts": 1757000000,
+      "title": "A letter before the solstice",
+      "text": "---\ntags: letters home\n---\n\nXiaoman, …", "compressedBytes": 1432,
+      "hook": null },
+    { "chainId": 1, "txHash": "0x…", "eventIndex": 0, "author": "0x…", "index": 1,
+      "block": 25990400, "prevBlock": 25985120, "logIndex": 3, "ts": 1757900000,
       "title": "Through the fan-out", "text": "…", "compressedBytes": 610,
-      "version": 2, "contract": "0x0000008d02020df6bcdd56a888cfc9ed9b9053ec",
       "hook": "0x00000e2b71d66e5feda58a70e6d5ae3762a18d93" }
   ],
   "images": [{ "chainId": 1, "txHash": "0x…", "mime": "image/webp", "base64": "UklGR…" }],
-  "authors": [{ "chainId": 1, "address": "0x…", "head": 25990000, "heads": { "1": 25945650, "2": 25990000 }, "complete": true }]
+  "authors": [{ "chainId": 1, "address": "0x…", "head": 25990400, "complete": true }]
 }
 ```
 
 - `scope.kind` is `browser` (everything cached) or `author` (with `address`).
-- A post on the second contract (§4.1) carries three more fields — `version: 2`, the `contract` it
-  lives on and the `hook` it went through (or `null`) — because `(author, index)` is only an
-  identity together with the contract; a post on the first contract carries exactly the fields it
-  always did, so a bundle written before there was a second contract reads unchanged. `contracts`
-  names the contract of each version, and `authors[].heads` the head each contract's list was walked
-  from (`head` is the newest of them). A reader that knows only the first contract ignores all of it.
+- `glyph.archive` is the **format version, 2**; a file at any other version is refused rather than
+  half-read. Version 1 was written while a post could live on either of two contracts, and carried a
+  `version` and a `contract` on a row and a `contracts` map at the top of the document. There is one
+  contract now (§4), so a row carries neither: `contract` names it once, for the whole file, and a
+  bundle whose `contract` is not this build's is refused rather than merged, because it describes a
+  different journal.
+- Every post carries the `hook` it went through — an address, or `null` for a plain post. It is the
+  one thing about a post that `(chainId, author, index)` and the text together do not say.
 - `posts[].text` is the exact **decompressed** document, so nothing has to be decoded to read a bundle.
   Every number is a plain JSON number; block heights and timestamps sit far below 2^53, and no BigInt
   can survive a file.
@@ -693,9 +727,7 @@ code, and any tool that reads JSON can read it decades from now.
   and a `complete` author proves that author's whole list — so those pages then need no node. Nothing
   in a bundle proves anything about the FEED, which is a claim about every author at once, so the home
   feed goes on scanning exactly as before. Records already present are never overwritten: what a post
-  says is fixed by the transaction carrying it, so a second copy could only be wrong. A bundle whose
-  `contract` differs from this build's is refused rather than merged, because it describes a different
-  journal.
+  says is fixed by the transaction carrying it, so a second copy could only be wrong.
 
 ---
 

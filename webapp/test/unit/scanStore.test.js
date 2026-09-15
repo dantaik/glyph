@@ -91,7 +91,7 @@ describe('scanStore', () => {
     store.rememberFeedRange(5n, 15n);
     store.setFeedScanHead(15n);
     store.persistFeedScan();
-    const saved = JSON.parse(localStorage.getItem('glyph.feedScan.v2.1'));
+    const saved = JSON.parse(localStorage.getItem('glyph.feedScan.v3.1'));
     expect(saved.head).toBe('15');
     expect(saved.segments).toEqual([[5, 15]]);
     expect(saved.rows).toHaveLength(2);
@@ -125,26 +125,12 @@ describe('scanStore', () => {
     store.rememberPosts(rows);
     store.rememberFeedRange(900n, 2000n);
     store.persistFeedScan();
-    const saved = JSON.parse(localStorage.getItem('glyph.feedScan.v2.1'));
+    const saved = JSON.parse(localStorage.getItem('glyph.feedScan.v3.1'));
     expect(saved.rows).toHaveLength(FEED_ROW_CAP);
     // The newest FEED_ROW_CAP rows sit in blocks 1050..1349; blocks below the
     // oldest kept row are no longer claimed.
     const oldestKept = Math.min(...saved.rows.map((r) => r.block));
     expect(saved.segments).toEqual([[oldestKept, 2000]]);
-  });
-
-  it('reads a v1 mainnet snapshot as the first segment', () => {
-    localStorage.setItem(
-      'glyph.feedScan.v1',
-      JSON.stringify({ frontier: 100, head: '200', rows: [row(A, 0, 150)] }),
-    );
-    const store = createScanStore(1);
-    expect(store.feedCoverage()).toEqual([[100n, 200n]]);
-    expect(store.feedScanHead()).toBe('200');
-    expect(store.coveredPosts()).toHaveLength(1);
-    store.persistFeedScan();
-    expect(localStorage.getItem('glyph.feedScan.v1')).toBeNull();
-    expect(localStorage.getItem('glyph.feedScan.v2.1')).not.toBeNull();
   });
 
   it('once() shares an in-flight promise per key', async () => {

@@ -36,15 +36,21 @@ test('title.js loads in plain Node and measures UTF-8, not characters', async ()
 test('abi.js loads in plain Node and describes the contract', async () => {
   const mod = await import('../../webapp/src/lib/abi.js');
   const names = mod.abi.map((entry) => entry.name);
-  assert.deepEqual(names.sort(), ['Post', 'count', 'latestBlock', 'publish']);
+  assert.deepEqual(new Set(names), new Set(['DOMAIN_SEPARATOR', 'Post', 'count', 'latestBlock', 'publish', 'publishDigest', 'publishFor']));
   assert.equal(mod.POST_EVENT.type, 'event');
+  // The event carries the hook as a second indexed field.
+  assert.deepEqual(
+    mod.POST_EVENT.inputs.map((i) => i.name),
+    ['author', 'hook', 'index', 'prevBlock', 'title'],
+  );
 });
 
 test('chains.js loads in plain Node and knows the address and the chains', async () => {
   const mod = await import('../../webapp/src/lib/chains.js');
   // The contract is CREATE2-deployed to the same address everywhere, which is
   // why plain Node can know it without any build-time configuration.
-  assert.match(mod.DEFAULT_GLYPH_ADDRESS, /^0x[0-9a-fA-F]{40}$/);
+  assert.match(mod.DEFAULT_XUENI_ADDRESS, /^0x[0-9a-fA-F]{40}$/);
+  assert.equal(mod.defaultContractAddress(), mod.DEFAULT_XUENI_ADDRESS);
   assert.deepEqual(mod.SELECTABLE_CHAIN_IDS, [1, 167000]);
   assert.equal(mod.chainSlug(167000), 'taiko');
   assert.equal(mod.chainFromSlug('ethereum'), 1);
@@ -63,7 +69,8 @@ test('src/shared.js re-exports every borrowed module', async () => {
     'abi',
     'POST_EVENT',
     'CHAINS',
-    'DEFAULT_GLYPH_ADDRESS',
+    'DEFAULT_XUENI_ADDRESS',
+    'defaultContractAddress',
     'SELECTABLE_CHAIN_IDS',
     'chainFromSlug',
     'chainSlug',

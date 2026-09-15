@@ -59,6 +59,7 @@ describe('fetch', () => {
       'title',
       'text',
       'compressedBytes',
+      'hook',
     ]);
     assert.equal(record.chainId, 1);
     assert.equal(record.txHash, post.txHash);

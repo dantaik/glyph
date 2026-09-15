@@ -15,19 +15,15 @@
 // answer, and the linked list exists precisely so that nobody has to make
 // one.
 //
-// Two contracts, one journal. Logs are asked for from both addresses in
-// one request and every row says which contract it is on; an author has a
-// list on each, and `walkAuthor` walks both, taking the higher block first,
-// so the rows come out newest first across the two. On a chain where the
-// second contract is not deployed its views answer nothing, which reads as
-// "never published there".
+// One contract, one journal: every Post event comes from Xueni at its
+// CREATE2 address, and `walkAuthor` follows one prevBlock chain per author.
+// On a chain where it is not deployed the views answer nothing, which reads
+// as "never published there".
 
 import { decodeEventLog, decodeFunctionData, hexToBytes } from 'viem';
 import {
-  CONTRACT_VERSIONS,
-  POST_EVENTS,
-  abiFor,
-  abiV2,
+  POST_EVENT,
+  abi,
   chainSlug,
   decodeTitle,
   defaultContractAddress,
@@ -40,11 +36,10 @@ import { fail } from './out.js';
 import { msg } from './messages.js';
 
 const ZERO_ADDRESS = `0x${'00'.repeat(20)}`;
-const ADDRESSES = CONTRACT_VERSIONS.map((v) => defaultContractAddress(v));
+const ADDRESS = defaultContractAddress();
 
-/** Which contract version an address is, or null. */
-const versionOf = (address) =>
-  CONTRACT_VERSIONS.find((v) => defaultContractAddress(v).toLowerCase() === String(address ?? '').toLowerCase()) ?? null;
+/** Whether a log came from the contract this tool reads. */
+const isOurs = (address) => String(address ?? '').toLowerCase() === ADDRESS.toLowerCase();
 
 const hookOf = (args) => {
   const hook = args?.hook;
@@ -93,7 +88,6 @@ const rowOf = (log, block, ts) => ({
   eventIndex: log.__eventIndex ?? 0,
   logIndex: Number(log.logIndex),
   ts,
-  version: versionOf(log.address) ?? 1,
   hook: hookOf(log.args),
 });
 
@@ -148,12 +142,12 @@ export function createReader(chainId, client) {
    */
   const addrArg = (a) => String(a).toLowerCase();
 
-  /** One contract's view of an author, or 0 where the contract is not deployed. */
-  const authorView = (functionName, author, version) =>
+  /** The contract's view of an author, or 0 where it is not deployed. */
+  const authorView = (functionName, author) =>
     client
       .readContract({
-        address: defaultContractAddress(version),
-        abi: abiFor(version),
+        address: ADDRESS,
+        abi,
         functionName,
         args: [addrArg(author)],
       })
@@ -168,23 +162,21 @@ export function createReader(chainId, client) {
     slug: chainSlug(id),
     name: chain.name,
     client,
-    /** The contract versions every read here covers. */
-    versions: [...CONTRACT_VERSIONS],
 
     blockTs,
 
-    /** The block holding `author`'s newest post on one contract — 0 when they have none there. */
-    latestBlock: (author, version = 1) => authorView('latestBlock', author, version),
+    /** The block holding `author`'s newest post — 0 when they have none here. */
+    latestBlock: (author) => authorView('latestBlock', author),
 
-    /** How many posts `author` has published on one contract. */
-    count: (author, version = 1) => authorView('count', author, version),
+    /** How many posts `author` has published on this chain. */
+    count: (author) => authorView('count', author),
 
-    /** `author`'s Post events in one block, on every contract, newest index first within each. */
+    /** `author`'s Post events in one block, newest index first. */
     async authorPostsInBlock(author, block) {
       const at = BigInt(block);
       const logs = await client.getLogs({
-        address: ADDRESSES,
-        events: POST_EVENTS,
+        address: ADDRESS,
+        event: POST_EVENT,
         fromBlock: at,
         toBlock: at,
       });
@@ -200,18 +192,17 @@ export function createReader(chainId, client) {
     },
 
     /**
-     * Every Post event a transaction emitted, from either contract, in log
-     * order — one receipt read, no scanning at all.
+     * Every Post event a transaction emitted, in log order — one receipt
+     * read, no scanning at all.
      */
     async postsInTx(txHash) {
       const receipt = await client.getTransactionReceipt({ hash: txHash });
       const posts = [];
       for (const entry of receipt.logs) {
-        const version = versionOf(entry.address);
-        if (version == null) continue;
+        if (!isOurs(entry.address)) continue;
         try {
           const decoded = decodeEventLog({
-            abi: abiFor(version),
+            abi,
             eventName: 'Post',
             data: entry.data,
             topics: entry.topics,
@@ -239,7 +230,7 @@ export function createReader(chainId, client) {
       const tx = await client.getTransaction({ hash: txHash });
       let decoded;
       try {
-        decoded = decodeFunctionData({ abi: abiV2, data: tx.input });
+        decoded = decodeFunctionData({ abi, data: tx.input });
       } catch {
         fail(msg.notPublishCall(txHash));
       }
@@ -262,75 +253,42 @@ export function createReader(chainId, client) {
     },
 
     /**
-     * `author`'s list, newest first across both contracts, by following
-     * prevBlock from each contract's head and always taking the higher
-     * block next.
+     * `author`'s list, newest first, by following prevBlock from the head.
      *
-     * `limit` stops it early; without one it runs to index 0 on every
-     * contract, which is what `export` needs and what makes `complete`
-     * true. `onRow` is called as each row arrives so a long walk can report
-     * progress.
+     * `limit` stops it early; without one it runs to index 0, which is what
+     * `export` needs and what makes `complete` true. `onRow` is called as
+     * each row arrives so a long walk can report progress.
      *
-     * @returns {{ rows, head: bigint, heads: Record<number, bigint>, complete: boolean }}
-     *   `head` — the newest of the heads; `heads` — each contract's;
-     *   `complete` — every contract's walk reached the author's first post
-     *   there, so nothing older exists.
+     * @returns {{ rows, head: bigint, complete: boolean }}
+     *   `head` — the author's newest post's block; `complete` — the walk
+     *   reached their first post, so nothing older exists.
      */
     async walkAuthor(author, { limit = null, onRow = null } = {}) {
-      const versions = this.versions;
-      const headList = await Promise.all(versions.map((v) => this.latestBlock(author, v)));
-      const heads = Object.fromEntries(versions.map((v, i) => [v, BigInt(headList[i])]));
-      const head = headList.reduce((a, b) => (BigInt(b) > a ? BigInt(b) : a), 0n);
-      const streams = versions.map((version, i) => ({
-        version,
-        cursor: BigInt(headList[i]),
-        done: BigInt(headList[i]) === 0n,
-        complete: BigInt(headList[i]) === 0n, // nothing there is a whole list
-      }));
+      const head = BigInt(await this.latestBlock(author));
       const rows = [];
-      // One fetch reads a block for every contract; a block both streams
-      // point at is read once.
-      const blocks = new Map();
-      const readBlock = async (block) => {
-        const key = String(block);
-        if (!blocks.has(key)) blocks.set(key, this.authorPostsInBlock(author, block));
-        return blocks.get(key);
-      };
-      for (;;) {
-        let stream = null;
-        for (const s of streams) if (!s.done && (stream == null || s.cursor > stream.cursor)) stream = s;
-        if (!stream) break;
-        const found = (await readBlock(stream.cursor)).filter((r) => r.version === stream.version);
+      let cursor = head;
+      let complete = head === 0n; // nothing here is a whole list
+      while (cursor > 0n) {
+        const found = await this.authorPostsInBlock(author, cursor);
         // A block the head pointer names but that holds no event of this
-        // author on this contract means the node is behind, or answering
-        // from a fork. Stop this list rather than pretend it ended here.
-        if (found.length === 0) {
-          stream.done = true;
-          continue;
-        }
+        // author means the node is behind, or answering from a fork. Stop
+        // rather than pretend the list ended here.
+        if (found.length === 0) break;
         for (const row of found) {
           rows.push(row);
           onRow?.(row);
-          if (row.index === 0n) stream.complete = true;
-          if (limit != null && rows.length >= limit) {
-            return { rows, head, heads, complete: streams.every((s) => s.complete) };
-          }
+          if (row.index === 0n) complete = true;
+          if (limit != null && rows.length >= limit) return { rows, head, complete };
         }
         const oldest = found[found.length - 1];
-        if (oldest.index === 0n) {
-          stream.done = true; // the author's first post on this contract
-          continue;
-        }
+        if (oldest.index === 0n) break; // the author's first post
         const next = oldest.prevBlock;
         // The list must strictly descend; anything else — a truncated read, a
         // reorg, an inconsistent node — would loop for ever.
-        if (next >= stream.cursor) {
-          stream.done = true;
-          continue;
-        }
-        stream.cursor = next;
+        if (next >= cursor) break;
+        cursor = next;
       }
-      return { rows, head, heads, complete: streams.every((s) => s.complete) };
+      return { rows, head, complete };
     },
   };
   return reader;

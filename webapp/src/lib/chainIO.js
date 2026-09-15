@@ -8,20 +8,17 @@
 // Every call goes through the chain's client of the moment (clients.js), so
 // an edited endpoint list applies to the next request, even mid-sweep.
 //
-// One chain, two contracts. Logs are asked for from both addresses in one
-// request (eth_getLogs takes a list), and every row says which contract it
-// came from; the head pointer and the count are per contract, because an
-// author has a list on each. On a chain where v2 is not deployed yet, its
-// logs are simply absent and its two views answer no data, which reads as
-// "never published there" — so nothing has to be configured when it lands.
+// One chain, one contract: every Post event comes from Xueni at the same
+// CREATE2 address, and an author's head pointer and count are that
+// contract's two views.
 
 import { decodeEventLog, decodeFunctionData, hexToBytes, zeroAddress } from 'viem';
 import { normalize } from 'viem/ens';
-import { POST_EVENTS, abiFor, abiV2 } from './abi';
+import { POST_EVENT, abi } from './abi';
 import { mapLimit } from './async';
 import { getChain } from './chains';
 import { getClient } from './clients';
-import { CONTRACTS, contractAddress, contractVersionOf } from './config';
+import { XUENI_ADDRESS, isContractAddress } from './config';
 import { decodeTitle } from './title';
 import { decodePayload } from './payload';
 import { shortAddr } from './format';
@@ -49,9 +46,8 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 1200 } = {}) {
 
 const ZERO_ADDRESS = zeroAddress;
 
-/** The addresses read on every chain, and the versions they are. */
-const ADDRESSES = CONTRACTS.map((c) => c.address);
-const VERSIONS = CONTRACTS.map((c) => c.version);
+/** The address read on every chain. */
+const ADDRESS = XUENI_ADDRESS;
 
 /**
  * ENS names are normalised before they are hashed (UTS-46 plus ENSIP-15), so
@@ -123,9 +119,6 @@ function assignEventIndexes(logs) {
   return logs;
 }
 
-/** Which contract a log came from. A log with no address (a test double) is v1's. */
-const versionOf = (log) => (log.address == null ? 1 : contractVersionOf(log.address));
-
 const hookOf = (args) => {
   const hook = args?.hook;
   if (!hook || String(hook).toLowerCase() === ZERO_ADDRESS) return null;
@@ -146,7 +139,6 @@ function logToMeta(log, block) {
     // The block's timestamp (seconds) when the node put it on the log
     // (geth ≥ 1.14 and Erigon do); otherwise looked up, see withTimes().
     ts: log.blockTimestamp != null ? Number(log.blockTimestamp) : null,
-    version: versionOf(log) ?? 1,
     hook: hookOf(log.args),
   };
 }
@@ -232,32 +224,6 @@ export function createChainIO(chainId, log) {
     return rows;
   }
 
-  /** Whether a contract version has code on this chain — once per page. */
-  const deployed = new Map(); // version -> Promise<boolean>
-  function isDeployed(version) {
-    const v = Number(version);
-    let hit = deployed.get(v);
-    if (!hit) {
-      const address = contractAddress(v);
-      hit = address
-        ? log
-            .fromNode(
-              'eth_getCode',
-              `contract v${v}`,
-              () => client().getCode({ address }),
-              (code) => (code && code !== '0x' ? 'deployed' : 'not deployed'),
-            )
-            .then((code) => Boolean(code && code !== '0x'))
-            .catch((err) => {
-              deployed.delete(v); // ask again next time
-              throw err;
-            })
-        : Promise.resolve(false);
-      deployed.set(v, hit);
-    }
-    return hit;
-  }
-
   /** Whether an address holds code: a contract account, as against a key. */
   function hasCode(address) {
     return log
@@ -270,19 +236,16 @@ export function createChainIO(chainId, log) {
       .then((code) => Boolean(code && code !== '0x'));
   }
 
-  /** One contract's view of an author, or 0 where the contract is not deployed. */
-  function authorView(functionName, author, version) {
-    const v = Number(version);
-    const address = contractAddress(v);
-    if (!address) return Promise.resolve(0n);
+  /** The contract's view of an author, or 0 where it is not deployed here. */
+  function authorView(functionName, author) {
     return log.fromNode(
       `${functionName}()`,
-      `author ${shortAddr(author)} · v${v}`,
+      `author ${shortAddr(author)}`,
       () =>
         client()
           .readContract({
-            address,
-            abi: abiFor(v),
+            address: ADDRESS,
+            abi,
             functionName,
             args: [addrArg(author)],
           })
@@ -298,8 +261,6 @@ export function createChainIO(chainId, log) {
     chainId: id,
     /** False: what this reads is worth keeping in IndexedDB. */
     ephemeral: false,
-    /** The contract versions every read here covers. */
-    versions: VERSIONS,
 
     /** The node's current head. */
     blockNumber() {
@@ -332,7 +293,7 @@ export function createChainIO(chainId, log) {
     },
 
     /**
-     * Every Post event in `[from, to]`, all authors, both contracts. Returns
+     * Every Post event in `[from, to]`, all authors. Returns
      * the top block actually read: when the node hasn't seen `to` yet the
      * window is retried one block shorter, up to HEAD_RETRIES times, and the
      * caller claims coverage only up to what came back.
@@ -348,8 +309,8 @@ export function createChainIO(chainId, log) {
             () =>
               withRetry(() =>
                 client().getLogs({
-                  address: ADDRESSES,
-                  events: POST_EVENTS,
+                  address: ADDRESS,
+                  event: POST_EVENT,
                   fromBlock: bottom,
                   toBlock: top,
                 }),
@@ -382,8 +343,8 @@ export function createChainIO(chainId, log) {
         () =>
           withRetry(() =>
             client().getLogs({
-              address: ADDRESSES,
-              events: POST_EVENTS,
+              address: ADDRESS,
+              event: POST_EVENT,
               fromBlock: at,
               toBlock: at,
             }),
@@ -402,16 +363,15 @@ export function createChainIO(chainId, log) {
     },
 
     /** The block holding `author`'s newest post on one contract (0 when they have none there). */
-    latestBlock(author, version = 1) {
-      return authorView('latestBlock', author, version);
+    latestBlock(author) {
+      return authorView('latestBlock', author);
     },
 
     /** How many posts `author` has published on one contract. */
-    count(author, version = 1) {
-      return authorView('count', author, version);
+    count(author) {
+      return authorView('count', author);
     },
 
-    isDeployed,
     hasCode,
 
     /**
@@ -428,23 +388,22 @@ export function createChainIO(chainId, log) {
       );
       const posts = [];
       for (const entry of receipt.logs) {
-        const version = contractVersionOf(entry.address);
-        if (version == null) continue;
+        if (!isContractAddress(entry.address)) continue;
         try {
           const decoded = decodeEventLog({
-            abi: abiFor(version),
+            abi,
             eventName: 'Post',
             data: entry.data,
             topics: entry.topics,
           });
-          posts.push({ log: entry, args: decoded.args, version });
+          posts.push({ log: entry, args: decoded.args });
         } catch {
           continue; // some other event from the same contract
         }
       }
       posts.sort((a, b) => a.log.logIndex - b.log.logIndex);
       const ts = posts.length ? await blockTs(receipt.blockNumber) : null;
-      return posts.map(({ log: entry, args, version }, i) => ({
+      return posts.map(({ log: entry, args }, i) => ({
         author: args.author,
         index: args.index,
         block: receipt.blockNumber,
@@ -454,7 +413,6 @@ export function createChainIO(chainId, log) {
         eventIndex: i,
         logIndex: entry.logIndex,
         ts,
-        version,
         hook: hookOf(args),
       }));
     },
@@ -478,7 +436,7 @@ export function createChainIO(chainId, log) {
         (t) => `${log.b((t.input.length - 2) / 2)} bytes calldata`,
       );
       // v2's ABI decodes every form, v1's plain call included (same selector).
-      const call = describeCall(decodeFunctionData({ abi: abiV2, data: tx.input }));
+      const call = describeCall(decodeFunctionData({ abi, data: tx.input }));
       const bytes = hexToBytes(call.payload);
       const body = await decodePayload(bytes);
       return {

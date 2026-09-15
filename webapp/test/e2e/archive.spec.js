@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { calls, oracle, postHrefs, prepare, reset } from './app.mjs';
 
+// The bundle format, as src/lib/archive.js writes it. Spelled out rather
+// than imported: that module reaches for Vite's import.meta.env, which a
+// Playwright spec running in plain Node does not have.
+const ARCHIVE_FORMAT = 2;
+
 /** Open a post and wait for its body to be on the page (and so, cached). */
 async function readPost(page, href) {
   await page.goto(href);
@@ -29,7 +34,7 @@ test.describe('archive bundles', () => {
     );
 
     expect(name).toMatch(/^glyph-archive-\d{4}-\d{2}-\d{2}\.xueni\.json$/);
-    expect(doc.glyph).toEqual({ archive: 1 });
+    expect(doc.glyph).toEqual({ archive: ARCHIVE_FORMAT });
     expect(doc.scope).toEqual({ kind: 'browser' });
     // Every post whose body was read carries its exact stored text.
     for (const post of chosen) {
@@ -124,7 +129,7 @@ test.describe('archive bundles', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(
         JSON.stringify({
-          glyph: { archive: 1 },
+          glyph: { archive: ARCHIVE_FORMAT },
           contract: '0x1111111111111111111111111111111111111111',
           posts: [],
         }),

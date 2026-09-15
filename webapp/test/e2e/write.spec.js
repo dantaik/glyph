@@ -3,9 +3,8 @@ import { toFunctionSelector } from 'viem';
 import { prepare } from './app.mjs';
 
 const PUBLISH = toFunctionSelector('publish(bytes32,bytes)');
-// The mock node has the second contract deployed on both chains, so a post
-// goes there — through the same two-argument call v1 takes, since no hook
-// was chosen. hooks.spec.js covers the other calls.
+// A post with no hook chosen goes out through the two-argument call;
+// hooks.spec.js covers the other two.
 const XUENI = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
 
 test.describe('the write tab', () => {
