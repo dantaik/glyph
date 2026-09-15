@@ -338,22 +338,25 @@ command-line tool and the macOS app read Xueni alone.
 
 ## Deployment record
 
-| Contract | Address (every chain) | Ethereum | Taiko |
-|---|---|---|---|
-| Xueni | `0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9` | not yet deployed | not yet deployed |
-| MultiHook | `0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10` | not yet deployed | not yet deployed |
+**Xueni** — the contract every surface reads — at `0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9` on both chains:
 
-An earlier build of the same two contracts was deployed on both chains on 2026-09-15, by
-`0x327fa3369B1D1D42120d84bc407e5865ECa7c458`, and verified. Renaming the project changed a comment
-in `Xueni.sol`, which changed its compiled metadata, its init code hash and therefore every
-deterministic address — so the salts above were re-mined and those deployments are not these
-addresses. Deploying is one command per chain (above); it costs about 2.3M gas, and the deployer
-holds no privilege over either contract, neither of which has an owner or can be upgraded.
+| Chain | Chain ID | Deployment block | Deployment tx | Deployer | Date |
+|---|---|---|---|---|---|
+| Ethereum mainnet | 1 | 25,980,697 | [0xe375…d4b8](https://etherscan.io/tx/0xe375aef357501b9659c61f8a4378e7b152f38a28fd043132aa2b9e6e59c3d4b8) | `0x327f…c458` | 2026-09-15 |
+| Taiko mainnet | 167000 | 11,413,668 | [0xea2f…a81f](https://taikoscan.io/tx/0xea2f2f654c3cc115a3b1be9182d02071b3b46df319f2fbf16fdde75b0ca8a81f) | `0x327f…c458` | 2026-09-15 |
 
-Add the block, the transaction and the explorer link per chain here once they are on chain, and
-raise each chain's `deployBlock` in `webapp/src/lib/chains.js` to the Xueni deployment block. Until
-then `deployBlock` holds the height at which the salts were mined: a safe floor, since the contracts
-cannot have been deployed below it.
+**MultiHook** — the fan-out hook beside it — at `0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10`:
+
+| Chain | Chain ID | Deployment block | Deployment tx | Deployer | Date |
+|---|---|---|---|---|---|
+| Ethereum mainnet | 1 | 25,980,700 | [0xdeda…6248](https://etherscan.io/tx/0xdedae15fa3c2bd42fe3e4d20d709ae6be0030748d02983d58eab1de70b096248) | `0x327f…c458` | 2026-09-15 |
+| Taiko mainnet | 167000 | 11,413,668 | [0x622e…31f6](https://taikoscan.io/tx/0x622e8a8ff130ff9987934426ba114eebce197eca6d5e61ae162ec011d14131f6) | `0x327f…c458` | 2026-09-15 |
+
+The address is itself the proof of what is deployed: CREATE2 fixes it from the salt and the init
+code hash alone, both pinned in `script/Create2DeployXueni.s.sol`, and each transaction above
+carries the matching salt. The deployer holds no privilege over either contract; neither has an
+owner and neither can be upgraded. Each chain's Xueni deployment block is its `deployBlock` in
+`webapp/src/lib/chains.js`: no block below it can hold a Post event, so no sweep ever reads that far.
 
 The earlier contract at `0x000000AE2f2249c497cfc5F262dd1491634C361C`, deployed 2026-09-02 on both
 chains and verified, is no longer read by anything here. Posts published to it stay where they are,

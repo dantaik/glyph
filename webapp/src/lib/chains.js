@@ -51,11 +51,9 @@ export const CHAINS = {
     // "Load earlier posts" click. Blocks already read are free and don't count.
     // 270,000 blocks ≈ 37 days of Ethereum at 12s a block.
     scanBlocks: 270_000,
-    // The sweep's floor: no block below it can hold a Post event. The
-    // contracts were re-mined at this height and deploy at or above it, so
-    // this is a safe lower bound — raise it to the deployment block once
-    // they are on chain.
-    deployBlock: 25_980_362,
+    // The block the contract was deployed in (tx 0xe375…d4b8). No block
+    // below it can hold a Post event, so no sweep ever reads that far.
+    deployBlock: 25_980_697,
     wallet: {
       chainName: 'Ethereum Mainnet',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -75,8 +73,8 @@ export const CHAINS = {
     // Per scan (see Ethereum above). 270,000 blocks ≈ 6 days of Taiko at
     // ~2s a block.
     scanBlocks: 270_000,
-    // The sweep's floor (see Ethereum above).
-    deployBlock: 11_411_659,
+    // Deployment tx 0xea2f…a81f.
+    deployBlock: 11_413_668,
     wallet: {
       chainName: 'Taiko Alethia',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },

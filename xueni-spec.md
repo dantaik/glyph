@@ -841,15 +841,19 @@ MultiHook:  0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10   (5 leading zeros; its i
 
 **The deployment record**
 
-Not yet deployed at these addresses. An earlier build of the same contracts was deployed on both
-chains on 2026-09-15 and verified; the salts above were re-mined when the project was renamed, which
-changed the compiled metadata and with it every deterministic address, so those deployments are not
-these addresses. Deploying is one command per chain (above) and costs about 2.3M gas.
+| Contract | Chain | Block | Transaction |
+|---|---|---|---|
+| Xueni | Ethereum mainnet (1) | 25,980,697 | `0xe375aef357501b9659c61f8a4378e7b152f38a28fd043132aa2b9e6e59c3d4b8` |
+| Xueni | Taiko mainnet (167000) | 11,413,668 | `0xea2f2f654c3cc115a3b1be9182d02071b3b46df319f2fbf16fdde75b0ca8a81f` |
+| MultiHook | Ethereum mainnet (1) | 25,980,700 | `0xdedae15fa3c2bd42fe3e4d20d709ae6be0030748d02983d58eab1de70b096248` |
+| MultiHook | Taiko mainnet (167000) | 11,413,668 | `0x622e8a8ff130ff9987934426ba114eebce197eca6d5e61ae162ec011d14131f6` |
 
-Once they are on chain, each chain's Xueni deployment block becomes that chain's `deployBlock` in
-`webapp/src/lib/chains.js`: no block below it can hold a `Post` event, so no sweep ever reads
-further back. Until then `deployBlock` holds the height at which the salts were mined, which is a
-safe lower bound — the contracts cannot have been deployed below it.
+Deployed 2026-09-15 by `0x327fa3369B1D1D42120d84bc407e5865ECa7c458`, which holds no privilege over
+either contract — neither has an owner and neither can be upgraded. The address is itself the proof
+of what is deployed: CREATE2 fixes it from the salt and the init code hash alone, and each
+transaction above carries the matching salt. Each chain's Xueni deployment block is that chain's
+`deployBlock` in `webapp/src/lib/chains.js`: no block below it can hold a `Post` event, so no sweep
+ever reads further back.
 
 **Front-end configuration**
 
