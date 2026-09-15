@@ -8,7 +8,7 @@
 // file takes effect at once, with no reload, and nothing here knows how
 // a setting is stored.
 //
-// The file names its format (`glyph.settings`): a document in some later,
+// The file names its format (`xueni.settings`): a document in some later,
 // different format is refused rather than half-applied.
 
 import { defaultRpcs, isKnownChain } from './chains';
@@ -38,7 +38,7 @@ export function collectSettings() {
   const rpcs = {};
   for (const id of READ_CHAIN_IDS) rpcs[id] = getRpcUrls(id);
   return {
-    glyph: { settings: SETTINGS_FORMAT },
+    xueni: { settings: SETTINGS_FORMAT },
     exportedAt: new Date().toISOString(),
     rpcs,
     rescanDelayMinutes: getRescanDelayMs() / 60_000,
@@ -54,7 +54,7 @@ export function collectSettings() {
 export const serializeSettings = () => JSON.stringify(collectSettings(), null, 2);
 
 /** The file's name — dated, so two exports don't overwrite each other. */
-export const settingsFileName = (date = new Date()) => `glyph-settings-${date.toISOString().slice(0, 10)}.json`;
+export const settingsFileName = (date = new Date()) => `xueni-settings-${date.toISOString().slice(0, 10)}.json`;
 
 /**
  * Read a settings file. Returns what can be applied (`settings`: only the
@@ -75,11 +75,11 @@ export function parseSettingsFile(text) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
     return { settings, problems: [t('settingsFile.notObject')], summary };
   }
-  const format = doc.glyph?.settings;
+  const format = doc.xueni?.settings;
   if (format !== SETTINGS_FORMAT) {
     problems.push(
       format == null
-        ? t('settingsFile.notGlyph')
+        ? t('settingsFile.notXueni')
         : t('settingsFile.badFormat', { format, supported: SETTINGS_FORMAT }),
     );
     return { settings, problems, summary };

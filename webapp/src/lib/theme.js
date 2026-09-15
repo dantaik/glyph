@@ -3,13 +3,13 @@
 // Source of truth is the DOM (the `.dark` class on <html>), seeded before
 // first paint by the inline FOUC script in index.html. The setter persists
 // to localStorage, mutates the DOM, then announces the change on a
-// `glyph:prefs` window event so every hook instance stays in sync — and so
+// `xueni:prefs` window event so every hook instance stays in sync — and so
 // a settings file restored on the settings page applies at once.
 
 import { useCallback, useEffect, useState } from 'react';
 
-const THEME_KEY = 'glyph.theme.v1';
-const PREFS_EVENT = 'glyph:prefs';
+const THEME_KEY = 'xueni.theme.v1';
+const PREFS_EVENT = 'xueni:prefs';
 const META_COLORS = { light: '#f7f8fa', dark: '#16181c' };
 
 function lsGet(key) {

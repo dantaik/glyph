@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { archiveImage, archivePost, buildArchive, ARCHIVE_FORMAT as CLI_FORMAT } from '../../../cli/src/archive.js';
 import { ARCHIVE_FORMAT, parseArchive } from '../../src/lib/archive';
-import { GLYPH_ADDRESS } from '../../src/lib/config';
+import { XUENI_ADDRESS } from '../../src/lib/config';
 import { AUTHORS } from '../../src/lib/fixtureWorld';
 
 const TX = `0x${'ab'.repeat(32)}`;
@@ -20,7 +20,7 @@ describe('the format the two tools share', () => {
 
   it('a bundle built by the command-line tool is one the web app reads', () => {
     const doc = buildArchive({
-      contract: GLYPH_ADDRESS,
+      contract: XUENI_ADDRESS,
       scope: { kind: 'author', address: AUTHORS[0].toLowerCase() },
       posts: [
         archivePost({

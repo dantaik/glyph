@@ -66,22 +66,21 @@ export async function getMarketStates(chains) {
  * @param {number} payloadBytes — brotli-compressed payload size in bytes
  * @param {boolean} firstPost   — true if this author has never posted on
  *   that contract (cold SSTORE)
- * @param {{ version?: number, hooked?: boolean, hookDataBytes?: number }} call
- *   the v2 contract indexes the hook as one more topic; a post through a
- *   hook pays the hook word, the data's offsets, one cold call and the
- *   memory the hook is handed — and then whatever the hook itself does,
- *   which no estimate here can know
+ * @param {{ hooked?: boolean, hookDataBytes?: number }} call
+ *   a post through a hook pays the hook word, the data's offsets, one cold
+ *   call and the memory the hook is handed — and then whatever the hook
+ *   itself does, which no estimate here can know
  */
-export function estimatePublishGas(payloadBytes, firstPost, { version = 1, hooked = false, hookDataBytes = 0 } = {}) {
+export function estimatePublishGas(payloadBytes, firstPost, { hooked = false, hookDataBytes = 0 } = {}) {
   const padded = Math.ceil(payloadBytes / 32) * 32;
   const nonzero = 4 + 32 + payloadBytes; // selector + title + payload (mostly nonzero)
   const zero = 32 + 32 + (padded - payloadBytes); // ABI offset + length slots (~zero)
   const calldata = nonzero * 40 + zero * 10;
 
   const base = 21000;
-  // LOG with 2 topics (signature + indexed author) and 96 bytes of data:
-  // 375 + 375 × 2 + 8 × 96 = 1,893 (EIP-2929). v2 indexes the hook too.
-  const logCost = 1893 + (Number(version) === 2 ? 375 : 0);
+  // LOG with 3 topics (signature, indexed author, indexed hook) and 96
+  // bytes of data: 375 + 375 × 3 + 8 × 96 = 2,268 (EIP-2929).
+  const logCost = 2268;
   // One packed slot, read then written: warm SLOAD+SSTORE = 100+100 (EIP-2929);
   // the first post pays cold access + 0→non-zero init = 2,100+22,100.
   const sstore = firstPost ? 2100 + 22100 : 100 + 100;

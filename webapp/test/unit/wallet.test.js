@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
 
-const KEY = 'glyph.wallet.choice.v1';
+const KEY = 'xueni.wallet.choice.v1';
 
 /** An EIP-1193 provider that records what was asked of it. */
 function makeProvider({ accounts = ['0xabc'], chainId = '0x1' } = {}) {

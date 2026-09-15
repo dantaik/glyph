@@ -22,8 +22,8 @@ function watch(page) {
 
 test.describe('every page, everywhere', () => {
   for (const [label, storage, writeLabel] of [
-    ['English, light', { 'glyph.lang.v1': 'en' }, 'Write'],
-    ['Chinese, dark', { 'glyph.lang.v1': 'zh', 'glyph.theme.v1': 'dark' }, '写'],
+    ['English, light', { 'xueni.lang.v1': 'en' }, 'Write'],
+    ['Chinese, dark', { 'xueni.lang.v1': 'zh', 'xueni.theme.v1': 'dark' }, '写'],
   ]) {
     test(`opens without an error: ${label}`, async ({ page, request }) => {
       const { posts, counts } = await oracle(request);

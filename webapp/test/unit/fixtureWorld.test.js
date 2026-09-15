@@ -62,7 +62,7 @@ describe('fixtureWorld', () => {
   it('the two worlds overlap in time and differ in content', () => {
     const worlds = buildWorlds(WORLD_CHAIN_IDS, { now: NOW });
     const order = expectedMergedOrder(worlds);
-    expect(order).toHaveLength(20);
+    expect(order).toHaveLength(23);
     // Newest first, with both chains interleaved rather than one after the other.
     for (let i = 1; i < order.length; i++) expect(order[i].ts).toBeLessThanOrEqual(order[i - 1].ts);
     const chains = order.slice(0, 6).map((p) => p.chainId);
@@ -76,7 +76,7 @@ describe('fixtureWorld', () => {
   it('keeps the single-chain QA hooks on Ethereum', () => {
     const eth = buildWorld(1, { now: NOW });
     const a0 = eth.byAuthor.get(AUTHORS[0].toLowerCase());
-    expect(a0.map((p) => Number(p.index))).toEqual([0, 1, 2, 3, 4]);
+    expect(a0.map((p) => Number(p.index))).toEqual([0, 1, 2, 3, 4, 5]);
     expect(a0[0].title).toBe('');
     expect(eth.posts.some((p) => p.title.endsWith('�'))).toBe(true);
     // The long article is referenced from another letter on the same chain.
@@ -84,51 +84,43 @@ describe('fixtureWorld', () => {
     expect(ref).toContain(`](${txOf(1, AUTHORS[0], 2n)})`);
   });
 
-  it('keeps the second contract as streams of their own', () => {
-    // Without asking, a world is the v1 journal alone.
-    expect(buildWorld(1, { now: NOW }).posts.every((p) => p.version === 1)).toBe(true);
-    expect(expectedMergedOrder(buildWorlds(WORLD_CHAIN_IDS, { now: NOW, v2: true }))).toHaveLength(23);
-    const worlds = buildWorlds(WORLD_CHAIN_IDS, { now: NOW, v2: true });
+  it('keeps the posts that took a route of their own', () => {
+    const worlds = buildWorlds(WORLD_CHAIN_IDS, { now: NOW });
     const eth = worlds.get(1);
     const taiko = worlds.get(167000);
-    // v1 lists are untouched by the v2 posts…
-    expect(eth.byAuthor.get(AUTHORS[0].toLowerCase()).every((p) => p.version === 1)).toBe(true);
-    // …and each v2 stream starts at index 0 with its own chain of blocks.
-    const a0v2 = eth.byStream.get(`${AUTHORS[0].toLowerCase()}@2`);
-    expect(a0v2.map((p) => [Number(p.index), Number(p.prevBlock), p.version])).toEqual([[0, 0, 2]]);
-    expect(a0v2[0].hook).toBe(DEFAULT_MULTI_HOOK_ADDRESS.toLowerCase());
-    const a1v2 = eth.byStream.get(`${AUTHORS[1].toLowerCase()}@2`);
-    expect(a1v2[0].relayer).toBe(DEMO_RELAYER);
-    expect(a1v2[0].hook).toBeNull();
-    expect(taiko.byStream.get(`${AUTHORS[3].toLowerCase()}@2`)[0].hook).toBe(DEMO_UNKNOWN_HOOK);
-    // The same index on the two contracts is a different transaction.
-    expect(txOf(1, AUTHORS[0], 0, 2)).not.toBe(txOf(1, AUTHORS[0], 0));
-    expect(eth.posts.filter((p) => p.version === 2)).toHaveLength(2);
-    expect(taiko.posts.filter((p) => p.version === 2)).toHaveLength(1);
+    // They sit in the author's one sequence, newest of it.
+    const a0 = eth.byAuthor.get(AUTHORS[0].toLowerCase());
+    const hooked = a0.find((p) => p.hook);
+    expect([Number(hooked.index), Number(hooked.block)]).toEqual([4, 2560]);
+    expect(hooked.hook).toBe(DEFAULT_MULTI_HOOK_ADDRESS.toLowerCase());
+    const a1 = eth.byAuthor.get(AUTHORS[1].toLowerCase());
+    const relayed = a1[a1.length - 1];
+    expect(relayed.relayer).toBe(DEMO_RELAYER);
+    expect(relayed.hook).toBeNull();
+    const a3 = taiko.byAuthor.get(AUTHORS[3].toLowerCase());
+    expect(a3[a3.length - 1].hook).toBe(DEMO_UNKNOWN_HOOK);
+    expect(eth.posts.filter((p) => p.hook || p.relayer)).toHaveLength(2);
+    expect(taiko.posts.filter((p) => p.hook || p.relayer)).toHaveLength(1);
   });
 
-  it('the fixture I/O reads each contract as its own stream', async () => {
-    expect(createFixtureIO(1, '1', { now: NOW, delay: 0 }).versions).toEqual([1]);
-    const io = createFixtureIO(1, '1', { now: NOW, delay: 0, v2: true });
-    expect(io.versions).toEqual([1, 2]);
-    expect(await io.latestBlock(AUTHORS[0], 1)).toBe(2870n);
-    expect(await io.latestBlock(AUTHORS[0], 2)).toBe(2560n);
-    expect(await io.count(AUTHORS[0], 1)).toBe(5n);
-    expect(await io.count(AUTHORS[0], 2)).toBe(1n);
-    expect(await io.count(AUTHORS[2], 2)).toBe(0n);
-    expect(await io.latestBlock(AUTHORS[2], 2)).toBe(0n);
+  it('the fixture I/O reads one list per author', async () => {
+    const io = createFixtureIO(1, '1', { now: NOW, delay: 0 });
+    expect(await io.latestBlock(AUTHORS[0])).toBe(2870n);
+    expect(await io.count(AUTHORS[0])).toBe(6n);
+    expect(await io.count(AUTHORS[3])).toBe(0n); // writes on Taiko only
+    expect(await io.latestBlock(AUTHORS[3])).toBe(0n);
     const rows = await io.authorPostsInBlock(AUTHORS[0], 2560n);
-    expect(rows.map((r) => [r.version, r.hook])).toEqual([[2, DEFAULT_MULTI_HOOK_ADDRESS.toLowerCase()]]);
+    expect(rows.map((r) => [Number(r.index), r.hook])).toEqual([[4, DEFAULT_MULTI_HOOK_ADDRESS.toLowerCase()]]);
     expect(rows[0].relayer).toBeUndefined();
-    const relayed = await io.postBody(txOf(1, AUTHORS[1], 0, 2));
+    const relayed = await io.postBody(txOf(1, AUTHORS[1], 4n));
     expect(relayed.form).toBe('publishFor');
     expect(relayed.relayed.author).toBe(AUTHORS[1].toLowerCase());
     expect(relayed.sender).toBe(DEMO_RELAYER);
-    const hooked = await io.postBody(txOf(1, AUTHORS[0], 0, 2));
+    const hooked = await io.postBody(txOf(1, AUTHORS[0], 4n));
     expect(hooked.form).toBe('publishWithHook');
     expect(hooked.hookData).toBe('0xc0ffee');
     expect(hooked.relayed).toBeNull();
-    const plain = await io.postBody(txOf(1, AUTHORS[0], 0));
+    const plain = await io.postBody(txOf(1, AUTHORS[0], 0n));
     expect([plain.form, plain.hook, plain.relayed]).toEqual(['publish', null, null]);
   });
 
@@ -163,11 +155,12 @@ describe('createFixtureIO', () => {
       'Rain at midnight',
       'Morning fog at the crossing',
       'The drums',
+      'The crossing, indexed',
     ]);
     expect(rows.every((r) => r.ts === io.world.tsOf(r.block))).toBe(true);
     expect((await io.block(29_000n)).timestamp).toBe(io.world.tsOf(29_000n));
-    expect(await io.latestBlock(AUTHORS[3])).toBe(27_400n);
-    expect(await io.count(AUTHORS[3])).toBe(3n);
+    expect(await io.latestBlock(AUTHORS[3])).toBe(29_600n);
+    expect(await io.count(AUTHORS[3])).toBe(4n);
     expect(await io.count(AUTHORS[2])).toBe(0n); // writes on Ethereum only
     const inBlock = await io.authorPostsInBlock(AUTHORS[0], 28_900n);
     expect(inBlock.map((r) => r.title)).toEqual(['The drums']);

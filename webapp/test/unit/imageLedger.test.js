@@ -53,7 +53,7 @@ describe('the ledger of images already paid for', () => {
   });
 
   it('treats a corrupted record as an empty one', () => {
-    localStorage.setItem('glyph.images.v1', 'not json at all');
+    localStorage.setItem('xueni.images.v1', 'not json at all');
     expect(knownImage(1, 'anything')).toBeNull();
     rememberImage(1, 'hash', tx(3));
     expect(knownImage(1, 'hash')).toBe(tx(3));

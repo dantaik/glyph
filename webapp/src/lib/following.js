@@ -8,11 +8,11 @@
 import { useSyncExternalStore } from 'react';
 import { ADDRESS_RE } from './router';
 
-const KEY = 'glyph.following.v1';
-const KEY_SEEN = 'glyph.followingSeen.v1';
+const KEY = 'xueni.following.v1';
+const KEY_SEEN = 'xueni.followingSeen.v1';
 
 /** Window event: the followed list changed. */
-export const FOLLOWING_EVT = 'glyph:following';
+export const FOLLOWING_EVT = 'xueni:following';
 
 /** A generous ceiling; the point is to bound storage, not to ration reading. */
 export const FOLLOWING_MAX = 500;

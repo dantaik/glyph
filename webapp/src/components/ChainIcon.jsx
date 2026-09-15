@@ -5,7 +5,7 @@ import { EthereumMark, TaikoMark, ChainMark } from './Icons';
  * plain hexagon for anything else (a testnet reached through VITE_CHAIN_ID).
  * A testnet wears its mainnet's mark: it IS that chain, just not the real one.
  *
- * All three are currentColor glyphs from the shared icon set, so the switcher
+ * All three are currentColor icons from the shared set, so the switcher
  * stays inside the site's one-accent palette instead of importing two brand
  * colours into it.
  */

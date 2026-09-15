@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { isReadChain } from '../lib/config';
 import { getReader } from '../lib/data';
 import { chainName, fmtTitle } from '../lib/format';
-import { parsePostRef } from '../lib/glyphRefs';
+import { parsePostRef } from '../lib/postRefs';
 import { useT } from '../lib/i18n';
 import { FIELD_LABEL, INPUT } from './formStyles';
 import { Meta, Note } from './Text';
@@ -78,14 +78,14 @@ export default function RelationsFields({ meta, onChange, chainId, disabled = fa
           <span className={FIELD_LABEL}>{t('relations.language')}</span>
           <input
             type="text"
-            list="glyph-langs"
+            list="xueni-langs"
             value={meta?.lang ?? ''}
             onChange={(e) => set('lang', e.target.value)}
             disabled={disabled}
             placeholder={t('relations.languagePlaceholder')}
             className={INPUT}
           />
-          <datalist id="glyph-langs">
+          <datalist id="xueni-langs">
             <option value="en" />
             <option value="zh" />
           </datalist>

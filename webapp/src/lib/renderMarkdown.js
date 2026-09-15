@@ -52,7 +52,7 @@ marked.use({
 // (spec §8) can produce, and only the URL schemes the reader legitimately needs.
 // blob: and data:image/ are re-permitted for images (DOMPurify's defaults would
 // otherwise drop the on-chain and placeholder image sources); # and / keep the
-// in-app post links glyphRefs rewrites. Anything outside this set — a <script>,
+// in-app post links postRefs rewrites. Anything outside this set — a <script>,
 // an on* handler, a javascript: URL — is removed.
 const PURIFY_CONFIG = {
   ALLOWED_TAGS: [

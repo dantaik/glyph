@@ -2,18 +2,18 @@ import { expect, test } from '@playwright/test';
 import { decodeFunctionData, parseAbi, toFunctionSelector } from 'viem';
 import { oracle, prepare } from './app.mjs';
 
-const XUENI = '0x0000008d02020df6bcdd56a888cfc9ed9b9053ec';
+const XUENI = '0x0000003ce1a46c7fbb02b9e1a0a4709ad9cb15d9';
 const PUBLISH_WITH_HOOK = toFunctionSelector('publish(bytes32,bytes,address,bytes)');
 const PUBLISH_FOR = toFunctionSelector('publishFor(address,bytes32,bytes,address,bytes,uint256,bytes)');
 const HOOK = '0x00000000000000000000000000000000000000ab';
 const ACCOUNT = '0x327fa3369B1D1D42120d84bc407e5865ECa7c458';
 
-const abiV2 = parseAbi([
+const xueniAbi = parseAbi([
   'function publish(bytes32 title, bytes payload, address hook, bytes hookData) external payable',
   'function publishFor(address author, bytes32 title, bytes payload, address hook, bytes hookData, uint256 deadline, bytes signature) external payable',
 ]);
 
-test.describe('the second contract: hooks and relayed posts', () => {
+test.describe('hooks and relayed posts', () => {
   test('a post through a hook says so on its row and on its page, and the raw view names the call', async ({ page, request }) => {
     await prepare(page);
     const { posts } = await oracle(request);
@@ -25,7 +25,6 @@ test.describe('the second contract: hooks and relayed posts', () => {
     await page.locator(`main a[href="${hooked.href}"]`).first().click();
     await expect(page.locator('article h1')).toHaveText(hooked.title);
     await expect(page.locator('article')).toContainText(hooked.probe);
-    await expect(page.locator('[data-contract-version="2"]')).toHaveText('Xueni');
     const provenance = page.locator('[data-provenance]');
     await expect(provenance).toContainText('Through the hook');
     await expect(provenance.locator(`[data-hook="${hooked.hook}"]`)).toHaveText('Fan-out (several hooks)');
@@ -49,16 +48,16 @@ test.describe('the second contract: hooks and relayed posts', () => {
     await expect(page.locator('article header')).not.toContainText(`By ${relayed.relayer.slice(0, 6)}`, { ignoreCase: true });
     await page.getByRole('button', { name: 'Raw' }).click();
     await expect(page.locator('[data-raw-call="publishFor"]')).toContainText('Signed by');
-    // And the author page lists it among their posts, on the second contract.
+    // And the author page lists it among their posts.
     await page.goto(`/author/${relayed.author}`);
     await expect(page.locator(`main a[href="${relayed.href}"]`)).toBeVisible();
   });
 
-  test('a hook chosen in the write tab goes out as the four-argument call to the v2 contract', async ({ page }) => {
+  test('a hook chosen in the write tab goes out as the four-argument call', async ({ page }) => {
     await prepare(page, { wallet: { chainId: '0x1', connected: true } });
     await page.goto('/');
     await page.locator('header nav').getByRole('button', { name: 'Write' }).click();
-    await expect(page.locator('[data-publish-target="2"]')).toBeVisible();
+    await expect(page.locator('[data-hook-fields]')).toBeVisible();
     await page.locator('#post-title').fill('Through a hook, from the browser');
     await page.locator('[data-hook-fields] summary').click();
     await page.getByRole('button', { name: 'One hook' }).click();
@@ -74,7 +73,7 @@ test.describe('the second contract: hooks and relayed posts', () => {
     expect(tx.to.toLowerCase()).toBe(XUENI);
     expect(tx.data.startsWith(PUBLISH_WITH_HOOK)).toBe(true);
     expect(BigInt(tx.value)).toBe(1_000_000_000_000_000n);
-    const { args } = decodeFunctionData({ abi: abiV2, data: tx.data });
+    const { args } = decodeFunctionData({ abi: xueniAbi, data: tx.data });
     expect(args[2].toLowerCase()).toBe(HOOK);
     expect(args[3]).toBe('0x1234');
   });
@@ -83,7 +82,7 @@ test.describe('the second contract: hooks and relayed posts', () => {
     await prepare(page, { wallet: { chainId: '0x1', connected: true } });
     await page.goto('/');
     await page.locator('header nav').getByRole('button', { name: 'Write' }).click();
-    await expect(page.locator('[data-publish-target="2"]')).toBeVisible();
+    await expect(page.locator('[data-hook-fields]')).toBeVisible();
     await page.locator('#post-title').fill('Signed, not sent');
     await page.getByRole('button', { name: 'Sign for a relayer instead' }).click();
     const ticketView = page.locator('[data-relay-ticket]');
@@ -111,7 +110,7 @@ test.describe('the second contract: hooks and relayed posts', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].params[0].to.toLowerCase()).toBe(XUENI);
     expect(sent[0].params[0].data.startsWith(PUBLISH_FOR)).toBe(true);
-    const { args } = decodeFunctionData({ abi: abiV2, data: sent[0].params[0].data });
+    const { args } = decodeFunctionData({ abi: xueniAbi, data: sent[0].params[0].data });
     expect(args[0].toLowerCase()).toBe(ACCOUNT.toLowerCase());
     expect(args[6]).toBe(`0x${'ab'.repeat(32)}${'cd'.repeat(32)}1b`);
   });

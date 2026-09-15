@@ -43,7 +43,7 @@ describe('MergedAuthorList — edges', () => {
     expect(snap.allErrored).toBe(false);
     expect(snap.anyError).toBe(true);
     expect(snap.rows.every((r) => r.chainId === 1)).toBe(true);
-    expect(snap.rows).toHaveLength(5);
+    expect(snap.rows).toHaveLength(6);
     expect(snap.frontier).toMatchObject({ after: -1, leaders: [{ chainId: 167000, state: 'error' }] });
   });
 

@@ -9,7 +9,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { endpointsFor, parsePostArg, parseLimit, readRpcOverrides } from '../src/args.js';
-import { archiveImage, buildArchive, bytesToBase64 } from '../src/archive.js';
+import { ARCHIVE_FORMAT, archiveImage, buildArchive, bytesToBase64 } from '../src/archive.js';
 import { unifiedDiff } from '../src/diff.js';
 import { imageRefs, rewriteImageRefs, uploadRefRe, usedImageKeys } from '../src/images.js';
 import { compressText, decompressBytes, encodePayload } from '../src/payload.js';
@@ -88,8 +88,8 @@ describe('the archive format', () => {
       authors: [],
       now: new Date('2026-09-04T12:00:00.000Z'),
     });
-    assert.deepEqual(Object.keys(doc), ['glyph', 'exportedAt', 'contract', 'scope', 'posts', 'images', 'authors']);
-    assert.deepEqual(doc.glyph, { archive: 1 });
+    assert.deepEqual(Object.keys(doc), ['xueni', 'exportedAt', 'contract', 'scope', 'posts', 'images', 'authors']);
+    assert.deepEqual(doc.xueni, { archive: ARCHIVE_FORMAT });
     assert.equal(doc.exportedAt, '2026-09-04T12:00:00.000Z');
   });
 });

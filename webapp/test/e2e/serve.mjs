@@ -33,4 +33,4 @@ createServer((req, res) => {
   if (!file.startsWith(ROOT) || !existsSync(file) || statSync(file).isDirectory()) file = join(ROOT, 'index.html');
   res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
   res.end(readFileSync(file));
-}).listen(PORT, '127.0.0.1', () => console.log(`glyph dist on http://127.0.0.1:${PORT}`));
+}).listen(PORT, '127.0.0.1', () => console.log(`xueni dist on http://127.0.0.1:${PORT}`));

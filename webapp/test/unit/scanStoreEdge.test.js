@@ -45,8 +45,8 @@ describe('scanStore — what persistence may claim', () => {
   });
 
   it('a corrupted snapshot reads as a first scan, and is overwritten cleanly', () => {
-    localStorage.setItem('glyph.feedScan.v2.404', '{not json');
-    localStorage.setItem('glyph.authorScan.v2.404', '[1, 2');
+    localStorage.setItem('xueni.feedScan.v3.404', '{not json');
+    localStorage.setItem('xueni.authorScan.v3.404', '[1, 2');
     const store = createScanStore(404);
     expect(store.allPosts()).toEqual([]);
     expect(store.feedCoverage()).toEqual([]);
@@ -56,11 +56,6 @@ describe('scanStore — what persistence may claim', () => {
     expect(createScanStore(404).feedCoverage()).toEqual([[0n, 20n]]);
   });
 
-  it('a v1 mainnet snapshot means nothing to another chain\'s store', () => {
-    localStorage.setItem('glyph.feedScan.v1', JSON.stringify({ head: '300', frontier: 100, rows: [row(0, 150)] }));
-    expect(createScanStore(167000).allPosts()).toEqual([]);
-    expect(createScanStore(1).allPosts()).toHaveLength(1);
-  });
 });
 
 describe('scanStore — walking and sharing', () => {

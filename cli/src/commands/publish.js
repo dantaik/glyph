@@ -19,7 +19,7 @@ import { basename } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { toHex } from 'viem';
 import {
-  DEFAULT_GLYPH_ADDRESS,
+  DEFAULT_XUENI_ADDRESS,
   FRONT_MATTER_KEYS,
   MAX_CALLDATA_BYTES,
   TITLE_MAX_BYTES,
@@ -51,7 +51,7 @@ export const OPTIONS = {
  * first heading, else the file name.
  *
  * `title:` is accepted from front-matter as a convenience — every static
- * site generator writes one — but it is NOT a Glyph front-matter key: on
+ * site generator writes one — but it is NOT a Xueni front-matter key: on
  * chain the title is its own bytes32 argument, so it is read here and
  * written nowhere.
  */
@@ -219,7 +219,7 @@ export async function run(argv) {
 
   note(msg.publishing(chainSlug(chainId)));
   const txHash = await wallet.writeContract({
-    address: DEFAULT_GLYPH_ADDRESS,
+    address: DEFAULT_XUENI_ADDRESS,
     abi,
     functionName: 'publish',
     args: [encodeTitle(title), toHex(payload)],

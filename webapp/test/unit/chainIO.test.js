@@ -60,7 +60,7 @@ vi.mock('../../src/lib/clients', () => ({
 }));
 
 const { createChainIO } = await import('../../src/lib/chainIO');
-const { GLYPH_ADDRESS } = await import('../../src/lib/config');
+const { XUENI_ADDRESS } = await import('../../src/lib/config');
 const { encodeAbiParameters } = await import('viem');
 
 const AUTHOR = '0x1111111111111111111111111111111111111111';
@@ -79,10 +79,10 @@ const decoded = ({ block, index, tx, logIndex, blockTimestamp }) => ({
 
 /** The same log undecoded, as a receipt carries it. */
 function toRawLog(l) {
-  const POST_TOPIC = toEventSelector('Post(address,uint256,uint256,bytes32)');
+  const POST_TOPIC = toEventSelector('Post(address,address,uint256,uint256,bytes32)');
   return {
-    address: GLYPH_ADDRESS,
-    topics: [POST_TOPIC, pad(AUTHOR, { size: 32 })],
+    address: XUENI_ADDRESS,
+    topics: [POST_TOPIC, pad(AUTHOR, { size: 32 }), pad(`0x${'00'.repeat(20)}`, { size: 32 })],
     data: encodeAbiParameters(
       [{ type: 'uint256' }, { type: 'uint256' }, { type: 'bytes32' }],
       [l.args.index, l.args.prevBlock, l.args.title],

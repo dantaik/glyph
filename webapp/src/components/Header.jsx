@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { hrefFor, useUrlState } from '../lib/router';
 import { LANG_NAMES, setLang, useLang, useT } from '../lib/i18n';
 import { useTheme } from '../lib/theme';
-import { GlyphMark, Globe, Search, Sun, Moon, Sliders, MoreHorizontal } from './Icons';
+import { XueniMark, Globe, Search, Sun, Moon, Sliders, MoreHorizontal } from './Icons';
 
 // No display utility here on purpose: call sites choose between `inline-flex`
 // and `hidden sm:inline-flex`, and both set `display`. Baking `inline-flex`
@@ -20,7 +20,7 @@ const TABS = [
 const OTHER_LANG = { en: 'zh', zh: 'en' };
 
 /**
- * How each language names itself in one glyph's worth of space — the
+ * How each language names itself in one character's worth of space — the
  * header button shows the language it would switch TO, in that language's
  * own script, the way a language switch is read everywhere.
  */
@@ -78,7 +78,7 @@ export default function Header({ tab, onTabChange, onOpenSettings }) {
           className="flex shrink-0 select-none items-center gap-1.5 rounded-lg py-1 pr-1 text-accent hover:text-accent-strong transition-colors"
         >
           {/* Mark and wordmark are one thing, in one colour. */}
-          <GlyphMark size={26} />
+          <XueniMark size={26} />
           <span className="hidden text-lg font-bold tracking-wide min-[380px]:inline">
             {t('brand.wordmark')}
           </span>

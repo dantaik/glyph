@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { formatPostRef, parsePostRef } from '../../src/lib/glyphRefs';
+import { formatPostRef, parsePostRef } from '../../src/lib/postRefs';
 
 const HASH = `0x${'ab'.repeat(32)}`;
 const ETHEREUM = 1;

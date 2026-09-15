@@ -17,12 +17,12 @@ describe('MergedFeed over the two demo chains', () => {
     const taikoBottom = taiko.head - taiko.scanBlocks; // 18,000: the first sweep's floor
     const expected = expectedMergedOrder(worlds()).filter((p) => p.chainId === 1 || p.block >= taikoBottom);
     expect(hashes(snap.rows)).toEqual(hashes(expected));
-    expect(snap.rows).toHaveLength(16);
+    expect(snap.rows).toHaveLength(19);
     expect(snap.rows.every((r) => r.tsExact)).toBe(true);
     // Both chains interleave from the top rather than one after the other.
     expect(snap.rows.map((r) => r.chainId)).toEqual(expected.map((p) => p.chainId));
     expect(new Set(snap.rows.slice(0, 4).map((r) => r.chainId)).size).toBe(2);
-    expect(snap.total).toBe(16);
+    expect(snap.total).toBe(19);
     expect(snap.done).toBe(false);
   });
 
@@ -38,8 +38,8 @@ describe('MergedFeed over the two demo chains', () => {
       [1, true, -Infinity],
       [167000, false, tStar],
     ]);
-    expect(snap.frontier.after).toBe(14);
-    expect(titles(snap.rows.slice(15))).toEqual(['']);
+    expect(snap.frontier.after).toBe(17);
+    expect(titles(snap.rows.slice(18))).toEqual(['']);
   });
 
   it('loading earlier posts deepens the chain at the frontier until everything is complete', async () => {
@@ -52,7 +52,7 @@ describe('MergedFeed over the two demo chains', () => {
     let snap = await settle(view.feed);
     const taiko = worlds().get(167000);
     expect(snap.frontier.ts).toBe(taiko.tsOf(taiko.head - 2n * taiko.scanBlocks));
-    expect(snap.rows).toHaveLength(19);
+    expect(snap.rows).toHaveLength(20);
     // Everything known is newer than the new frontier; Taiko's oldest letter
     // is still below its coverage and not on the page at all yet.
     expect(titles(snap.rows.slice(snap.frontier.after + 1))).toEqual([]);
@@ -64,7 +64,7 @@ describe('MergedFeed over the two demo chains', () => {
     expect(snap.frontier).toBeNull();
     expect(snap.done).toBe(true);
     expect(hashes(snap.rows)).toEqual(hashes(expectedMergedOrder(worlds())));
-    expect(snap.rows).toHaveLength(20);
+    expect(snap.rows).toHaveLength(23);
     expect(snap.chains.every((c) => c.exhausted)).toBe(true);
   });
 
@@ -77,7 +77,7 @@ describe('MergedFeed over the two demo chains', () => {
 
     await view.reader(1).feed.refresh();
     const snap = await settle(view.feed);
-    expect(snap.rows).toHaveLength(12);
+    expect(snap.rows).toHaveLength(14);
     expect(snap.frontier).toMatchObject({ after: -1, ts: Infinity, leaders: [{ chainId: 167000, state: 'idle' }] });
   });
 
@@ -97,7 +97,7 @@ describe('MergedFeed over the two demo chains', () => {
     ]);
     await view.feed.refresh();
     let snap = await settle(view.feed);
-    expect(snap.rows).toHaveLength(12);
+    expect(snap.rows).toHaveLength(14);
     expect(snap.rows.every((r) => r.chainId === 1)).toBe(true);
     expect(snap.anyError).toBe(true);
     expect(snap.allErrored).toBe(false);
@@ -108,7 +108,7 @@ describe('MergedFeed over the two demo chains', () => {
     await view.feed.retry(167000);
     snap = await settle(view.feed);
     expect(snap.anyError).toBe(false);
-    expect(snap.rows).toHaveLength(16);
+    expect(snap.rows).toHaveLength(19);
   });
 
   it('a single-chain view has no frontier', async () => {
@@ -116,11 +116,11 @@ describe('MergedFeed over the two demo chains', () => {
     await view.feed.refresh();
     const snap = await settle(view.feed);
     expect(snap.frontier).toBeNull();
-    expect(snap.rows).toHaveLength(4);
+    expect(snap.rows).toHaveLength(5);
     expect(snap.done).toBe(false);
     await view.feed.loadMore();
     const more = await settle(view.feed);
-    expect(more.rows).toHaveLength(8);
+    expect(more.rows).toHaveLength(9);
     expect(more.done).toBe(true);
   });
 
@@ -150,29 +150,33 @@ describe('MergedFeed over the two demo chains', () => {
     // An earlier visit read 800..1200 and holds its two letters.
     reader.store.rememberPosts(world.posts.filter((p) => p.block >= 800n && p.block <= 1200n));
     reader.store.rememberFeedRange(800n, 1200n);
-    const view = createView([reader], { pageSize: 3 });
+    // A page deep enough to span the unread stretch between the two segments.
+    const view = createView([reader], { pageSize: 4 });
     await view.feed.refresh();
     let snap = await settle(view.feed);
     expect(snap.chains[0].coverage).toEqual([[800n, 1200n], [2600n, 2999n]]);
     expect(titles(snap.rows)).toEqual([
       'A letter before the solstice',
+      'Relayed from the hills',
       'A letter from the hills',
       'When the osmanthus opens',
     ]);
-    expect(snap.gaps).toEqual([{ chainId: 1, after: 1, from: 1201n, to: 2599n }]);
+    expect(snap.gaps).toEqual([{ chainId: 1, after: 2, from: 1201n, to: 2599n }]);
 
     await view.feed.fillGap(1, snap.gaps[0]); // one budget's worth: 2200..2599
     snap = await settle(view.feed);
     expect(snap.chains[0].coverage).toEqual([[800n, 1200n], [2200n, 2999n]]);
-    expect(snap.shown).toBe(5); // widened by the two letters the fill found
+    expect(snap.shown).toBe(7); // widened by the letters the fill found
     expect(titles(snap.rows)).toEqual([
       'A letter before the solstice',
+      'Relayed from the hills',
       'A letter from the hills',
+      'Through the fan-out',
       'Winter by the sea',
       'The yard in spring',
       'When the osmanthus opens',
     ]);
-    expect(snap.gaps).toEqual([{ chainId: 1, after: 3, from: 1201n, to: 2199n }]);
+    expect(snap.gaps).toEqual([{ chainId: 1, after: 5, from: 1201n, to: 2199n }]);
   });
 
   it('notes a load-more that read blocks on a chain and found nothing', async () => {
@@ -217,8 +221,8 @@ describe('createView', () => {
     expect(view.key).toBe('1,167000');
     expect(view.reader(167000).chainId).toBe(167000);
     expect(view.reader(11155111)).toBeNull();
-    expect(await view.counts(WORLD_AUTHORS[0])).toEqual({ total: 8n, byChain: { 1: 5n, 167000: 3n } });
-    expect(await view.counts(WORLD_AUTHORS[3])).toEqual({ total: 3n, byChain: { 1: 0n, 167000: 3n } });
+    expect(await view.counts(WORLD_AUTHORS[0])).toEqual({ total: 9n, byChain: { 1: 6n, 167000: 3n } });
+    expect(await view.counts(WORLD_AUTHORS[3])).toEqual({ total: 4n, byChain: { 1: 0n, 167000: 4n } });
   });
 
   it('finds a post on whichever chain holds it', async () => {
@@ -243,6 +247,6 @@ describe('createView', () => {
         },
       }),
     ]);
-    expect(await view.counts(WORLD_AUTHORS[0])).toEqual({ total: null, byChain: { 1: 5n, 167000: null } });
+    expect(await view.counts(WORLD_AUTHORS[0])).toEqual({ total: null, byChain: { 1: 6n, 167000: null } });
   });
 });

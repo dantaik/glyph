@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {Glyph} from "../src/Blog.sol";
 import {Xueni} from "../src/Xueni.sol";
 import {IPublishHook} from "../src/IPublishHook.sol";
 import {FeeHook, RecordingHook, ReenteringHook} from "./mocks/Mocks.sol";
@@ -16,7 +15,9 @@ contract XueniTest is Test {
     bytes32 constant POST_TOPIC = keccak256("Post(address,address,uint256,uint256,bytes32)");
     bytes32 constant TITLE = bytes32("A letter before the solstice");
     bytes constant PAYLOAD = hex"0b0e804a7573742070726f73652e0a0a54776f20706172616772617068732e0a03";
-    bytes4 constant V1_SELECTOR = 0x70a74532;
+    /// The plain call's selector, normative in codec/SPEC.md §6: a change
+    /// here would silently break every encoder that writes calldata for it.
+    bytes4 constant PUBLISH_SELECTOR = 0x70a74532;
 
     Xueni xueni;
     RecordingHook hook;
@@ -29,7 +30,7 @@ contract XueniTest is Test {
         vm.roll(100);
     }
 
-    // --- Plain posts: v1 behaviour, one more topic -------------------------
+    // --- Plain posts -------------------------------------------------------
 
     function test_plainPostMovesTheHeadAndEmits() public {
         vm.expectEmit(true, true, true, true, address(xueni));
@@ -75,16 +76,15 @@ contract XueniTest is Test {
         assertEq(xueni.count(bob), 1);
     }
 
-    function test_thePlainFormIsByteIdenticalToV1() public {
-        bytes memory v1 = abi.encodeCall(Glyph.publish, (TITLE, PAYLOAD));
-        bytes memory v2 = abi.encodeWithSignature("publish(bytes32,bytes)", TITLE, PAYLOAD);
-        assertEq(v2, v1);
-        assertEq(bytes4(v2), V1_SELECTOR);
+    function test_thePlainFormMatchesTheSpecifiedCallData() public {
+        bytes memory call = abi.encodeWithSignature("publish(bytes32,bytes)", TITLE, PAYLOAD);
+        assertEq(bytes4(call), PUBLISH_SELECTOR);
+        assertEq(call, abi.encodePacked(PUBLISH_SELECTOR, abi.encode(TITLE, PAYLOAD)));
 
         vm.expectEmit(true, true, true, true, address(xueni));
         emit Post(alice, address(0), 0, 0, TITLE);
         vm.prank(alice);
-        (bool ok,) = address(xueni).call(v1);
+        (bool ok,) = address(xueni).call(call);
         assertTrue(ok);
     }
 

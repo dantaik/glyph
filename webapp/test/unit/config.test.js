@@ -33,7 +33,7 @@ describe('config — the chain written to', () => {
     window.addEventListener(c.PUBLISH_CHAIN_EVT, heard);
     c.savePublishChainId(167000);
     expect(c.getPublishChainId()).toBe(167000);
-    expect(localStorage.getItem('glyph.publishChain.v1')).toBe('167000');
+    expect(localStorage.getItem('xueni.publishChain.v1')).toBe('167000');
     expect(heard).toHaveBeenCalledTimes(1);
     expect(c.hasOverrides()).toBe(true);
   });
@@ -48,7 +48,7 @@ describe('config — the chain written to', () => {
   });
 
   it('a stored unknown chain reads as none', async () => {
-    localStorage.setItem('glyph.publishChain.v1', '424242');
+    localStorage.setItem('xueni.publishChain.v1', '424242');
     const c = await freshConfig();
     expect(c.getPublishChainId()).toBeNull();
   });
@@ -96,11 +96,11 @@ describe('config — endpoints and rescan delay', () => {
   });
 
   it('migrates a single legacy URL into the env chain list', async () => {
-    localStorage.setItem('glyph.rpc.v1', 'https://legacy.example');
+    localStorage.setItem('xueni.rpc.v1', 'https://legacy.example');
     const c = await freshConfig();
     expect(c.getRpcUrls(1)[0]).toBe('https://legacy.example');
     expect(c.getRpcUrls(1).length).toBeGreaterThan(1);
-    expect(localStorage.getItem('glyph.rpc.v1')).toBeNull();
+    expect(localStorage.getItem('xueni.rpc.v1')).toBeNull();
   });
 
   it('rescan delay: one minute by default, in minutes, with the legacy key honoured', async () => {
@@ -110,16 +110,16 @@ describe('config — endpoints and rescan delay', () => {
     expect(c.getRescanDelayMs()).toBe(300_000);
     c.saveRescanDelay(-3);
     expect(c.getRescanDelayMs()).toBe(60_000);
-    localStorage.setItem('glyph.cacheTtl.v1', '3');
+    localStorage.setItem('xueni.cacheTtl.v1', '3');
     expect(c.getRescanDelayMs()).toBe(180_000);
     c.saveRescanDelay(0);
     expect(c.getRescanDelayMs()).toBe(0);
-    expect(localStorage.getItem('glyph.cacheTtl.v1')).toBeNull();
+    expect(localStorage.getItem('xueni.cacheTtl.v1')).toBeNull();
   });
 
   it('reset forgets every preference, the legacy active chain included', async () => {
     const c = await freshConfig();
-    localStorage.setItem('glyph.chainId.v1', '167000');
+    localStorage.setItem('xueni.chainId.v1', '167000');
     c.savePublishChainId(167000);
     c.saveRpcUrls(1, ['https://x.example']);
     c.saveRescanDelay(9);
@@ -127,7 +127,7 @@ describe('config — endpoints and rescan delay', () => {
     const heard = vi.fn();
     window.addEventListener(c.PUBLISH_CHAIN_EVT, heard);
     c.resetEndpointConfig();
-    expect(localStorage.getItem('glyph.chainId.v1')).toBeNull();
+    expect(localStorage.getItem('xueni.chainId.v1')).toBeNull();
     expect(c.getPublishChainId()).toBeNull();
     expect(c.hasCustomRpcs(1)).toBe(false);
     expect(c.getRescanDelayMs()).toBe(60_000);

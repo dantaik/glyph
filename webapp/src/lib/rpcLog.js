@@ -10,12 +10,12 @@
 // running in the background while the reader shows another), and their
 // lines would be indistinguishable otherwise.
 //
-// On by default. Silence it with `localStorage['glyph.log.v1'] = '0'` (or
+// On by default. Silence it with `localStorage['xueni.log.v1'] = '0'` (or
 // `?log=0`); `?log=1` turns it back on.
 
 import { queryParam } from './router';
 
-const KEY = 'glyph.log.v1';
+const KEY = 'xueni.log.v1';
 
 function enabled() {
   try {
@@ -60,7 +60,7 @@ export const range = (from, to) =>
 function line(chain, kindStyle, kind, method, detail, summary, tail) {
   if (!enabled()) return;
   console.log(
-    `%c glyph %c${chain}%c ${kind}%c ${method} %c${detail}%c ${summary}%c${tail ? ' ' + tail : ''}`,
+    `%c xueni %c${chain}%c ${kind}%c ${method} %c${detail}%c ${summary}%c${tail ? ' ' + tail : ''}`,
     TAG,
     CHAIN,
     kindStyle,

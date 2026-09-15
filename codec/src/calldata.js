@@ -42,17 +42,23 @@ export const PUBLISH_FOR_SIGNATURE = 'publishFor(address,bytes32,bytes,address,b
 export const PUBLISH_FOR_SELECTOR = '0x80e41e43';
 
 /**
- * The event v1's `publish()` emits, whose `title` field is the same bytes32 —
- * informative: decoding events is a client's job, but `decodeTitle` applies
- * to what a log carries exactly as it applies to the calldata.
+ * The event the RETIRED first contract emitted. Kept because this package's
+ * exports are part of its published surface and old logs still decode with
+ * it; nothing in this repository reads that contract any more.
  */
 export const POST_EVENT_SIGNATURE = 'Post(address,uint256,uint256,bytes32)';
-/** keccak256(POST_EVENT_SIGNATURE): topic 0 of every v1 Post log. */
+/** keccak256(POST_EVENT_SIGNATURE): topic 0 of a retired-contract Post log. */
 export const POST_EVENT_TOPIC = '0x5cd0759ab74dbe8f489ac7602146c443e7d2eedf00377e0c113b0466b4ffde5f';
 
-/** The v2 event: the hook a post went through is its second indexed field. */
+/**
+ * The event Xueni's three `publish` forms emit — the current one. Its
+ * `title` field is the same bytes32 the calldata carries, and the hook a
+ * post went through is its second indexed field. Informative: decoding
+ * events is a client's job, but `decodeTitle` applies to what a log carries
+ * exactly as it applies to the calldata.
+ */
 export const POST_V2_EVENT_SIGNATURE = 'Post(address,address,uint256,uint256,bytes32)';
-/** keccak256(POST_V2_EVENT_SIGNATURE): topic 0 of every v2 Post log. */
+/** keccak256(POST_V2_EVENT_SIGNATURE): topic 0 of every Post log on Xueni. */
 export const POST_V2_EVENT_TOPIC = '0xb9b1202ea7165d7724de1f5fd6ae97b9a1b4376c87e1fdbcceb4907f60a78a9d';
 
 /** The zero address: "no hook", as the chain spells it. */

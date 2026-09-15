@@ -21,7 +21,6 @@ import { onChain } from '../chain.js';
 import { imageRefs, rewriteImageRefs } from '../images.js';
 import { help, msg } from '../messages.js';
 import { errorText, fail, note, print, printDoc, printJson } from '../out.js';
-import { defaultContractAddress } from '../shared.js';
 import { readPost, readersFor } from '../walk.js';
 
 export const OPTIONS = {
@@ -75,7 +74,7 @@ export async function run(argv) {
 
   if (values.json) {
     if (values.images) await saveImages(reader, body.markdown, values.images);
-    return printJson(archivePost({ chainId, row, body, contract: defaultContractAddress(row.version ?? 1) }));
+    return printJson(archivePost({ chainId, row, body }));
   }
   if (values.raw) {
     if (values.images) await saveImages(reader, body.markdown, values.images);

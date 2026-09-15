@@ -7,7 +7,7 @@
 //
 // The choice is a preference like the theme: persisted to localStorage,
 // applied to <html lang> so the browser and screen readers agree with the
-// page, and announced on a `glyph:lang` window event so every hook — and a
+// page, and announced on a `xueni:lang` window event so every hook — and a
 // settings file restored on the settings page — takes effect at once,
 // without a reload.
 //
@@ -20,10 +20,10 @@ import { useSyncExternalStore } from 'react';
 import en from './locales/en';
 import zh from './locales/zh';
 
-const KEY_LANG = 'glyph.lang.v1';
+const KEY_LANG = 'xueni.lang.v1';
 
 /** Window event: the interface language changed. */
-export const LANG_EVT = 'glyph:lang';
+export const LANG_EVT = 'xueni:lang';
 
 /** The languages the interface is written in, in the order the switch shows them. */
 export const LANGS = ['en', 'zh'];

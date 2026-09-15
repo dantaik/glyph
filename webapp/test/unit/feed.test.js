@@ -57,7 +57,7 @@ describe('FeedController', () => {
     expect(store.feedScanHead()).toBe('2999');
     expect(store.coveredPosts()).toHaveLength(14);
     expect(snap.refreshedAt).toBeGreaterThan(0);
-    expect(JSON.parse(localStorage.getItem('glyph.feedScan.v2.201')).rows).toHaveLength(14);
+    expect(JSON.parse(localStorage.getItem('xueni.feedScan.v3.201')).rows).toHaveLength(14);
   });
 
   it('ensureFresh is a no-op while the last refresh is inside the rescan delay', async () => {

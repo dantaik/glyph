@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { contractAddress, isReadChain } from '../lib/config';
+import { XUENI_ADDRESS, isReadChain } from '../lib/config';
 import { chainName, etherscanTxUrl, fmtAbsTime, shortAddr } from '../lib/format';
 import { hookInfo } from '../lib/hookRegistry';
 import { useT } from '../lib/i18n';
@@ -61,7 +61,7 @@ export default function RelayPanel({ chainId, reader = null, disabled = false })
     });
     if (!ticket) return out;
     if (!isReadChain(ticket.chainId)) out.push(t('relay.unknownChain', { id: ticket.chainId }));
-    else if (ticket.contract !== String(contractAddress(2)).toLowerCase()) {
+    else if (ticket.contract !== String(XUENI_ADDRESS).toLowerCase()) {
       out.push(t('relay.wrongContract', { contract: ticket.contract }));
     }
     if (ticketExpired(ticket)) out.push(t('relay.expired'));

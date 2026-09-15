@@ -19,32 +19,19 @@ const taikoHoodi = {
 };
 
 /**
- * The canonical CREATE2 deployment — identical on every EVM chain, so it is
- * a constant rather than configuration. It lives here, in the registry that
- * plain Node can load (the e2e mock node and the command-line tool both
- * import this file); config.js re-exports it and applies the build-time
- * override for a private redeploy.
+ * The canonical CREATE2 deployment — Xueni.sol, identical on every EVM
+ * chain, so it is a constant rather than configuration. It lives here, in
+ * the registry that plain Node can load (the e2e mock node and the
+ * command-line tool both import this file); config.js re-exports it and
+ * applies the build-time override for a private redeploy.
  */
-export const DEFAULT_GLYPH_ADDRESS = '0x000000AE2f2249c497cfc5F262dd1491634C361C';
+export const DEFAULT_XUENI_ADDRESS = '0x0000003CE1a46C7Fbb02B9E1a0A4709AD9cb15d9';
 
-/**
- * The second contract — Xueni.sol: per-post hooks, and publishing on an
- * author's behalf against their signature. Mined for the same proxy, so it
- * too sits at one address on every chain. On a chain where it is not yet
- * deployed, reading it finds nothing, which is exactly what an author with
- * no v2 posts looks like; so every chain is read on both contracts always.
- */
-export const DEFAULT_XUENI_ADDRESS = '0x0000008D02020df6bCDD56A888cFC9eD9b9053eC';
+/** The fan-out hook deployed beside it (contracts/src/hooks/MultiHook.sol). */
+export const DEFAULT_MULTI_HOOK_ADDRESS = '0x0000098B1F5b2Fb1F7251Af47F8df15eb319ed10';
 
-/** The fan-out hook deployed beside v2 (contracts/src/hooks/MultiHook.sol). */
-export const DEFAULT_MULTI_HOOK_ADDRESS = '0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93';
-
-/** Every contract version a chain is read on, oldest first. */
-export const CONTRACT_VERSIONS = [1, 2];
-
-/** The built-in address of each version — plain Node's view of the deployment. */
-export const defaultContractAddress = (version) =>
-  Number(version) === 2 ? DEFAULT_XUENI_ADDRESS : DEFAULT_GLYPH_ADDRESS;
+/** The built-in address — plain Node's view of the deployment. */
+export const defaultContractAddress = () => DEFAULT_XUENI_ADDRESS;
 
 export const CHAINS = {
   1: {
@@ -64,9 +51,9 @@ export const CHAINS = {
     // "Load earlier posts" click. Blocks already read are free and don't count.
     // 270,000 blocks ≈ 37 days of Ethereum at 12s a block.
     scanBlocks: 270_000,
-    // The block the contract was deployed in (tx 0x5f16…ce9a). No block
+    // The block the contract was deployed in (tx 0xe375…d4b8). No block
     // below it can hold a Post event, so no sweep ever reads that far.
-    deployBlock: 25_888_250,
+    deployBlock: 25_980_697,
     wallet: {
       chainName: 'Ethereum Mainnet',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -86,8 +73,8 @@ export const CHAINS = {
     // Per scan (see Ethereum above). 270,000 blocks ≈ 6 days of Taiko at
     // ~2s a block.
     scanBlocks: 270_000,
-    // Deployment tx 0x6c66…dae7.
-    deployBlock: 10_863_505,
+    // Deployment tx 0xea2f…a81f.
+    deployBlock: 11_413_668,
     wallet: {
       chainName: 'Taiko Alethia',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },

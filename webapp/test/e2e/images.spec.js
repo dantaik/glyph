@@ -43,7 +43,7 @@ test.describe('images in a post', () => {
 
     // …and the preview draws it.
     await page.getByRole('button', { name: 'Preview' }).click();
-    await expect(page.locator('.prose-glyph img')).toHaveCount(1);
+    await expect(page.locator('.prose-xueni img')).toHaveCount(1);
   });
 
   test('an image already on chain is referenced again, not paid for again', async ({ page }) => {

@@ -96,9 +96,9 @@ describe('MergedFeed — edges', () => {
     // page until its block's header has been read.
     const snap = await until(() => {
       const s = view.feed.getSnapshot();
-      return s.rows.length === 12 && s.rows.every((r) => r.tsExact) ? s : null;
+      return s.rows.length === 14 && s.rows.every((r) => r.tsExact) ? s : null;
     });
-    expect(snap.chains[0].total).toBe(12);
+    expect(snap.chains[0].total).toBe(14);
   });
 
   it('a chain whose node fails mid-sweep keeps what it read and says what failed', async () => {

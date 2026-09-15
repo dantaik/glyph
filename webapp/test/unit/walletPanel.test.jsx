@@ -98,7 +98,7 @@ describe('WalletPanel', () => {
     expect(pressed('Ethereum')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Taiko' }));
     expect(pressed('Taiko')).toBeTruthy();
-    expect(localStorage.getItem('glyph.publishChain.v1')).toBe('167000');
+    expect(localStorage.getItem('xueni.publishChain.v1')).toBe('167000');
   });
 
   it('connects on request and offers the author page', async () => {

@@ -16,7 +16,7 @@
 // across chains.
 
 import { getCachedBodies } from './cache';
-import { parsePostRef } from './glyphRefs';
+import { parsePostRef } from './postRefs';
 import { getScanStore } from './scanStore';
 
 /** The relations a post can declare about another post (spec §5.1). */

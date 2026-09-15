@@ -308,7 +308,7 @@ export default {
   'archive.applied': ({ posts, images, skipped }) =>
     `新增 ${posts} 篇文章和 ${images} 张图片，其中 ${skipped} 篇本来就在。`,
   'archive.notJson': '不是有效的 JSON 文件。',
-  'archive.notArchive': '这不是存档文件（缺少 glyph.archive 标记）。',
+  'archive.notArchive': '这不是存档文件（缺少 xueni.archive 标记）。',
   'archive.wrongVersion': ({ version }) => `不支持版本 ${version} 的存档。`,
   'archive.wrongContract': ({ contract }) => `这个存档来自另一份合约部署（${contract}）。`,
   'archive.droppedPosts': ({ count }) => `忽略 ${count} 篇格式错误或链未知的文章。`,
@@ -427,7 +427,7 @@ export default {
   // --- 读取设置文件 --------------------------------------------------------
   'settingsFile.notJson': '不是有效的 JSON 文件。',
   'settingsFile.notObject': '文件内容不是一个设置对象。',
-  'settingsFile.notGlyph': '这不是雪泥的设置文件（缺少 glyph.settings 标记）。',
+  'settingsFile.notXueni': '这不是雪泥的设置文件（缺少 xueni.settings 标记）。',
   'settingsFile.badFormat': ({ format, supported }) =>
     `设置文件格式版本 ${format} 不受支持（本版本支持 ${supported}）。`,
   'settingsFile.rpcsShape': 'rpcs 应是按链 ID 分组的节点列表。',
@@ -474,7 +474,6 @@ export default {
   'chain.taikoHoodi': 'Taiko Hoodi 测试网',
 
   // --- 第二份合约：钩子，以及由他人代发的文章 ------------------------------
-  'post.contractVersion': ({ version }) => (Number(version) === 2 ? 'Xueni' : 'Glyph'),
   'post.viaHook': '经由钩子',
   'post.relayedBy': '由他人代为发送：',
   'post.hookMark': '钩子',
@@ -492,7 +491,6 @@ export default {
   'hooks.heading': '钩子',
   'hooks.note':
     '可选。钩子是一份在发布过程中运行的合约：它可以拒绝这篇文章、为它收费、把它编入索引，或把它记入某个刊物。文章仍然属于你；钩子只是在它之外多做一些事。本应用从不运行钩子的代码，只显示一篇文章经过了哪个钩子。',
-  'hooks.notDeployed': ({ chain }) => `钩子需要 Xueni，而它尚未部署到${chain}；这篇文章将发布到原合约。`,
   'hooks.target': ({ chain }) => `这篇文章将发布到${chain}上的 Xueni。`,
   'hooks.mode': '钩子',
   'hooks.none': '无',

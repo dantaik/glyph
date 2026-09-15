@@ -19,7 +19,7 @@
 // such an entry is re-filed under the scoped key the first time it is
 // asked for instead of being fetched again.
 
-const DB_NAME = 'glyph-cache';
+const DB_NAME = 'xueni-cache';
 /** 1: bodies + images. 2: adds `drafts`. */
 const DB_VERSION = 2;
 

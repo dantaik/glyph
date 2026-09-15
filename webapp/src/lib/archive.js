@@ -17,15 +17,15 @@
 
 import { base64ToBytes, bytesToBase64 } from './base64';
 import { getCachedBody, setCachedBody, setCachedImage } from './cache';
-import { CONTRACTS, GLYPH_ADDRESS, contractAddress } from './config';
+import { XUENI_ADDRESS } from './config';
 import { t } from './i18n';
 import { isKnownChain } from './chains';
 import { chainName } from './format';
 import { parsePayloadText } from './payloadText';
 import { ADDRESS_RE } from './router';
 
-/** The format version, as `glyph.archive`. Bumping it is breaking the file. */
-export const ARCHIVE_FORMAT = 1;
+/** The format version, as `xueni.archive`. Bumping it is breaking the file. */
+export const ARCHIVE_FORMAT = 2;
 
 /** Every image on chain is WebP: the writers only ever produce that. */
 export const IMAGE_MIME = 'image/webp';
@@ -38,7 +38,7 @@ const num = (v) => (typeof v === 'bigint' ? Number(v) : Number(v ?? 0));
 export const archiveFileName = (scope, now = new Date()) => {
   const day = now.toISOString().slice(0, 10);
   const who = scope?.kind === 'author' ? `-${lower(scope.address).slice(2, 10)}` : '';
-  return `glyph-archive${who}-${day}.xueni.json`;
+  return `xueni-archive${who}-${day}.xueni.json`;
 };
 
 // --- Collecting -----------------------------------------------------------
@@ -61,13 +61,7 @@ const postRecord = (chainId, row, text, compressedBytes) => ({
   title: row.title ?? '',
   text,
   compressedBytes: num(compressedBytes),
-  ...(Number(row.version ?? 1) === 1
-    ? {}
-    : {
-        version: Number(row.version),
-        contract: lower(contractAddress(row.version) ?? ''),
-        hook: row.hook ? lower(row.hook) : null,
-      }),
+  hook: row.hook ? lower(row.hook) : null,
 });
 
 /**
@@ -165,18 +159,11 @@ export async function collectAuthorArchive(view, author, { onProgress = null, no
     done += mine.length;
     posts.push(...part.posts);
     images.push(...imageRecords(reader.chainId, part.images));
-    // The author has a list on each contract; `heads` is where each was
-    // walked from, `head` the newest of them (the field older readers know).
-    const heads = {};
-    for (const version of reader.versions ?? [1]) {
-      const own = mine.filter((r) => Number(r.version ?? 1) === Number(version));
-      if (own.length) heads[version] = Math.max(...own.map((r) => num(r.block)));
-    }
     authors.push({
       chainId: reader.chainId,
       address: lower(author),
+      // Where the walk started: the author's newest post on this chain.
       head: mine.length ? Math.max(...mine.map((r) => num(r.block))) : 0,
-      heads,
       // Nothing left to walk on any chain, so this chain's part is whole.
       complete: !list.getSnapshot().hasMore,
     });
@@ -186,12 +173,10 @@ export async function collectAuthorArchive(view, author, { onProgress = null, no
 
 function build({ scope, posts, images, authors, now }) {
   return {
-    glyph: { archive: ARCHIVE_FORMAT },
+    xueni: { archive: ARCHIVE_FORMAT },
     exportedAt: now.toISOString(),
-    // `contract` names the journal (v1's address, which older readers check);
-    // `contracts` names every contract a post here may live on.
-    contract: GLYPH_ADDRESS,
-    contracts: Object.fromEntries(CONTRACTS.map((c) => [c.version, c.address])),
+    // `contract` names the journal every post here lives on.
+    contract: XUENI_ADDRESS,
     scope,
     posts,
     images,
@@ -232,14 +217,14 @@ export function parseArchive(text) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { doc: null, problems: [t('archive.notArchive')], summary: [] };
   }
-  const version = raw.glyph?.archive;
+  const version = raw.xueni?.archive;
   if (version == null) return { doc: null, problems: [t('archive.notArchive')], summary: [] };
   if (Number(version) !== ARCHIVE_FORMAT) {
     return { doc: null, problems: [t('archive.wrongVersion', { version })], summary: [] };
   }
   // A bundle from another deployment describes a different journal, and
   // merging the two silently would be worse than refusing.
-  if (raw.contract && lower(raw.contract) !== lower(GLYPH_ADDRESS)) {
+  if (raw.contract && lower(raw.contract) !== lower(XUENI_ADDRESS)) {
     return { doc: null, problems: [t('archive.wrongContract', { contract: raw.contract })], summary: [] };
   }
 
@@ -274,7 +259,7 @@ export function parseArchive(text) {
   if (whole.length > 0) summary.push(t('archive.completeAuthors', { count: whole.length }));
 
   return {
-    doc: { ...raw, glyph: { archive: ARCHIVE_FORMAT }, posts, images, authors },
+    doc: { ...raw, xueni: { archive: ARCHIVE_FORMAT }, posts, images, authors },
     problems,
     summary,
   };
@@ -332,7 +317,6 @@ export async function applyArchive(doc, readers) {
         eventIndex: post.eventIndex ?? 0,
         logIndex: post.logIndex,
         ts: post.ts,
-        version: post.version ?? 1,
         hook: post.hook ?? null,
       },
     ]);
@@ -350,16 +334,11 @@ export async function applyArchive(doc, readers) {
   }
 
   // An author walked to their first post: their page needs no node at all.
-  // Each contract's list has its own head; a bundle written before v2 names
-  // one head, which is v1's.
   for (const author of doc.authors) {
     if (!author.complete) continue;
     const reader = byChain.get(Number(author.chainId));
     if (!reader) continue;
-    const heads = author.heads && typeof author.heads === 'object' ? author.heads : { 1: author.head ?? 0 };
-    for (const [version, head] of Object.entries(heads)) {
-      reader.store.setAuthorScanHead(author.address, head ?? 0, Number(version));
-    }
+    reader.store.setAuthorScanHead(author.address, author.head ?? 0);
   }
 
   for (const reader of byChain.values()) {

@@ -9,13 +9,13 @@
       // reader who chose 中文 never sees a flash of the English default.
       (function () {
         try {
-          var t = localStorage.getItem('glyph.theme.v1');
+          var t = localStorage.getItem('xueni.theme.v1');
           var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
           var d = document.documentElement;
           d.classList.toggle('dark', dark);
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute('content', dark ? '#16181c' : '#f7f8fa');
-          if (localStorage.getItem('glyph.lang.v1') === 'zh') {
+          if (localStorage.getItem('xueni.lang.v1') === 'zh') {
             d.lang = 'zh-CN';
             document.title = '\u96EA\u6CE5';
           }

@@ -2,14 +2,14 @@
 
 The conversion between a [Xueni](../README.md) post as a person sees it — a title, some tags, a
 Markdown body, a little front-matter — and the call data of the `publish()` call that stores it on
-chain (the plain call both contracts take, or the second contract's two others: through a hook, and
-on an author's behalf), in both directions, as **pure functions**: no wallet, no node, no I/O, no
+chain (the plain call, or the two others: through a hook, and on an author's behalf), in both
+directions, as **pure functions**: no wallet, no node, no I/O, no
 dependencies. A post in, `0x…` out; `0x…` in, the post out. Given the same compressor, the same
 input always gives the same bytes.
 
 **The specification is [`SPEC.md`](./SPEC.md).** It is normative and versioned; this package is its
 reference implementation, and the test suite here is the conformance suite. The design of the whole
-system — why a post is shaped like this — is [`../glyph-spec.md`](../glyph-spec.md).
+system — why a post is shaped like this — is [`../xueni-spec.md`](../xueni-spec.md).
 
 ## The four forms of a post
 
@@ -57,7 +57,7 @@ back.call;                                     // { form: 'publish', hook: null,
 
 const { text, payload, title, callData: same } = encodePost(post);   // every layer at once: a dry run
 
-// The second contract's two other calls: the same post, through a hook …
+// The two other calls: the same post, through a hook …
 const hooked = postToCallData(post, { hook, hookData });                       // '0xcf5f0bff…'
 // … or submitted by someone else against the author's EIP-712 signature.
 const relayed = encodeRelayedPost(post, { author, deadline, signature }).callData;   // '0x80e41e43…'
@@ -93,7 +93,7 @@ Everything below is exported from `xueni-codec`; `xueni-codec/node` re-exports i
 
 | Function | |
 | --- | --- |
-| `postToCallData(post, { brotli, version?, maxDocumentBytes?, hook?, hookData? })` | `0x…` call data: the plain call, or with a hook (other than the zero address) or hook data given, the second contract's four-argument call. Throws `InvalidPostError` with every problem, `UnsupportedFormatVersionError`, or `DocumentTooLargeError`. |
+| `postToCallData(post, { brotli, version?, maxDocumentBytes?, hook?, hookData? })` | `0x…` call data: the plain call, or with a hook (other than the zero address) or hook data given, the four-argument call. Throws `InvalidPostError` with every problem, `UnsupportedFormatVersionError`, or `DocumentTooLargeError`. |
 | `callDataToPost(callData, { brotli, maxDocumentBytes? })` | `{ version, title, tags, markdown, meta, text, compressedBytes, call }`, any of the three forms; `call` is `{ form, title, payload, hook, hookData, relayed }`, with `relayed` = `{ author, deadline, signature }` for a `publishFor` call and `null` otherwise. Throws `MalformedCallDataError`, `MalformedPayloadError`, `UnsupportedFormatVersionError`, `DocumentTooLargeError`. |
 | `encodePost(post, { brotli, version?, maxDocumentBytes?, hook?, hookData? })` | `{ version, title, text, payload, callData }` — every intermediate form, for a dry run or a cost estimate. |
 | `encodeRelayedPost(post, { brotli, author, deadline, signature, hook?, hookData?, version?, maxDocumentBytes? })` | the same, with `callData` a `publishFor()` call and `author` echoed. The signature is the author's over the contract's EIP-712 digest (`Xueni.publishDigest`); making it is a wallet's job, this takes the bytes. |
@@ -123,8 +123,8 @@ call, or the hooked one); `encodePublishForCallData({ author, title, payload, ho
 any of the three; `callDataForm(hex | bytes)` → `'publish' | 'publishWithHook' | 'publishFor' | null`;
 `isPublishCallData`; `CALL_FORMS`; `PUBLISH_SELECTOR` (`0x70a74532`), `PUBLISH_WITH_HOOK_SELECTOR`
 (`0xcf5f0bff`), `PUBLISH_FOR_SELECTOR` (`0x80e41e43`) and their `…_SIGNATURE`s; `POST_EVENT_TOPIC`
-(the first contract's event), `POST_V2_EVENT_TOPIC` (the second's, with the hook indexed) and their
-signatures; `ZERO_ADDRESS`.
+(the retired first contract's event, kept for old logs), `POST_V2_EVENT_TOPIC` (Xueni's, with the
+hook indexed — the one a reader wants) and their signatures; `ZERO_ADDRESS`.
 
 **Errors** — all `CodecError`s with a stable `.code`: `InvalidPostError` (`.problems`),
 `UnsupportedFormatVersionError` (`.version`, `.supported`), `MalformedPayloadError`,

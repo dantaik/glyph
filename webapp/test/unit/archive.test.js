@@ -14,7 +14,7 @@ import { NOW } from './mergedHelpers';
 let archive;
 let base64;
 let cache;
-let GLYPH_ADDRESS;
+let XUENI_ADDRESS;
 let buildWorlds;
 let createReader;
 let createScanStore;
@@ -27,7 +27,7 @@ beforeEach(async () => {
   archive = await import('../../src/lib/archive');
   base64 = await import('../../src/lib/base64');
   cache = await import('../../src/lib/cache');
-  ({ GLYPH_ADDRESS } = await import('../../src/lib/config'));
+  ({ XUENI_ADDRESS } = await import('../../src/lib/config'));
   ({ buildWorlds } = await import('../../src/lib/fixtureWorld'));
   ({ createReader } = await import('../../src/lib/reader'));
   ({ createScanStore } = await import('../../src/lib/scanStore'));
@@ -70,8 +70,8 @@ describe('exporting what this browser has read', () => {
     expect(rows.length).toBeGreaterThan(1);
 
     const doc = await archive.collectBrowserArchive([reader]);
-    expect(doc.glyph).toEqual({ archive: archive.ARCHIVE_FORMAT });
-    expect(doc.contract).toBe(GLYPH_ADDRESS);
+    expect(doc.xueni).toEqual({ archive: archive.ARCHIVE_FORMAT });
+    expect(doc.contract).toBe(XUENI_ADDRESS);
     expect(doc.scope).toEqual({ kind: 'browser' });
     expect(new Date(doc.exportedAt).toString()).not.toBe('Invalid Date');
     expect(doc.posts).toHaveLength(rows.length);
@@ -164,26 +164,30 @@ describe('exporting what this browser has read', () => {
 
   it('names the file after the day, and after the author when there is one', () => {
     const day = new Date('2026-09-04T10:00:00Z');
-    expect(archive.archiveFileName({ kind: 'browser' }, day)).toBe('glyph-archive-2026-09-04.xueni.json');
+    expect(archive.archiveFileName({ kind: 'browser' }, day)).toBe('xueni-archive-2026-09-04.xueni.json');
     expect(archive.archiveFileName({ kind: 'author', address: A0 }, day)).toMatch(
-      /^glyph-archive-8a1f3b52-2026-09-04\.xueni\.json$/,
+      /^xueni-archive-8a1f3b52-2026-09-04\.xueni\.json$/,
     );
   });
 });
 
 describe('reading a bundle back', () => {
-  const doc = (body) => JSON.stringify({ glyph: { archive: 1 }, contract: GLYPH_ADDRESS, ...body });
+  const doc = (body) => JSON.stringify({ xueni: { archive: archive.ARCHIVE_FORMAT }, contract: XUENI_ADDRESS, ...body });
 
   it('refuses a file that is not one of ours', () => {
     expect(archive.parseArchive('nonsense').problems[0]).toMatch(/valid JSON/);
     expect(archive.parseArchive('[1,2]').problems[0]).toMatch(/not an archive/);
     expect(archive.parseArchive('{"posts":[]}').problems[0]).toMatch(/not an archive/);
-    expect(archive.parseArchive(JSON.stringify({ glyph: { archive: 2 } })).problems[0]).toMatch(/version 2/);
+    expect(archive.parseArchive(JSON.stringify({ xueni: { archive: 1 } })).problems[0]).toMatch(/version 1/);
   });
 
   it('refuses a bundle from a different deployment of the contract', () => {
     const other = archive.parseArchive(
-      JSON.stringify({ glyph: { archive: 1 }, contract: '0x1111111111111111111111111111111111111111', posts: [] }),
+      JSON.stringify({
+        xueni: { archive: archive.ARCHIVE_FORMAT },
+        contract: '0x1111111111111111111111111111111111111111',
+        posts: [],
+      }),
     );
     expect(other.doc).toBeNull();
     expect(other.problems[0]).toMatch(/different deployment/);
@@ -286,8 +290,8 @@ describe('importing into a browser that has read nothing', () => {
     const bytes = new Uint8Array([9, 8, 7]);
     const parsed = archive.parseArchive(
       JSON.stringify({
-        glyph: { archive: 1 },
-        contract: GLYPH_ADDRESS,
+        xueni: { archive: archive.ARCHIVE_FORMAT },
+        contract: XUENI_ADDRESS,
         posts: [
           {
             chainId: 1,
