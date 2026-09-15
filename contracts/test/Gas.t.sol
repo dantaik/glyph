@@ -114,7 +114,7 @@ contract GasProbe {
 ///         base, the same calldata and the same cold-access charges to every
 ///         one of these, and under EIP-7623 the calldata floor (10 gas per
 ///         token) usually swallows the whole execution anyway — see
-///         glyph-spec §4.1.
+///         glyph-spec §4.
 ///
 ///         The bounds are regression guards, not targets: a change that
 ///         makes the plain post cost more than one extra topic over v1, or

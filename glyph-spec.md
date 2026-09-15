@@ -151,7 +151,13 @@ block-linked list — and the body still lives only in the transaction's calldat
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IPublishHook} from "./IPublishHook.sol";   // the one interface a hook implements (below)
+
 contract Xueni {
+    error ValueWithoutHook();                      // ETH sent with no hook to forward it to
+    error NotAHook(address hook);                  // the named hook has no code
+    error HookRejected(address hook, bytes4 returned);
+
     struct AuthorState {
         uint96 latestBlock; // 0 = author has never posted
         uint48 count;       // total posts by this author (== next post's index)
@@ -173,6 +179,10 @@ contract Xueni {
     function count(address author) external view returns (uint256) {
         return _authors[author].count;
     }
+
+    // The other two doors — publish(…, hook, hookData) and publishFor(…),
+    // with the EIP-712 machinery the second needs — are below; all three
+    // land in the same `_publish`.
 
     /// @notice Publish one article.
     ///         `payload` rides in the tx calldata only — the contract never
@@ -708,11 +718,11 @@ code, and any tool that reads JSON can read it decades from now.
 
 - `scope.kind` is `browser` (everything cached) or `author` (with `address`).
 - `glyph.archive` is the **format version, 2**; a file at any other version is refused rather than
-  half-read. Version 1 was written while a post could live on either of two contracts, and carried a
-  `version` and a `contract` on a row and a `contracts` map at the top of the document. There is one
-  contract now (§4), so a row carries neither: `contract` names it once, for the whole file, and a
-  bundle whose `contract` is not this build's is refused rather than merged, because it describes a
-  different journal.
+  half-read. Version 1 was the format written while a post could live on either of two contracts: a
+  row could carry a `version` and the `contract` it lived on, and the document a `contracts` map.
+  There is one contract now (§4), so a row carries neither, `contract` names it once for the whole
+  file, and a bundle whose `contract` is not this build's is refused rather than merged, because it
+  describes a different journal.
 - Every post carries the `hook` it went through — an address, or `null` for a plain post. It is the
   one thing about a post that `(chainId, author, index)` and the text together do not say.
 - `posts[].text` is the exact **decompressed** document, so nothing has to be decoded to read a bundle.
@@ -778,10 +788,10 @@ code, and any tool that reads JSON can read it decades from now.
 | Scan coverage | localStorage records **a set of ranges** already scanned, rather than one frontier | Paging back only fills unread gaps; a range already scanned is never scanned again |
 | Request de-duplication | indexed within a session by (author, index) / (txHash, event index) | One post is requested from the node at most once per session, whichever page it is reached from |
 | Interface language | English by default, switchable to Chinese; the choice is stored in `localStorage` (`glyph.lang.v1`) and applied without a reload | The interface is a presentation layer over on-chain content; a post stays in the language it was written in |
-| Extending the protocol | A second contract (`Xueni.sol`) with **one optional hook per post**, named by the author in the call, called once after the post is recorded, with the call's ETH forwarded; no registry, no permission flags, the hook an indexed event topic | Uniswap v4's lesson, trimmed to a journal: an immutable core plus third-party code at one fixed point inside the transaction lets publications, fees, indexes and collectibles be built by anyone without touching the core; effects-before-call means no hook can change who wrote what |
+| Extending the protocol | **One optional hook per post**, named by the author in the call, called once after the post is recorded, with the call's ETH forwarded; no registry, no permission flags, the hook an indexed event topic | Uniswap v4's lesson, trimmed to a journal: an immutable core plus third-party code at one fixed point inside the transaction lets publications, fees, indexes and collectibles be built by anyone without touching the core; effects-before-call means no hook can change who wrote what |
 | Publishing for someone else | `publishFor` in the core, against the author's EIP-712 signature, with the author's next post index as the nonce | A hook runs after authorship is decided, so relaying cannot be a hook; the index as nonce keeps signatures in order, unreplayable, and cancellable by the author's own next post |
 | Composing hooks | One hook in the core; `MultiHook` fans a post out to several, each with its own data and share of the ETH | The core stays one call and one check; composition is a hook's business, and a fan-out that trusts the core is all it takes |
-| Two contracts per chain | Every surface reads v1 and v2 together, a post carries a `version`, and the write tab targets v2 where it is deployed | v1 is immutable and its posts are forever; the reader treats the pair as one journal rather than asking authors to move |
+| One contract per chain | Every surface reads `Xueni` and nothing else; the earlier contract (`Blog.sol`, contract name `Glyph`) stays on chain, immutable, but nothing here reads it and its posts do not appear in the app | Reading two contracts and merging them made a post's identity a triple rather than a pair: every cached row, every archived post and every scan snapshot had to carry which contract it came from, and every surface had to merge two streams that could never interleave in a way a reader would notice. One contract is one head pointer, one index sequence and one walk per author per chain. The posts left on the earlier contract are not lost — it is immutable and they are readable through any explorer — they are simply not this journal any more |
 
 ---
 
@@ -808,33 +818,59 @@ browser tests use, and compare its bytes with `encodePayload`'s.
 
 **Deployment (Foundry)**
 ```bash
-forge create src/Blog.sol:Glyph \
-  --rpc-url $ETH_RPC --private-key $PK \
-  --broadcast --verify --etherscan-api-key $ETHERSCAN_KEY
+forge script script/Create2DeployXueni.s.sol:Create2DeployXueni \
+  --rpc-url $ETH_RPC --broadcast
+# PRIVATE_KEY comes from the environment. Both contracts go through the
+# canonical deterministic deployment proxy (Arachnid,
+# 0x4e59b44847b379578588920cA78FbF26c0B4956C) with fixed salts, so each lands
+# at ONE address on every EVM chain. The script is idempotent: an address
+# that already holds code is verified and skipped.
 # The deployer holds no privilege. Anyone's wallet can deploy this contract,
 # and every writer shares the one deployment.
 ```
 
+```
+Xueni:      0x0000008D02020df6bCDD56A888cFC9eD9b9053eC   (6 leading zeros)
+  salt            0x0603693f73b74be0d29d96d4ceac3d45c73a32d3190edd048fc2347fcfdf7c56
+  init code hash  0x21bb8135a2cf7b4ce30e0c2ca8354801651767f9115a0b9b06f188f09dbb7fe6
+MultiHook:  0x00000e2b71d66E5fEDA58A70e6D5AE3762a18D93   (5 leading zeros; its init code embeds the Xueni address)
+```
+
+**The deployment record**
+
+| Contract | Chain | Block | Transaction |
+|---|---|---|---|
+| Xueni | Ethereum mainnet (1) | 25,979,882 | `0x864cf1582f60100b988fe56fac346d9baa681700461a064c78ee8f41976f4b2f` |
+| Xueni | Taiko mainnet (167000) | 11,408,820 | `0xdb0a1b26af7199869573d35a72f912e9fea46f637dcd434fe6536bea43515d48` |
+| MultiHook | Ethereum mainnet (1) | 25,979,883 | `0x9a344d13993d5007a33acfda0c18a137b81aead30333afaa56f5bbcdf0bb5277` |
+| MultiHook | Taiko mainnet (167000) | 11,408,820 | `0xc38e65e01d5f7158e2d0b60059a2ff4d5da7398ea410c6d2194c73fc8edda6d6` |
+
+Deployed 2026-09-15 by `0x327fa3369B1D1D42120d84bc407e5865ECa7c458`, which holds no privilege over
+either contract — neither has an owner and neither can be upgraded — and both are verified on
+Etherscan and Taikoscan. Each chain's Xueni deployment block is that chain's `deployBlock` in
+`webapp/src/lib/chains.js`: no block below it can hold a `Post` event, so no sweep ever reads
+further back.
+
 **Front-end configuration**
 
 The contract address is determined by CREATE2 and is the same on every chain, so it is
-built in as a constant in `webapp/src/lib/config.js` (`DEFAULT_GLYPH_ADDRESS`) and needs no
-configuration. The variables below are inlined by Vite **at build time**, and are only
-useful when pointing the app at your own deployment:
+built in as a constant in `webapp/src/lib/chains.js` (`DEFAULT_XUENI_ADDRESS`, re-exported by
+`config.js` where it has always been imported from) and needs no configuration. The variables below
+are inlined by Vite **at build time**, and are only useful when pointing the app at your own
+deployment:
 
 ```bash
 # webapp/.env.local (optional)
-VITE_GLYPH_ADDRESS=0x...          # override the built-in contract address
-VITE_XUENI_ADDRESS=0x...       # override the second contract's address (§4.1)
+VITE_XUENI_ADDRESS=0x...          # override the built-in contract address
 VITE_MULTI_HOOK_ADDRESS=0x...     # override the fan-out hook's address
 VITE_RPC_URL=https://...          # the default RPC (overridable in the UI settings)
 VITE_CHAIN_ID=1                   # 1=mainnet, 11155111=sepolia
 ```
 
-The second contract and the fan-out hook have CREATE2 addresses of their own (`DEFAULT_XUENI_ADDRESS`,
-`DEFAULT_MULTI_HOOK_ADDRESS` in `chains.js`; the salts are pinned in `script/Create2DeployXueni.s.sol`),
-and the app reads them on every chain whether or not they are deployed there yet: a chain without
-them reads as empty.
+A changed `Xueni.sol` is a different address, which is what those two overrides are for. Both
+addresses (`DEFAULT_XUENI_ADDRESS` and `DEFAULT_MULTI_HOOK_ADDRESS` in `chains.js`; the salts that
+fix them are pinned in `script/Create2DeployXueni.s.sol`) are read on every chain the app knows,
+deployed there or not: a chain without them reads as empty.
 
 To read, visit `https://your-site/?author=0xAUTHOR_ADDRESS` for that author's title list;
 **with no author parameter you get the newest N posts network-wide (a scan of recent blocks)**.
